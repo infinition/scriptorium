@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Scriptorium</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Newsreader:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Syntax highlighting (code blocks) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/styles/github-dark.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/lib/common.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/rust.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/go.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/yaml.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/dockerfile.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/latex.min.js"></script>
+
+<!-- Math rendering (LaTeX) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="backdrop" id="backdrop"></div>
+
+  <!-- SIDEBAR (LEFT) -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">Scriptorium<span class="brand-dot">.</span></div>
+      <div class="header-actions">
+        <button class="icon-btn" id="searchBtn" title="Rechercher (Ctrl+P)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+        <button class="icon-btn" id="openSettingsBtn" title="Dossier de travail">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <button class="icon-btn" id="openFolderBtn" title="Ouvrir dans l'explorateur">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="new-btn" id="newDocBtn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      Nouveau texte
+      <span class="shortcut">Ctrl+N</span>
+    </button>
+
+    <nav class="nav" id="nav"></nav>
+
+    <button class="add-section-btn" id="addSectionBtn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      Nouvelle section
+    </button>
+
+    <div class="sidebar-footer">
+      <span class="dot"></span>
+      <span class="workspace-label" id="workspaceLabel" title="Workspace actuel">Local</span>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="importBtn" title="Importer des fichiers .md / .txt">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN AREA (CENTER) -->
+  <main class="main">
+
+    <div class="topbar" id="topbar">
+      <button class="icon-btn mobile-menu" id="mobileMenuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+
+      <div class="breadcrumb" id="breadcrumb">
+        <span>—</span>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="save-indicator saved" id="saveIndicator">
+          <span class="dot"></span>
+          <span id="saveText">Enregistré</span>
+        </div>
+
+        <button class="clear-highlight-btn hidden" id="clearHighlightBtn" title="Effacer le surlignage">
+          <span id="highlightQueryLabel"></span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+
+        <button class="icon-btn hidden" id="previewToggle" title="Aperçu (Ctrl+P)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+
+        <button class="icon-btn" id="focusToggle" title="Mode focus (F)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+
+        <button class="icon-btn mobile-ideas" id="mobileIdeasBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="1.5"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="19" r="1.5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="editor-wrap" id="editorWrap">
+      <div class="editor-container" id="editorContainer">
+        <div class="editor-pane" id="editorPane">
+          <div class="doc-meta" id="docMeta"></div>
+          <textarea class="title-input" id="title" placeholder="Sans titre" rows="1" autocomplete="off"></textarea>
+          <textarea class="subtitle-input" id="subtitle" placeholder="Sous-titre, ou une ligne pour situer le texte" rows="1" autocomplete="off"></textarea>
+          <div class="content-area" id="content" contenteditable="true" placeholder="Commence à écrire…" spellcheck="false"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLE OF CONTENTS -->
+    <aside class="toc-aside empty" id="tocAside">
+      <button class="toc-top-btn" id="tocTopBtn" title="Retour en haut">Sur cette page</button>
+      <div class="toc-wrap">
+        <svg class="toc-svg" id="tocSvg" aria-hidden="true">
+          <path id="tocPath" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <ul class="toc-list" id="tocList"></ul>
+      </div>
+    </aside>
+
+    <div class="statusbar">
+      <div class="stat"><strong id="wc">0</strong> mots</div>
+      <div class="stat"><strong id="cc">0</strong> signes</div>
+      <div class="stat"><strong id="rt">0 min</strong></div>
+      <div class="chord-indicator" id="chordIndicator">Ctrl+K…</div>
+      <div class="right">
+        <div class="stat">md</div>
+        <div class="stat" id="cursor">ln 1 · col 1</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- RIGHT PANEL: IDEAS or TOC (switchable) -->
+  <aside class="ideas-panel" id="ideasPanel">
+    <div class="ideas-header">
+      <div class="panel-tabs">
+        <button class="panel-tab active" id="panelTabIdeas">Idées</button>
+        <button class="panel-tab" id="panelTabToc">Sommaire</button>
+      </div>
+      <button class="icon-btn ideas-only" id="importIdeasBtn" title="Importer thème .md">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      </button>
+    </div>
+
+    <!-- IDEAS VIEW -->
+    <div class="ideas-view view-ideas">
+      <div class="themes-tabs" id="themesTabs"></div>
+
+      <div class="ideas-toolbar">
+        <button class="pill-btn active" id="activeTab" data-mode="active">Actives <span id="activeCount" style="opacity: 0.6"></span></button>
+        <button class="pill-btn" id="archiveTab" data-mode="archived">Archive <span id="archivedCount" style="opacity: 0.6"></span></button>
+      </div>
+
+      <div class="ideas-list" id="ideasList"></div>
+
+      <textarea class="idea-add hidden" id="ideaAddInput" placeholder="Nouvelle idée — Entrée pour valider, Échap pour annuler" rows="2"></textarea>
+
+      <div class="ideas-footer">
+        <kbd>clic</kbd> archive · <kbd>clic droit</kbd> insère · <kbd>survol</kbd> texte complet
+      </div>
+    </div>
+
+    <!-- TOC VIEW -->
+    <div class="ideas-view view-toc">
+      <div class="toc-side-top">
+        <button class="toc-top-btn" id="tocTopBtnSide" title="Retour en haut">Sur cette page</button>
+      </div>
+      <div class="toc-wrap" id="tocWrapSide">
+        <svg class="toc-svg" id="tocSvgSide" aria-hidden="true">
+          <path id="tocPathSide" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <ul class="toc-list" id="tocListSide"></ul>
+      </div>
+      <div class="toc-side-empty hidden" id="tocSideEmpty">Aucun titre dans ce document.</div>
+    </div>
+  </aside>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Dossier de travail</h3>
+      <button class="close-btn" id="closeSettingsBtn">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Définissez le dossier local sur votre ordinateur pour lire et enregistrer vos documents et vos thèmes d'idées.</p>
+      <div class="form-group">
+        <label for="workspacePathInput">Chemin absolu du dossier :</label>
+        <input type="text" id="workspacePathInput" placeholder="C:\chemin\vers\votre\dossier" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="cancelSettingsBtn">Annuler</button>
+        <button class="btn btn-primary" id="saveSettingsBtn">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SEARCH PALETTE -->
+<div class="search-modal-overlay" id="searchModalOverlay">
+  <div class="search-modal" role="dialog" aria-label="Recherche">
+    <div class="search-input-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="text" id="searchInput" placeholder="Rechercher dans les documents et les idées…" autocomplete="off" spellcheck="false" />
+      <kbd class="search-esc">Esc</kbd>
+    </div>
+    <div class="search-results" id="searchResults">
+      <div class="search-placeholder">Tapez pour rechercher dans tous vos textes et idées…</div>
+    </div>
+    <div class="search-footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> naviguer</span>
+      <span><kbd>↵</kbd> ouvrir</span>
+      <span><kbd>Esc</kbd> fermer</span>
+      <span class="search-count" id="searchCount"></span>
+    </div>
+  </div>
+</div>
+
+<!-- FLOATING SELECTION TOOLBAR -->
+<div class="sel-toolbar" id="selToolbar" role="toolbar" aria-label="Mise en forme">
+  <button class="sel-btn" data-act="bold" title="Gras (Ctrl+G)"><b>B</b></button>
+  <button class="sel-btn" data-act="italic" title="Italique (Ctrl+I)"><i>I</i></button>
+  <button class="sel-btn" data-act="underline" title="Souligné"><u>U</u></button>
+  <button class="sel-btn" data-act="strike" title="Barré"><s>S</s></button>
+  <button class="sel-btn" data-act="code" title="Code inline">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+  </button>
+  <button class="sel-btn" data-act="link" title="Lien">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+  </button>
+  <span class="sel-sep"></span>
+  <button class="sel-btn sel-btn-text" data-act="h1" title="Titre 1">H1</button>
+  <button class="sel-btn sel-btn-text" data-act="h2" title="Titre 2">H2</button>
+  <button class="sel-btn sel-btn-text" data-act="h3" title="Titre 3">H3</button>
+  <button class="sel-btn" data-act="quote" title="Citation">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+  </button>
+</div>
+
+<!-- GUTTER "+" BUTTON + BLOCK MENU -->
+<button class="block-add-btn" id="blockAddBtn" title="Ajouter un bloc" aria-label="Ajouter un bloc">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<div class="block-menu" id="blockMenu" role="menu" aria-label="Type de bloc">
+  <div class="block-menu-section">Texte</div>
+  <button class="block-menu-item" data-block="p" role="menuitem"><span class="ico">¶</span>Paragraphe</button>
+  <button class="block-menu-item" data-block="h1" role="menuitem"><span class="ico">H1</span>Titre 1<span class="hint">#</span></button>
+  <button class="block-menu-item" data-block="h2" role="menuitem"><span class="ico">H2</span>Titre 2<span class="hint">##</span></button>
+  <button class="block-menu-item" data-block="h3" role="menuitem"><span class="ico">H3</span>Titre 3<span class="hint">###</span></button>
+  <div class="block-menu-sep"></div>
+  <div class="block-menu-section">Listes</div>
+  <button class="block-menu-item" data-block="ul" role="menuitem"><span class="ico">•</span>Liste à puces<span class="hint">-</span></button>
+  <button class="block-menu-item" data-block="ol" role="menuitem"><span class="ico">1.</span>Liste numérotée<span class="hint">1.</span></button>
+  <button class="block-menu-item" data-block="task" role="menuitem"><span class="ico">☐</span>Case à cocher<span class="hint">- [ ]</span></button>
+  <div class="block-menu-sep"></div>
+  <div class="block-menu-section">Blocs</div>
+  <button class="block-menu-item" data-block="quote" role="menuitem"><span class="ico">"</span>Citation<span class="hint">&gt;</span></button>
+  <button class="block-menu-item" data-block="code" role="menuitem"><span class="ico">{}</span>Bloc de code<span class="hint">```</span></button>
+  <button class="block-menu-item" data-block="hr" role="menuitem"><span class="ico">―</span>Séparateur<span class="hint">---</span></button>
+</div>
+
+<!-- GLOBAL DROP OVERLAY -->
+<div class="drop-overlay" id="dropOverlay">
+  <div class="inner">
+    Déposer le(s) fichier .md
+    <div class="hint">Glissez sur une section (gauche) pour importer comme document — sur le panneau idées (droite) pour importer un thème</div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".md,.markdown,.txt" multiple style="display:none" />
+<input type="file" id="ideasFileInput" accept=".md,.markdown,.txt" multiple style="display:none" />
+
+<script defer src="app.js"></script>
+</body>
+</html>

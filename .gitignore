@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Local runtime config (workspace path is per-machine)
+config.json
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artefacts (none today, but keeps future hygiene)
+dist/
+build/
+.cache/
