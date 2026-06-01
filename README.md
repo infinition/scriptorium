@@ -97,6 +97,16 @@ in source.
   stay readable).
 - Fonts: Newsreader (body), Inter (UI), JetBrains Mono (code).
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=infinition%2Fscriptorium&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=infinition/scriptorium&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=infinition/scriptorium&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=infinition/scriptorium&type=date&legend=top-left" />
+ </picture>
+</a>
+
 ## License
 
 ISC. See `package.json`.
