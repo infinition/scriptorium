@@ -18,7 +18,7 @@ Then open `http://localhost:3000`.
 
 On first launch the server reads `config.json` (created next to `server.js`)
 to find your workspace folder. The default points at
-`C:\DEV\coding\nexearch\solutions\manifest` — change it from the gear icon in
+`C:\DEV\coding\nexearch\solutions\manifest`; change it from the gear icon in
 the sidebar, or edit `config.json` directly.
 
 ## Workspace layout
@@ -66,7 +66,7 @@ title and the file gets renamed on next save. Section renames are immediate.
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / redo per-document   |
 
 A floating toolbar appears whenever you select text. A small `+` button shows
-up in the gutter on the active line — click it for headings, lists, checkbox,
+up in the gutter on the active line; click it for headings, lists, checkbox,
 quote, code block, divider.
 
 ## Markdown support
@@ -91,7 +91,7 @@ in source.
 ## Stack
 
 - Node.js + Express on the server side. The whole API is in `server.js`.
-- No framework on the client — `public/{index.html, app.js, style.css}`.
+- No framework on the client: `public/{index.html, app.js, style.css}`.
 - `highlight.js` and `KaTeX` are loaded from a CDN; they degrade gracefully
   if offline (formulas show as inline code, blocks lose syntax colours but
   stay readable).
