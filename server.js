@@ -8,12 +8,21 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Persistent config
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 let workspaceDir = 'C:\\DEV\\coding\\nexearch\\solutions\\manifest';
+let ideasDirSetting = '';
+
+function getIdeasDir() {
+  if (ideasDirSetting && ideasDirSetting.trim() !== '') {
+    return path.resolve(ideasDirSetting.trim());
+  }
+  return path.join(workspaceDir, 'ideas');
+}
 
 function loadConfig() {
   try {
@@ -21,6 +30,9 @@ function loadConfig() {
       const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
       if (data.workspaceDir) {
         workspaceDir = data.workspaceDir;
+      }
+      if (data.ideasDir !== undefined) {
+        ideasDirSetting = data.ideasDir;
       }
     }
   } catch (err) {
@@ -30,7 +42,7 @@ function loadConfig() {
 
 function saveConfig() {
   try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ workspaceDir }, null, 2), 'utf8');
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ workspaceDir, ideasDir: ideasDirSetting }, null, 2), 'utf8');
   } catch (err) {
     console.error('Error saving config:', err);
   }
@@ -45,7 +57,7 @@ function ensureWorkspaceDirs() {
       fs.mkdirSync(workspaceDir, { recursive: true });
     }
 
-    const ideasDir = path.join(workspaceDir, 'ideas');
+    const ideasDir = getIdeasDir();
     if (!fs.existsSync(ideasDir)) {
       fs.mkdirSync(ideasDir, { recursive: true });
       
@@ -84,9 +96,10 @@ function ensureWorkspaceDirs() {
 
     // If there are no subdirectories (excluding ideas and git), create default ones
     const items = fs.readdirSync(workspaceDir);
+    const resolvedIdeasDir = path.resolve(ideasDir);
     const subdirs = items.filter(item => {
-      const p = path.join(workspaceDir, item);
-      return fs.statSync(p).isDirectory() && !['ideas', '.git', 'node_modules'].includes(item);
+      const p = path.resolve(workspaceDir, item);
+      return fs.statSync(p).isDirectory() && !['.git', 'node_modules'].includes(item) && p !== resolvedIdeasDir && item !== 'ideas';
     });
 
     if (subdirs.length === 0) {
@@ -232,31 +245,86 @@ function parseIdeasFile(text, filename) {
 
 // Get config
 app.get('/api/config', (req, res) => {
-  res.json({ workspaceDir });
+  res.json({
+    workspaceDir,
+    ideasDir: ideasDirSetting,
+    effectiveIdeasDir: getIdeasDir()
+  });
 });
 
 // Update config
 app.post('/api/config', (req, res) => {
-  const { newPath } = req.body;
+  const { newPath, ideasPath } = req.body;
   if (!newPath) {
     return res.status(400).json({ error: 'Path is required' });
   }
   
   workspaceDir = path.resolve(newPath);
+  if (ideasPath !== undefined) {
+    ideasDirSetting = ideasPath ? ideasPath.trim() : '';
+  }
   saveConfig();
   ensureWorkspaceDirs();
   
-  res.json({ success: true, workspaceDir });
+  res.json({
+    success: true,
+    workspaceDir,
+    ideasDir: ideasDirSetting,
+    effectiveIdeasDir: getIdeasDir()
+  });
 });
 
-// Open workspace folder in Windows Explorer
+// Open workspace or ideas folder in Windows Explorer
 app.post('/api/open-folder', (req, res) => {
-  if (fs.existsSync(workspaceDir)) {
-    exec(`explorer "${workspaceDir}"`);
+  const { type } = req.body || {};
+  const targetFolder = type === 'ideas' ? getIdeasDir() : workspaceDir;
+  if (fs.existsSync(targetFolder)) {
+    exec(`explorer "${targetFolder}"`);
     res.json({ success: true });
   } else {
-    res.status(404).json({ error: 'Workspace folder not found' });
+    res.status(404).json({ error: 'Folder not found' });
   }
+});
+
+// Pick folder via native Windows FolderBrowserDialog
+app.post('/api/pick-folder', (req, res) => {
+  const { currentPath } = req.body || {};
+  let initial = '';
+  if (currentPath && typeof currentPath === 'string' && fs.existsSync(currentPath)) {
+    initial = path.resolve(currentPath);
+  }
+
+  const psScript = `
+    Add-Type -AssemblyName System.Windows.Forms
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.Description = 'Sélectionnez un dossier de travail'
+    $initialPath = $env:PICKER_INITIAL_PATH
+    if ($initialPath -and (Test-Path $initialPath)) {
+      $dialog.SelectedPath = $initialPath
+    }
+    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+      [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+      Write-Output $dialog.SelectedPath
+    }
+  `;
+
+  const buffer = Buffer.from(psScript, 'utf16le');
+  const encoded = buffer.toString('base64');
+
+  exec(`powershell -NoProfile -STA -EncodedCommand ${encoded}`, {
+    env: { ...process.env, PICKER_INITIAL_PATH: initial }
+  }, (err, stdout, stderr) => {
+    if (err) {
+      console.error('Folder picker error:', err || stderr);
+      return res.status(500).json({ error: 'Impossible d\'ouvrir le sélecteur de dossier' });
+    }
+    const selectedPath = stdout.trim();
+    if (selectedPath) {
+      res.json({ success: true, path: selectedPath });
+    } else {
+      res.json({ success: false, cancelled: true });
+    }
+  });
 });
 
 // Get Workspace layout (sections, documents, ideas themes)
@@ -269,6 +337,7 @@ app.get('/api/workspace', (req, res) => {
     const ideaThemes = [];
     
     const items = fs.readdirSync(workspaceDir);
+    const resolvedIdeasDir = path.resolve(getIdeasDir());
     
     // Scan sections and general docs
     for (const item of items) {
@@ -278,52 +347,40 @@ app.get('/api/workspace', (req, res) => {
       if (stat.isDirectory()) {
         if (item === '.git' || item === 'node_modules') continue;
         
-        if (item === 'ideas') {
-          // Scan ideas themes
-          const ideaFiles = fs.readdirSync(fullPath);
-          for (const file of ideaFiles) {
-            if (file.endsWith('.md') || file.endsWith('.txt')) {
-              const themePath = path.join(fullPath, file);
-              const text = fs.readFileSync(themePath, 'utf8');
-              const theme = parseIdeasFile(text, file);
-              ideaThemes.push({
-                id: file.replace(/\.(md|markdown|txt)$/i, ''),
-                name: theme.themeName,
-                ideas: theme.ideas
-              });
-            }
-          }
-        } else {
-          // Regular section folder
-          const docs = [];
-          const files = fs.readdirSync(fullPath);
-          
-          for (const file of files) {
-            if (file.endsWith('.md') || file.endsWith('.txt')) {
-              const docPath = path.join(fullPath, file);
-              const text = fs.readFileSync(docPath, 'utf8');
-              const docInfo = parseMarkdownDoc(text, file);
-              const fileStat = fs.statSync(docPath);
-              
-              docs.push({
-                id: `${item}/${file}`,
-                filename: file,
-                title: docInfo.title,
-                subtitle: docInfo.subtitle,
-                content: docInfo.body,
-                createdAt: fileStat.birthtimeMs,
-                updatedAt: fileStat.mtimeMs
-              });
-            }
-          }
-          
-          sections.push({
-            id: item,
-            name: item,
-            collapsed: false,
-            documents: docs
-          });
+        // Skip ideas directory if located inside workspace
+        if (path.resolve(fullPath) === resolvedIdeasDir || item === 'ideas') {
+          continue;
         }
+        
+        // Regular section folder
+        const docs = [];
+        const files = fs.readdirSync(fullPath);
+        
+        for (const file of files) {
+          if (file.endsWith('.md') || file.endsWith('.txt')) {
+            const docPath = path.join(fullPath, file);
+            const text = fs.readFileSync(docPath, 'utf8');
+            const docInfo = parseMarkdownDoc(text, file);
+            const fileStat = fs.statSync(docPath);
+            
+            docs.push({
+              id: `${item}/${file}`,
+              filename: file,
+              title: docInfo.title,
+              subtitle: docInfo.subtitle,
+              content: docInfo.body,
+              createdAt: fileStat.birthtimeMs,
+              updatedAt: fileStat.mtimeMs
+            });
+          }
+        }
+        
+        sections.push({
+          id: item,
+          name: item,
+          collapsed: false,
+          documents: docs
+        });
       } else if (stat.isFile()) {
         // Files at the root go to "Général"
         if (item.endsWith('.md') || item.endsWith('.txt')) {
@@ -350,6 +407,24 @@ app.get('/api/workspace', (req, res) => {
         collapsed: false,
         documents: generalDocs
       });
+    }
+
+    // Scan ideas themes from getIdeasDir()
+    const ideasDir = getIdeasDir();
+    if (fs.existsSync(ideasDir)) {
+      const ideaFiles = fs.readdirSync(ideasDir);
+      for (const file of ideaFiles) {
+        if (file.endsWith('.md') || file.endsWith('.txt')) {
+          const themePath = path.join(ideasDir, file);
+          const text = fs.readFileSync(themePath, 'utf8');
+          const theme = parseIdeasFile(text, file);
+          ideaThemes.push({
+            id: file.replace(/\.(md|markdown|txt)$/i, ''),
+            name: theme.themeName,
+            ideas: theme.ideas
+          });
+        }
+      }
     }
     
     res.json({ sections, ideaThemes });
@@ -619,7 +694,7 @@ app.post('/api/ideas/toggle', (req, res) => {
   const { themeId, ideaText, archived } = req.body;
   if (!themeId || !ideaText) return res.status(400).json({ error: 'Theme ID and idea text required' });
   
-  const themeFile = path.join(workspaceDir, 'ideas', `${themeId}.md`);
+  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
   
   try {
     if (!fs.existsSync(themeFile)) {
@@ -688,7 +763,7 @@ app.post('/api/ideas/edit', (req, res) => {
     return res.status(400).json({ error: 'Theme ID, old text, and new text are required' });
   }
 
-  const themeFile = path.join(workspaceDir, 'ideas', `${themeId}.md`);
+  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
 
   try {
     if (!fs.existsSync(themeFile)) {
@@ -743,7 +818,7 @@ app.post('/api/ideas/delete', (req, res) => {
     return res.status(400).json({ error: 'Theme ID and idea text are required' });
   }
 
-  const themeFile = path.join(workspaceDir, 'ideas', `${themeId}.md`);
+  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
 
   try {
     if (!fs.existsSync(themeFile)) {
@@ -784,7 +859,7 @@ app.post('/api/ideas/add', (req, res) => {
     return res.status(400).json({ error: 'Theme ID and idea text are required' });
   }
   
-  const themeFile = path.join(workspaceDir, 'ideas', `${themeId}.md`);
+  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
   
   try {
     if (!fs.existsSync(themeFile)) {
@@ -823,7 +898,7 @@ app.post('/api/themes', (req, res) => {
   if (!name || !name.trim()) return res.status(400).json({ error: 'Theme name is required' });
   
   const themeId = safeFilename(name);
-  const themeFile = path.join(workspaceDir, 'ideas', `${themeId}.md`);
+  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
   
   try {
     if (fs.existsSync(themeFile)) {
@@ -844,7 +919,7 @@ app.delete('/api/themes', (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'ID is required' });
   
-  const themeFile = path.join(workspaceDir, 'ideas', `${id}.md`);
+  const themeFile = path.join(getIdeasDir(), `${id}.md`);
   
   try {
     if (fs.existsSync(themeFile)) {
@@ -914,7 +989,7 @@ app.post('/api/themes/import', (req, res) => {
   }
   
   try {
-    const ideasDir = path.join(workspaceDir, 'ideas');
+    const ideasDir = getIdeasDir();
     if (!fs.existsSync(ideasDir)) {
       fs.mkdirSync(ideasDir, { recursive: true });
     }

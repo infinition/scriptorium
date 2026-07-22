@@ -63,7 +63,8 @@ button { font: inherit; color: inherit; }
   padding: 24px 20px 14px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  overflow: hidden;
 }
 
 .brand {
@@ -72,12 +73,120 @@ button { font: inherit; color: inherit; }
   font-style: italic;
   letter-spacing: 0.4px;
   font-weight: 500;
+  flex: 0 0 auto;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.2s ease, text-shadow 0.3s ease;
+}
+.brand:hover,
+.brand:focus-visible {
+  color: #fff;
+  text-shadow: 0 0 18px var(--accent-soft);
+  outline: none;
 }
 .brand-dot { color: var(--accent); }
 
 .header-actions {
   display: flex;
-  gap: 4px;
+  gap: 1px;
+  max-width: 0;
+  margin-left: 0;
+  opacity: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-10px);
+  transition:
+    max-width 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    margin-left 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s ease,
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.42s;
+}
+
+.header-actions .icon-btn {
+  padding: 3px;
+  opacity: 0;
+  transform: translateX(-8px) scale(0.88);
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    opacity 0.24s ease,
+    transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar-reveal-zone.is-revealed .header-actions {
+  max-width: 112px;
+  margin-left: 4px;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+  transition-delay: 0s;
+}
+
+.sidebar-reveal-zone.is-revealed .header-actions .icon-btn {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+.sidebar-reveal-zone.is-revealed .header-actions .icon-btn:nth-child(2) { transition-delay: 35ms; }
+.sidebar-reveal-zone.is-revealed .header-actions .icon-btn:nth-child(3) { transition-delay: 70ms; }
+.sidebar-reveal-zone.is-revealed .header-actions .icon-btn:nth-child(4) { transition-delay: 105ms; }
+.sidebar-reveal-zone.is-revealed .header-actions .icon-btn:nth-child(5) { transition-delay: 140ms; }
+
+.sidebar-new-action {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-10px);
+  transition:
+    max-height 0.46s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.22s ease,
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0s linear 0.46s;
+}
+.app:not(.workspace-locked) .sidebar-reveal-zone.is-revealed .sidebar-new-action {
+  max-height: 108px;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition-delay: 45ms;
+}
+.sidebar-new-action .new-btn:first-child {
+  margin-bottom: 6px;
+}
+.sidebar-new-action .secondary-action-btn {
+  opacity: 0;
+  transform: translateY(-7px);
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.22s ease,
+    transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.15s ease;
+}
+.app:not(.workspace-locked) .sidebar-reveal-zone.is-revealed .sidebar-new-action .secondary-action-btn {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 115ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-actions,
+  .header-actions .icon-btn,
+  .sidebar-new-action,
+  .sidebar-new-action .secondary-action-btn {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
 }
 
 .icon-btn {
@@ -360,6 +469,7 @@ button { font: inherit; color: inherit; }
 
 /* ============ EDITOR ============ */
 .editor-wrap {
+  position: relative;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
@@ -1166,6 +1276,41 @@ button { font: inherit; color: inherit; }
   border-color: var(--accent);
 }
 
+.input-with-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.input-with-btn input {
+  flex: 1;
+}
+.picker-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 11px;
+  height: 36px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.picker-btn:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border-color: var(--accent);
+  color: var(--text);
+}
+.picker-btn:active {
+  transform: translateY(1px);
+}
+.picker-btn.loading {
+  opacity: 0.5;
+  cursor: wait;
+  pointer-events: none;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -1609,30 +1754,33 @@ mark.search-match.first-match {
   position: absolute;
   left: 0;
   top: 0;
-  /* IMPORTANT: do NOT set width/height in CSS.
-     The JS sets width/height attributes to the LIST's full pixel dimensions.
-     If we forced CSS height: 100%, the SVG would be sized to the scroll
-     VIEWPORT (clipped) while the viewBox still represents the full list —
-     and the path would render vertically squished, misaligned with the
-     actual TOC links. Letting the attributes drive keeps a 1:1 mapping. */
   pointer-events: none;
   overflow: visible;
-  z-index: 1;
+  z-index: 10;
 }
 
 #tocPath, #tocPathSide,
 .toc-svg path {
-  transition: d 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  stroke: var(--accent, #6366f1);
+  stroke-width: 2px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  transition: d 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
   opacity: 0;
 }
 #tocPath.active, #tocPathSide.active,
 .toc-svg path.active { opacity: 1; }
 
+.toc-relative-container {
+  position: relative;
+  width: 100%;
+}
+
 .toc-list {
   list-style: none;
   padding: 0 0 0 12px;
   margin: 0;
-  position: relative;
 }
 .toc-list li { margin: 0; }
 /* Inter-item gap to match the wiki's "space-y-2" — gives the path room to breathe */
@@ -2178,3 +2326,172 @@ mark.search-match.first-match {
 /* Inline math styling (KaTeX) */
 .editor-line .katex { font-size: 1.05em; }
 .editor-line .katex-mathml { display: none; }
+
+/* ============ BLOCK DRAG HANDLE & DROP INDICATOR ============ */
+.block-drag-btn {
+  position: absolute;
+  z-index: 90;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+.block-drag-btn.visible {
+  opacity: 0.65;
+  pointer-events: auto;
+}
+.block-drag-btn:hover {
+  opacity: 1;
+  color: var(--accent);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border-color: var(--accent);
+}
+.block-drag-btn:active,
+.block-drag-btn.dragging {
+  cursor: grabbing;
+  opacity: 1;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Dragged line styling in editor */
+.editor-line.dragging-line {
+  opacity: 0.35;
+  background: rgba(120, 120, 255, 0.08);
+  border-radius: 4px;
+}
+.editor-line.delete-mode {
+  opacity: 0.5;
+  background: rgba(239, 68, 68, 0.15);
+  text-decoration: line-through;
+}
+
+/* Fading tombstone for soft-deleted block */
+@keyframes fadeOutDelete {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.98); }
+}
+.editor-line.pending-delete {
+  animation: fadeOutDelete 5s linear forwards;
+  background-color: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
+  text-decoration: line-through;
+  cursor: pointer;
+  pointer-events: auto;
+  border-radius: 4px;
+}
+.editor-line.pending-delete * {
+  color: #ef4444 !important;
+}
+.editor-line.pending-delete::after {
+  content: " — Clic pour annuler la suppression";
+  font-style: italic;
+  font-size: 0.85em;
+  opacity: 0.8;
+  color: #ef4444;
+}
+.editor-line.pending-delete:hover {
+  animation-play-state: paused;
+  background-color: rgba(239, 68, 68, 0.25) !important;
+  opacity: 1 !important;
+}
+
+/* Drag Ghost preview element floating under cursor */
+.block-drag-ghost {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  background: var(--bg-elevated, #25252b);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  opacity: 0.9;
+  max-width: 400px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translate(12px, 12px);
+}
+.block-drag-ghost.delete-mode {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  text-decoration: line-through;
+}
+
+/* Drop indicator insertion line */
+.block-drop-indicator {
+  position: absolute;
+  z-index: 95;
+  height: 3px;
+  background: var(--accent, #6366f1);
+  border-radius: 2px;
+  pointer-events: none;
+  display: none;
+  box-shadow: 0 0 8px var(--accent, #6366f1);
+  transition: top 0.04s linear;
+}
+.block-drop-indicator::before,
+.block-drop-indicator::after {
+  content: '';
+  position: absolute;
+  top: -3.5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent, #6366f1);
+  box-shadow: 0 0 6px var(--accent, #6366f1);
+}
+.block-drop-indicator::before {
+  left: -5px;
+}
+.block-drop-indicator::after {
+  right: -5px;
+}
+
+/* ============ WORKSPACE LOCK MODE ============ */
+#lockToggleBtn.locked {
+  color: var(--accent, #6366f1);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+}
+#lockToggleBtn .icon-locked.hidden,
+#lockToggleBtn .icon-unlocked.hidden {
+  display: none !important;
+}
+
+/* Hide trash/delete icons on files, sections, themes, and ideas when locked */
+.app.workspace-locked .delete-doc,
+.app.workspace-locked .nav-section-actions,
+.app.workspace-locked .delete-theme,
+.app.workspace-locked .chip-action-btn.delete-btn,
+.app.workspace-locked #importBtn {
+  display: none !important;
+}
+
+/* ============ MARKDOWN IMAGES ============ */
+.md-img {
+  max-width: 100%;
+  max-height: 50vh;
+  object-fit: contain;
+  border-radius: 6px;
+  margin: 12px 0;
+  display: block;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+}

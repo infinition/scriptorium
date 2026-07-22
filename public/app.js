@@ -7,7 +7,10 @@ let state = {
   activeDocId: null,
   activeThemeId: null,
   ideasMode: 'active', // 'active' | 'archived'
-  workspaceDir: ''
+  workspaceDir: '',
+  ideasDir: '',
+  isLocked: localStorage.getItem('scriptorium_is_locked') !== 'false',
+  docSortMode: localStorage.getItem('scriptorium_doc_sort') === 'modified' ? 'modified' : 'alpha'
 };
 
 // Archive timers map: ideaText -> { timer, element }
@@ -62,18 +65,22 @@ const backdrop = $('backdrop');
 const settingsModal = $('settingsModal');
 const workspaceLabel = $('workspaceLabel');
 const workspacePathInput = $('workspacePathInput');
+const ideasPathInput = $('ideasPathInput');
 const newDocBtn = $('newDocBtn');
+const sortDocsBtn = $('sortDocsBtn');
 const ideasPanel = $('ideasPanel');
 
 // ============ API COMMUNICATIONS ============
 
 async function fetchWorkspace() {
+  updateLockStateUI();
   docHistory = {}; // Clear history cache on workspace load
   try {
     // Get config first
     const configRes = await fetch('/api/config');
     const configData = await configRes.json();
     state.workspaceDir = configData.workspaceDir;
+    state.ideasDir = configData.ideasDir || '';
     workspaceLabel.textContent = pathBasename(state.workspaceDir);
     workspaceLabel.title = state.workspaceDir;
     
@@ -169,6 +176,10 @@ async function createDocument(sectionId) {
 }
 
 async function deleteDocument(docId) {
+  if (state.isLocked) {
+    alert("Le workspace est verrouillé. Cliquez sur le cadenas en haut à gauche pour autoriser les suppressions.");
+    return;
+  }
   if (!confirm('Supprimer définitivement ce document du disque ?')) return;
   
   try {
@@ -230,6 +241,10 @@ async function renameSection(oldId, newName) {
 }
 
 async function deleteSection(sectionId) {
+  if (state.isLocked) {
+    alert("Le workspace est verrouillé. Cliquez sur le cadenas en haut à gauche pour autoriser les suppressions.");
+    return;
+  }
   const section = state.sections.find(s => s.id === sectionId);
   if (!section) return;
   
@@ -355,6 +370,10 @@ async function createTheme(name) {
 }
 
 async function deleteTheme(id) {
+  if (state.isLocked) {
+    alert("Le workspace est verrouillé. Cliquez sur le cadenas en haut à gauche pour autoriser les suppressions.");
+    return;
+  }
   const theme = state.ideaThemes.find(t => t.id === id);
   if (!theme) return;
   
@@ -464,6 +483,32 @@ function relDate(ts) {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function documentsForNav(documents) {
+  return [...documents].sort((a, b) => {
+    if (state.docSortMode === 'modified') {
+      const byDate = (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
+      if (byDate !== 0) return byDate;
+    }
+    const aTitle = String(a.title || a.filename || 'Sans titre').trim();
+    const bTitle = String(b.title || b.filename || 'Sans titre').trim();
+    return aTitle.localeCompare(bTitle, 'fr', { sensitivity: 'base', numeric: true });
+  });
+}
+
+function updateDocSortButton() {
+  if (!sortDocsBtn) return;
+  const byDate = state.docSortMode === 'modified';
+  const alphaIcon = sortDocsBtn.querySelector('.sort-icon-alpha');
+  const dateIcon = sortDocsBtn.querySelector('.sort-icon-date');
+  const label = byDate
+    ? 'Tri par date de modification — cliquer pour trier de A à Z'
+    : 'Tri A à Z — cliquer pour trier par date de modification';
+  if (alphaIcon) alphaIcon.classList.toggle('hidden', byDate);
+  if (dateIcon) dateIcon.classList.toggle('hidden', !byDate);
+  sortDocsBtn.title = label;
+  sortDocsBtn.setAttribute('aria-label', label);
 }
 
 // Render Sidebar Navigation
@@ -607,7 +652,7 @@ function renderNav() {
     const itemsEl = document.createElement('div');
     itemsEl.className = 'nav-items';
     
-    section.documents.forEach(doc => {
+    documentsForNav(section.documents).forEach(doc => {
       const item = document.createElement('div');
       item.className = 'nav-item' + (doc.id === state.activeDocId ? ' active' : '');
       item.draggable = true;
@@ -722,15 +767,12 @@ function updateBreadcrumbAndMeta() {
   `;
 
   docMeta.innerHTML = `
-    <span>${escapeHtml(sectionName.toLowerCase())}</span>
-    <span>·</span>
-    ${filename ? `<span class="doc-meta-filename" title="Nom du fichier sur disque — cliquer pour copier">${escapeHtml(filename)}</span><span>·</span>` : ''}
     <span>créé ${relDate(doc.createdAt)}</span>
     <span>·</span>
     <span>modifié ${relDate(doc.updatedAt)}</span>
   `;
 
-  // Copy filename to clipboard on click (both locations)
+  // Copy filename to clipboard on click (in breadcrumb only)
   const onFilenameClick = async (e) => {
     if (!filename) return;
     try {
@@ -744,8 +786,7 @@ function updateBreadcrumbAndMeta() {
       }, 1100);
     } catch (_) { /* clipboard denied — silent */ }
   };
-  const fnInMeta = docMeta.querySelector('.doc-meta-filename');
-  if (fnInMeta) fnInMeta.addEventListener('click', onFilenameClick);
+
   const fnInBc = breadcrumb.querySelector('.breadcrumb-filename');
   if (fnInBc) fnInBc.addEventListener('click', onFilenameClick);
 }
@@ -951,6 +992,10 @@ function cancelArchiving(ideaText) {
 const deleteTimers = new Map(); // ideaText -> { timer, element }
 
 function startDeleting(themeId, ideaText, chip) {
+  if (state.isLocked) {
+    alert("Le workspace est verrouillé. Cliquez sur le cadenas en haut à gauche pour autoriser les suppressions.");
+    return;
+  }
   // If archive was pending, cancel it first
   if (archiveTimers.has(ideaText)) cancelArchiving(ideaText);
 
@@ -1696,6 +1741,9 @@ function getContentMarkdown() {
   const children = content.children;
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
+    if (child.classList && child.classList.contains('pending-delete')) {
+      continue;
+    }
     let raw = child.dataset.raw;
     if (child === activeLineNode) {
       raw = child.textContent;
@@ -2144,32 +2192,123 @@ function updateActiveLine() {
 
 function wrapSelectionInline(prefix, suffix = prefix) {
   const sel = window.getSelection();
-  if (!sel.rangeCount || !activeLineNode) return;
+  if (!sel || !sel.rangeCount) return;
   
   const range = sel.getRangeAt(0);
-  if (!activeLineNode.contains(range.startContainer)) return;
-  
+  if (range.collapsed) return;
+
+  const startLine = getLineForNode(range.startContainer) || (range.startContainer === content ? content.firstElementChild : null);
+  const endLine = getLineForNode(range.endContainer) || (range.endContainer === content ? content.lastElementChild : null);
+  if (!startLine || !endLine) return;
+
   saveHistory(state.activeDocId, true);
-  
-  const startOffset = range.startOffset;
-  const endOffset = range.endOffset;
-  const text = activeLineNode.textContent;
-  
-  const selectedText = text.substring(startOffset, endOffset);
-  const replacement = prefix + selectedText + suffix;
-  
-  document.execCommand('insertText', false, replacement);
-  
-  const textNode = activeLineNode.firstChild;
-  if (textNode) {
-    const newStart = startOffset + prefix.length;
-    const newEnd = newStart + selectedText.length;
-    range.setStart(textNode, newStart);
-    range.setEnd(textNode, newEnd);
-    sel.removeAllRanges();
-    sel.addRange(range);
+
+  // Capture rendered offsets BEFORE modifying any line state
+  const startOffRendered = rangeOffsetIn(startLine, range.startContainer, range.startOffset);
+  const endOffRendered = rangeOffsetIn(endLine, range.endContainer, range.endOffset);
+
+  // Convert to raw offsets
+  const startOffRaw = renderedToRawOffset(startLine, startOffRendered);
+  const endOffRaw = renderedToRawOffset(endLine, endOffRendered);
+
+  // Collect all lines in the selection range
+  const linesToProcess = [];
+  let curr = startLine;
+  while (curr) {
+    if (curr.nodeType === 1 && curr.classList.contains('editor-line')) {
+      linesToProcess.push(curr);
+    }
+    if (curr === endLine) break;
+    curr = curr.nextSibling;
   }
-  
+
+  if (linesToProcess.length === 0) return;
+
+  if (linesToProcess.length === 1) {
+    // Single line selection
+    const line = linesToProcess[0];
+    if (line !== activeLineNode) {
+      makeLineRawAndActive(line);
+    }
+
+    const text = line.textContent;
+    const s = Math.min(startOffRaw, endOffRaw);
+    const e = Math.max(startOffRaw, endOffRaw);
+    const selectedText = text.substring(s, e);
+    if (!selectedText) return;
+
+    let newText = '';
+    let newStart = s;
+    let newEnd = e;
+
+    // Check if already wrapped to toggle off
+    if (selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length >= prefix.length + suffix.length) {
+      const unwrapped = selectedText.slice(prefix.length, selectedText.length - suffix.length);
+      newText = text.substring(0, s) + unwrapped + text.substring(e);
+      newStart = s;
+      newEnd = s + unwrapped.length;
+    } else {
+      const wrapped = prefix + selectedText + suffix;
+      newText = text.substring(0, s) + wrapped + text.substring(e);
+      newStart = s + prefix.length;
+      newEnd = newStart + selectedText.length;
+    }
+
+    line.textContent = newText;
+    line.dataset.raw = newText;
+    applyLineKind(line, newText);
+
+    // Re-select the inner formatted text
+    let tn = line.firstChild;
+    if (!tn || tn.nodeType !== Node.TEXT_NODE) {
+      tn = document.createTextNode(newText);
+      line.innerHTML = '';
+      line.appendChild(tn);
+    }
+    const newRange = document.createRange();
+    newRange.setStart(tn, Math.min(newStart, tn.nodeValue.length));
+    newRange.setEnd(tn, Math.min(newEnd, tn.nodeValue.length));
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+  } else {
+    // Multi-line selection
+    linesToProcess.forEach((line, idx) => {
+      if (line !== activeLineNode) {
+        makeLineRawAndActive(line);
+      }
+      const text = line.textContent;
+      let s = 0;
+      let e = text.length;
+
+      if (idx === 0) {
+        s = startOffRaw;
+      }
+      if (idx === linesToProcess.length - 1) {
+        e = endOffRaw;
+      }
+
+      if (s >= e) return;
+
+      const selectedText = text.substring(s, e);
+      if (!selectedText.trim()) return;
+
+      let newText = '';
+      if (selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length >= prefix.length + suffix.length) {
+        const unwrapped = selectedText.slice(prefix.length, selectedText.length - suffix.length);
+        newText = text.substring(0, s) + unwrapped + text.substring(e);
+      } else {
+        const wrapped = prefix + selectedText + suffix;
+        newText = text.substring(0, s) + wrapped + text.substring(e);
+      }
+
+      line.textContent = newText;
+      line.dataset.raw = newText;
+      applyLineKind(line, newText);
+    });
+
+    makeLineRawAndActive(endLine);
+  }
+
   markDirty();
   updateStats();
   saveHistory(state.activeDocId, true);
@@ -2482,7 +2621,8 @@ window.addEventListener('keydown', (e) => {
 
 // Settings Modal Events
 $('openSettingsBtn').addEventListener('click', () => {
-  workspacePathInput.value = state.workspaceDir;
+  workspacePathInput.value = state.workspaceDir || '';
+  ideasPathInput.value = state.ideasDir || '';
   settingsModal.classList.add('active');
 });
 
@@ -2491,13 +2631,14 @@ $('cancelSettingsBtn').addEventListener('click', () => settingsModal.classList.r
 
 $('saveSettingsBtn').addEventListener('click', async () => {
   const newPath = workspacePathInput.value.trim();
+  const ideasPath = ideasPathInput ? ideasPathInput.value.trim() : '';
   if (!newPath) return;
   
   try {
     const res = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newPath })
+      body: JSON.stringify({ newPath, ideasPath })
     });
     const data = await res.json();
     if (data.success) {
@@ -2511,6 +2652,40 @@ $('saveSettingsBtn').addEventListener('click', async () => {
   }
 });
 
+async function handlePickFolder(inputEl, btnEl) {
+  if (btnEl) btnEl.classList.add('loading');
+  try {
+    const currentPath = inputEl ? inputEl.value.trim() : '';
+    const res = await fetch('/api/pick-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPath })
+    });
+    const data = await res.json();
+    if (data.success && data.path) {
+      inputEl.value = data.path;
+    }
+  } catch (err) {
+    console.error('Pick folder error:', err);
+  } finally {
+    if (btnEl) btnEl.classList.remove('loading');
+  }
+}
+
+const pickWorkspaceFolderBtn = $('pickWorkspaceFolderBtn');
+if (pickWorkspaceFolderBtn) {
+  pickWorkspaceFolderBtn.addEventListener('click', () => {
+    handlePickFolder(workspacePathInput, pickWorkspaceFolderBtn);
+  });
+}
+
+const pickIdeasFolderBtn = $('pickIdeasFolderBtn');
+if (pickIdeasFolderBtn) {
+  pickIdeasFolderBtn.addEventListener('click', () => {
+    handlePickFolder(ideasPathInput, pickIdeasFolderBtn);
+  });
+}
+
 $('openFolderBtn').addEventListener('click', async () => {
   try {
     await fetch('/api/open-folder', { method: 'POST' });
@@ -2518,6 +2693,57 @@ $('openFolderBtn').addEventListener('click', async () => {
     console.error(err);
   }
 });
+
+if (sortDocsBtn) {
+  updateDocSortButton();
+  sortDocsBtn.addEventListener('click', () => {
+    state.docSortMode = state.docSortMode === 'alpha' ? 'modified' : 'alpha';
+    localStorage.setItem('scriptorium_doc_sort', state.docSortMode);
+    updateDocSortButton();
+    renderNav();
+  });
+}
+
+function updateLockStateUI() {
+  const lockToggleBtn = $('lockToggleBtn');
+  if (!lockToggleBtn) return;
+  const brandLockBtn = $('brandRevealBtn');
+  const iconUnlocked = lockToggleBtn.querySelector('.icon-unlocked');
+  const iconLocked = lockToggleBtn.querySelector('.icon-locked');
+
+  if (state.isLocked) {
+    app.classList.add('workspace-locked');
+    lockToggleBtn.classList.add('locked');
+    lockToggleBtn.title = "Mode verrouillé : Suppressions et corbeille bloquées";
+    if (brandLockBtn) {
+      brandLockBtn.title = 'Déverrouiller Scriptorium';
+      brandLockBtn.setAttribute('aria-label', 'Déverrouiller Scriptorium');
+    }
+    if (iconUnlocked) iconUnlocked.classList.add('hidden');
+    if (iconLocked) iconLocked.classList.remove('hidden');
+  } else {
+    app.classList.remove('workspace-locked');
+    lockToggleBtn.classList.remove('locked');
+    lockToggleBtn.title = "Mode déverrouillé (cliquer pour verrouiller)";
+    if (brandLockBtn) {
+      brandLockBtn.title = 'Verrouiller Scriptorium';
+      brandLockBtn.setAttribute('aria-label', 'Verrouiller Scriptorium');
+    }
+    if (iconUnlocked) iconUnlocked.classList.remove('hidden');
+    if (iconLocked) iconLocked.classList.add('hidden');
+  }
+}
+
+function toggleWorkspaceLock() {
+  state.isLocked = !state.isLocked;
+  localStorage.setItem('scriptorium_is_locked', state.isLocked);
+  updateLockStateUI();
+}
+
+const lockToggleBtn = $('lockToggleBtn');
+if (lockToggleBtn) {
+  lockToggleBtn.addEventListener('click', toggleWorkspaceLock);
+}
 
 // Drag and drop import global overlays
 let dragCounter = 0;
@@ -3107,6 +3333,32 @@ searchOverlay.addEventListener('click', (e) => {
 if (searchBtn) searchBtn.addEventListener('click', openSearch);
 if (clearHighlightBtn) clearHighlightBtn.addEventListener('click', () => clearSearchHighlights(true));
 
+// ============ COMPACT SIDEBAR HEADER ============
+const sidebarHeader = document.querySelector('.sidebar-header');
+const sidebarRevealZone = $('sidebarRevealZone');
+const brandRevealBtn = $('brandRevealBtn');
+
+function setHeaderActionsRevealed(revealed) {
+  if (!sidebarRevealZone || !brandRevealBtn) return;
+  sidebarRevealZone.classList.toggle('is-revealed', revealed);
+  brandRevealBtn.setAttribute('aria-expanded', String(revealed));
+}
+
+if (sidebarRevealZone && sidebarHeader && brandRevealBtn) {
+  brandRevealBtn.addEventListener('pointerenter', () => setHeaderActionsRevealed(true));
+  brandRevealBtn.addEventListener('click', () => {
+    setHeaderActionsRevealed(true);
+    toggleWorkspaceLock();
+  });
+  sidebarRevealZone.addEventListener('pointerleave', () => setHeaderActionsRevealed(false));
+  sidebarRevealZone.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      setHeaderActionsRevealed(false);
+      brandRevealBtn.focus();
+    }
+  });
+}
+
 // ============ TABLE OF CONTENTS ============
 
 // Both TOC instances: the floating one (focus-mode only) and the side one (inside right panel)
@@ -3132,16 +3384,91 @@ let tocRegenTimer;
 let tocActiveRaf = null;
 
 function getEditorHeadings() {
-  return content.querySelectorAll(
-    '.editor-line h1, .editor-line h2, .editor-line h3, .editor-line h4, .editor-line h5, .editor-line h6'
+  if (!content) return [];
+
+  // Query all potential line containers and heading elements
+  const candidates = Array.from(
+    content.querySelectorAll('.editor-line, h1, h2, h3, h4, h5, h6, [class*="is-h"]')
   );
+  if (candidates.length === 0 && content.children.length > 0) {
+    Array.from(content.children).forEach(child => candidates.push(child));
+  }
+
+  const headings = [];
+  const processedElements = new Set();
+
+  candidates.forEach((el) => {
+    const lineEl = getLineForNode(el) || el;
+    if (processedElements.has(lineEl)) return;
+
+    let level = 0;
+
+    // 1. Check classes is-h1..is-h6 on line element
+    for (let i = 1; i <= 6; i++) {
+      if (lineEl.classList.contains(`is-h${i}`)) {
+        level = i;
+        break;
+      }
+    }
+
+    // 2. Check inner or self HTML tag (H1..H6)
+    if (!level) {
+      const hTag = (lineEl.tagName && /^H[1-6]$/i.test(lineEl.tagName))
+        ? lineEl
+        : lineEl.querySelector('h1, h2, h3, h4, h5, h6');
+      if (hTag) {
+        level = parseInt(hTag.tagName.substring(1), 10) || 1;
+      }
+    }
+
+    // 3. Check raw text starting with # .. ######
+    const rawText = (lineEl.dataset.raw || lineEl.textContent || lineEl.innerText || '').trim();
+    if (!level) {
+      const match = rawText.match(/^(#{1,6})(?:\s+|$)/);
+      if (match) {
+        level = match[1].length;
+      }
+    }
+
+    if (level > 0) {
+      processedElements.add(lineEl);
+
+      // Strip leading `#` hashes for clean display in TOC
+      let cleanText = rawText.replace(/^(#{1,6})\s*/, '').trim();
+      if (!cleanText) {
+        const innerNode = lineEl.querySelector('h1, h2, h3, h4, h5, h6') || lineEl;
+        cleanText = (innerNode.textContent || innerNode.innerText || '').replace(/^(#{1,6})\s*/, '').trim() || '—';
+      }
+
+      headings.push({
+        element: lineEl,
+        // Keep the DOM id when headings are collected again during scrolling.
+        // generateTOC() assigns it once; updateTOCActiveState() then relies on
+        // this value to match the corresponding TOC link.
+        id: lineEl.id || null,
+        level: level,
+        text: cleanText
+      });
+    }
+  });
+
+  return headings;
 }
 
 function generateTOC() {
-  const headings = Array.from(getEditorHeadings());
+  const headings = getEditorHeadings();
+
+  // A newly rendered document reuses ids such as `toc-h-0`. Reset the cached
+  // active id so the visible TOC is centred even when the first id is the same
+  // as in the previously opened document.
+  lastActiveTocLinkId = null;
 
   // Assign stable IDs once
-  headings.forEach((h, i) => { h.id = `toc-h-${i}`; });
+  headings.forEach((item, i) => {
+    const id = `toc-h-${i}`;
+    item.element.id = id;
+    item.id = id;
+  });
 
   // Update empty states
   if (!headings.length) {
@@ -3164,19 +3491,20 @@ function generateTOC() {
 function populateTocList(listNode, pathNode, headings) {
   if (!listNode) return;
   listNode.innerHTML = '';
+
   if (!headings.length) {
     if (pathNode) { pathNode.setAttribute('d', ''); pathNode.classList.remove('active'); }
     return;
   }
-  headings.forEach(h => {
-    const id = h.id;
-    const level = parseInt(h.tagName.substring(1), 10) || 1;
+  headings.forEach(item => {
+    const id = item.id;
+    const level = item.level;
     const li = document.createElement('li');
     const a = document.createElement('a');
     a.className = `toc-link level-${level}`;
     a.dataset.targetId = id;
     a.dataset.level = level;
-    const text = (h.textContent || '').trim() || '—';
+    const text = item.text || '—';
     a.textContent = text;
     a.title = text;
     a.href = '#' + id;
@@ -3196,15 +3524,19 @@ function populateTocList(listNode, pathNode, headings) {
   });
 }
 
+let lastActiveTocLinkId = null;
+
 function updateTOCSvgSize() {
   TOC_INSTANCES.forEach(({ list, svg }) => {
     if (!svg || !list) return;
-    if (!list.offsetParent) return; // hidden — skip
-    const w = list.offsetWidth;
-    const h = list.offsetHeight;
-    svg.setAttribute('width', w);
-    svg.setAttribute('height', h);
-    svg.setAttribute('viewBox', `0 0 ${w || 1} ${h || 1}`);
+    const h = list.scrollHeight || list.offsetHeight || 0;
+    const w = list.scrollWidth || list.offsetWidth || 0;
+    if (h > 0) {
+      svg.setAttribute('height', h + 'px');
+    }
+    if (w > 0) {
+      svg.setAttribute('width', Math.max(220, w) + 'px');
+    }
   });
 }
 
@@ -3220,23 +3552,23 @@ function scheduleTOCActiveUpdate() {
 // H1 sits 1px LEFT of the UL container (overflow:visible lets it show),
 // each subsequent level is +12px (the wiki's ml-3/ml-6 indent unit).
 function tocXForLevel(lvl) {
-  if (lvl <= 1) return -1;
-  if (lvl === 2) return 11;
-  if (lvl === 3) return 23;
-  if (lvl === 4) return 35;
-  return 47;
+  if (lvl <= 1) return 1;
+  if (lvl === 2) return 13;
+  if (lvl === 3) return 25;
+  if (lvl === 4) return 37;
+  if (lvl === 5) return 49;
+  return 61;
 }
 
 function updateTOCActiveState() {
-  const headings = Array.from(getEditorHeadings());
+  const headings = getEditorHeadings();
   if (!headings.length) return;
 
-  // Compute active set once (shared between both instances)
   const containerRect = editorWrap.getBoundingClientRect();
   const buffer = 12;
 
-  let activeHeadings = headings.filter(h => {
-    const rect = h.getBoundingClientRect();
+  let activeHeadings = headings.filter(item => {
+    const rect = item.element.getBoundingClientRect();
     const relTop = rect.top - containerRect.top;
     const relBottom = rect.bottom - containerRect.top;
     return relTop < containerRect.height - buffer && relBottom > buffer;
@@ -3244,7 +3576,7 @@ function updateTOCActiveState() {
 
   if (!activeHeadings.length) {
     for (let i = headings.length - 1; i >= 0; i--) {
-      const rect = headings[i].getBoundingClientRect();
+      const rect = headings[i].element.getBoundingClientRect();
       if (rect.top - containerRect.top <= 100) {
         activeHeadings.push(headings[i]);
         break;
@@ -3252,19 +3584,47 @@ function updateTOCActiveState() {
     }
   }
   if (!activeHeadings.length) activeHeadings.push(headings[0]);
-  const activeIds = new Set(activeHeadings.map(h => h.id));
+  const activeIds = new Set(activeHeadings.map(item => item.id));
+
+  // Determine if active link actually changed to trigger scrolling
+  const activeId = activeHeadings[0].id;
+  const changed = (lastActiveTocLinkId !== activeId);
+  if (changed) {
+    lastActiveTocLinkId = activeId;
+  }
 
   // Apply to both instances
-  TOC_INSTANCES.forEach(({ list, path }) => applyActiveToInstance(list, path, activeIds));
+  TOC_INSTANCES.forEach(({ list, path }) => applyActiveToInstance(list, path, activeIds, changed));
 }
 
-function applyActiveToInstance(listNode, pathNode, activeIds) {
+function scrollActiveTocLinkIntoView(listNode, activeLink) {
+  if (!listNode || !activeLink) return;
+  const wrap = listNode.closest('.toc-wrap');
+  if (!wrap) return;
+
+  // Don't calculate if the wrap is not visible
+  if (wrap.offsetHeight === 0) return;
+
+  const wrapRect = wrap.getBoundingClientRect();
+  const linkRect = activeLink.getBoundingClientRect();
+
+  if (linkRect.top < wrapRect.top + 30 || linkRect.bottom > wrapRect.bottom - 30) {
+    const targetScrollTop = wrap.scrollTop + (linkRect.top - wrapRect.top) - (wrapRect.height / 2) + (linkRect.height / 2);
+    wrap.scrollTo({
+      top: Math.max(0, targetScrollTop),
+      behavior: 'smooth'
+    });
+  }
+}
+
+function applyActiveToInstance(listNode, pathNode, activeIds, changed) {
   if (!listNode || !pathNode) return;
-  // Skip hidden instances — offsetParent is null when display:none on any ancestor.
-  // (Otherwise offsetTop returns 0 for every link, producing a degenerate path.)
-  if (!listNode.offsetParent) return;
   const links = Array.from(listNode.querySelectorAll('.toc-link'));
-  if (!links.length) return;
+  if (!links.length) {
+    pathNode.setAttribute('d', '');
+    pathNode.classList.remove('active');
+    return;
+  }
 
   const activeLinks = [];
   links.forEach(link => {
@@ -3280,6 +3640,10 @@ function applyActiveToInstance(listNode, pathNode, activeIds) {
     pathNode.setAttribute('d', '');
     pathNode.classList.remove('active');
     return;
+  }
+
+  if (changed) {
+    scrollActiveTocLinkIntoView(listNode, activeLinks[0]);
   }
 
   // Same path-tracing algorithm as the wiki: contiguous active links share
@@ -3335,10 +3699,12 @@ function setRightPanelView(view) {
   if (panelTabIdeas) panelTabIdeas.classList.toggle('active', !isToc);
   if (panelTabToc)   panelTabToc.classList.toggle('active', isToc);
   try { localStorage.setItem('rightPanelView', view); } catch (e) {}
-  if (isToc) {
-    // Recompute SVG sizes now that the side container is visible
-    setTimeout(() => { updateTOCSvgSize(); scheduleTOCActiveUpdate(); }, 30);
-  }
+  
+  requestAnimationFrame(() => {
+    generateTOC();
+    updateTOCSvgSize();
+    updateTOCActiveState();
+  });
 }
 
 if (panelTabIdeas) panelTabIdeas.addEventListener('click', () => setRightPanelView('ideas'));
@@ -3354,10 +3720,13 @@ try {
 
 const selToolbar = $('selToolbar');
 const blockAddBtn = $('blockAddBtn');
+const blockDragBtn = $('blockDragBtn');
+const blockDropIndicator = $('blockDropIndicator');
 const blockMenu = $('blockMenu');
 
 let selToolbarTimer;
 let blockBtnTimer;
+let hoveredLineNode = null;
 
 function getSelectionInContent() {
   const sel = window.getSelection();
@@ -3396,10 +3765,13 @@ document.addEventListener('selectionchange', () => {
   clearTimeout(selToolbarTimer);
   selToolbarTimer = setTimeout(showSelectionToolbar, 40);
   clearTimeout(blockBtnTimer);
-  blockBtnTimer = setTimeout(updateBlockAddPosition, 40);
+  blockBtnTimer = setTimeout(() => {
+    updateBlockAddPosition();
+    updateBlockDragPosition();
+  }, 40);
 });
-editorWrap.addEventListener('scroll', () => { hideSelectionToolbar(); updateBlockAddPosition(); closeBlockMenu(); });
-window.addEventListener('resize', () => { hideSelectionToolbar(); updateBlockAddPosition(); closeBlockMenu(); });
+editorWrap.addEventListener('scroll', () => { hideSelectionToolbar(); updateBlockAddPosition(); updateBlockDragPosition(); closeBlockMenu(); });
+window.addEventListener('resize', () => { hideSelectionToolbar(); updateBlockAddPosition(); updateBlockDragPosition(); closeBlockMenu(); });
 
 // Prevent the buttons from stealing the selection on mousedown
 if (selToolbar) {
@@ -3414,25 +3786,6 @@ if (selToolbar) {
 
 function applyInlineFormat(act) {
   if (!act) return;
-  // Ensure the line containing the selection is in active/raw mode so the
-  // wrap/prefix operations target raw markdown, not rendered HTML.
-  const sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  const range = sel.getRangeAt(0);
-  const line = getLineForNode(range.startContainer) || getLineForNode(range.endContainer);
-  if (line && line !== activeLineNode) {
-    makeLineRawAndActive(line);
-    // Re-derive offsets within the raw line and reselect
-    // (textContent of raw line === raw markdown)
-    const newRange = document.createRange();
-    const tn = line.firstChild;
-    if (tn && tn.nodeType === Node.TEXT_NODE) {
-      newRange.setStart(tn, 0);
-      newRange.setEnd(tn, tn.nodeValue.length);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-    }
-  }
 
   switch (act) {
     case 'bold':       wrapSelectionInline('**'); break;
@@ -3540,6 +3893,275 @@ function updateBlockAddPosition() {
   blockAddBtn.classList.add('visible');
 }
 
+// ============ BLOCK DRAG & DROP REORDERING ============
+
+let isDraggingBlock = false;
+let draggedLineNode = null;
+let blockDragGhostEl = null;
+let targetDropLine = null;
+let dropInsertBefore = true;
+let autoScrollAnimFrame = null;
+let autoScrollSpeed = 0;
+let lastDragEvent = null;
+
+function updateBlockDragPosition() {
+  if (!blockDragBtn) return;
+  if (isDraggingBlock) return; // Keep visible while dragging
+
+  if (!activeLineNode || !content.contains(activeLineNode)) {
+    blockDragBtn.classList.remove('visible');
+    return;
+  }
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0 && !sel.getRangeAt(0).collapsed) {
+    blockDragBtn.classList.remove('visible');
+    return;
+  }
+
+  const rect = activeLineNode.getBoundingClientRect();
+  const editorRect = editorWrap.getBoundingClientRect();
+  // Hide if the line is scrolled off the editor's visible viewport
+  if (rect.bottom < editorRect.top + 20 || rect.top > editorRect.bottom - 20) {
+    blockDragBtn.classList.remove('visible');
+    return;
+  }
+
+  // Position at the right edge of the block / editor pane
+  const containerRect = editorContainer.getBoundingClientRect();
+  let left = rect.right + 10;
+  if (left > containerRect.right - 28) {
+    left = containerRect.right - 28;
+  }
+  if (left > window.innerWidth - 30) {
+    left = window.innerWidth - 30;
+  }
+
+  const top = rect.top + (rect.height / 2) - 11;
+
+  blockDragBtn.style.top = top + 'px';
+  blockDragBtn.style.left = left + 'px';
+  blockDragBtn.classList.add('visible');
+}
+
+function startBlockDrag(line, e) {
+  if (!line || !content.contains(line)) return;
+
+  isDraggingBlock = true;
+  draggedLineNode = line;
+  draggedLineNode.classList.add('dragging-line');
+  if (blockDragBtn) blockDragBtn.classList.add('dragging');
+
+  // Create drag ghost element
+  if (blockDragGhostEl) blockDragGhostEl.remove();
+  blockDragGhostEl = document.createElement('div');
+  blockDragGhostEl.className = 'block-drag-ghost';
+  blockDragGhostEl.textContent = (line.textContent || '').trim() || '(Bloc vide)';
+  document.body.appendChild(blockDragGhostEl);
+  updateGhostPosition(e.clientX, e.clientY);
+
+  if (blockDropIndicator) {
+    blockDropIndicator.style.display = 'block';
+  }
+
+  window.addEventListener('mousemove', onBlockDragMove);
+  window.addEventListener('mouseup', onBlockDragEnd);
+}
+
+function updateGhostPosition(x, y) {
+  if (blockDragGhostEl) {
+    blockDragGhostEl.style.left = x + 'px';
+    blockDragGhostEl.style.top = y + 'px';
+  }
+}
+
+function onBlockDragMove(e) {
+  if (!isDraggingBlock) return;
+  lastDragEvent = e;
+  updateGhostPosition(e.clientX, e.clientY);
+
+  // Smooth Auto-scroll when mouse gets near top or bottom edges of editor window
+  const wrapRect = editorWrap.getBoundingClientRect();
+  const topThreshold = wrapRect.top + 70;
+  const bottomThreshold = wrapRect.bottom - 70;
+
+  if (e.clientY < topThreshold) {
+    const dist = topThreshold - e.clientY;
+    autoScrollSpeed = -Math.min(32, Math.max(5, dist * 0.45));
+  } else if (e.clientY > bottomThreshold) {
+    const dist = e.clientY - bottomThreshold;
+    autoScrollSpeed = Math.min(32, Math.max(5, dist * 0.45));
+  } else {
+    autoScrollSpeed = 0;
+  }
+
+  if (autoScrollSpeed !== 0 && !autoScrollAnimFrame) {
+    runAutoScrollLoop();
+  }
+
+  const isDeleteZone = e.clientX > window.innerWidth - 80;
+  if (isDeleteZone) {
+    blockDragGhostEl.classList.add('delete-mode');
+    draggedLineNode.classList.add('delete-mode');
+    if (blockDropIndicator) blockDropIndicator.style.display = 'none';
+  } else {
+    blockDragGhostEl.classList.remove('delete-mode');
+    draggedLineNode.classList.remove('delete-mode');
+    updateDropIndicatorPosition(e.clientY);
+  }
+}
+
+function updateDropIndicatorPosition(mouseY) {
+  if (!blockDropIndicator || !content) return;
+  const lines = Array.from(content.children).filter(el => el.classList && el.classList.contains('editor-line'));
+  if (lines.length === 0) return;
+
+  targetDropLine = null;
+  dropInsertBefore = true;
+  let indicatorTop = 0;
+  let targetLineRect = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const r = l.getBoundingClientRect();
+    const mid = r.top + r.height / 2;
+
+    if (mouseY < mid) {
+      targetDropLine = l;
+      dropInsertBefore = true;
+      indicatorTop = r.top - 2;
+      targetLineRect = r;
+      break;
+    } else {
+      targetDropLine = l;
+      dropInsertBefore = false;
+      indicatorTop = r.bottom - 1;
+      targetLineRect = r;
+    }
+  }
+
+  if (targetLineRect) {
+    const wrapRect = editorWrap.getBoundingClientRect();
+    const containerRect = editorContainer.getBoundingClientRect();
+
+    blockDropIndicator.style.top = (indicatorTop - wrapRect.top + editorWrap.scrollTop) + 'px';
+    blockDropIndicator.style.left = (containerRect.left - wrapRect.left + editorWrap.scrollLeft) + 'px';
+    blockDropIndicator.style.width = containerRect.width + 'px';
+    blockDropIndicator.style.display = 'block';
+  }
+}
+
+function runAutoScrollLoop() {
+  if (!isDraggingBlock || autoScrollSpeed === 0) {
+    autoScrollAnimFrame = null;
+    return;
+  }
+
+  editorWrap.scrollTop += autoScrollSpeed;
+  if (lastDragEvent) {
+    updateDropIndicatorPosition(lastDragEvent.clientY);
+  }
+
+  autoScrollAnimFrame = requestAnimationFrame(runAutoScrollLoop);
+}
+
+function onBlockDragEnd(e) {
+  if (!isDraggingBlock) return;
+
+  window.removeEventListener('mousemove', onBlockDragMove);
+  window.removeEventListener('mouseup', onBlockDragEnd);
+
+  if (autoScrollAnimFrame) {
+    cancelAnimationFrame(autoScrollAnimFrame);
+    autoScrollAnimFrame = null;
+  }
+  autoScrollSpeed = 0;
+
+  if (blockDragGhostEl) {
+    blockDragGhostEl.remove();
+    blockDragGhostEl = null;
+  }
+
+  if (blockDropIndicator) {
+    blockDropIndicator.style.display = 'none';
+  }
+
+  if (blockDragBtn) {
+    blockDragBtn.classList.remove('dragging');
+  }
+
+  if (draggedLineNode) {
+    draggedLineNode.classList.remove('dragging-line');
+    
+    const isDeleteZone = e.clientX > window.innerWidth - 80;
+
+    if (isDeleteZone) {
+      draggedLineNode.classList.remove('delete-mode');
+      
+      const nodeToDelete = draggedLineNode;
+      nodeToDelete.classList.add('pending-delete');
+      
+      const timeoutId = setTimeout(() => {
+        if (nodeToDelete.parentNode) {
+          saveHistory(state.activeDocId, true);
+          nodeToDelete.remove();
+          if (activeLineNode === nodeToDelete) activeLineNode = null;
+          markDirty();
+          updateStats();
+          debouncedRegenerateTOC();
+          saveHistory(state.activeDocId, true);
+        }
+      }, 5000);
+
+      const cancelDelete = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        clearTimeout(timeoutId);
+        nodeToDelete.classList.remove('pending-delete');
+        nodeToDelete.removeEventListener('mousedown', cancelDelete);
+      };
+      nodeToDelete.addEventListener('mousedown', cancelDelete);
+      
+      // Update stats and TOC without the node (it's hidden from getContentMarkdown)
+      markDirty();
+      updateStats();
+      debouncedRegenerateTOC();
+      
+    } else if (targetDropLine && targetDropLine !== draggedLineNode) {
+      saveHistory(state.activeDocId, true);
+
+      if (dropInsertBefore) {
+        content.insertBefore(draggedLineNode, targetDropLine);
+      } else {
+        content.insertBefore(draggedLineNode, targetDropLine.nextSibling);
+      }
+
+      makeLineRawAndActive(draggedLineNode);
+      markDirty();
+      updateStats();
+      saveHistory(state.activeDocId, true);
+      debouncedRegenerateTOC();
+    }
+  }
+
+  isDraggingBlock = false;
+  draggedLineNode = null;
+  targetDropLine = null;
+  lastDragEvent = null;
+
+  updateBlockAddPosition();
+  updateBlockDragPosition();
+}
+
+if (blockDragBtn) {
+  blockDragBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (activeLineNode) {
+      startBlockDrag(activeLineNode, e);
+    }
+  });
+}
+
 if (blockAddBtn) {
   blockAddBtn.addEventListener('mousedown', (e) => e.preventDefault());
   blockAddBtn.addEventListener('click', (e) => {
@@ -3610,7 +4232,6 @@ function applyBlockChoice(kind) {
     debouncedRegenerateTOC();
     return;
   }
-  // For "hr", replace the active line with --- (if empty) or insert below.
   if (kind === 'hr') {
     saveHistory(state.activeDocId, true);
     if (activeLineNode.textContent.trim() === '') {
@@ -3621,6 +4242,22 @@ function applyBlockChoice(kind) {
       const hr = makeLineNode('---');
       activeLineNode.parentNode.insertBefore(hr, activeLineNode.nextSibling);
     }
+    markDirty();
+    updateStats();
+    saveHistory(state.activeDocId, true);
+    return;
+  }
+  // For "image", format as markdown image
+  if (kind === 'image') {
+    saveHistory(state.activeDocId, true);
+    const text = activeLineNode.textContent.trim();
+    const newText = `![${text || 'description'}](url_de_l_image)`;
+    activeLineNode.textContent = newText;
+    activeLineNode.dataset.raw = newText;
+    applyLineKind(activeLineNode, newText);
+    
+    // Position caret at 'url_de_l_image' so user can easily replace it
+    setCaretInLine(activeLineNode, newText.indexOf('url_de_l_image') + 'url_de_l_image'.length);
     markDirty();
     updateStats();
     saveHistory(state.activeDocId, true);
