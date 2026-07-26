@@ -1,0 +1,24 @@
+/* Self-hosted typefaces, served from node_modules by server.js.
+   Replaces the Google Fonts stylesheet: no third-party request on load, and
+   the app keeps its typography offline. Each imported file declares its own
+   @font-face and resolves ./files/*.woff2 relative to itself.
+
+   Weights match what style.css actually asks for — adding one here means
+   adding the matching npm file, not a new network round trip. */
+
+/* Inter — interface */
+@import url("/vendor/fonts/inter/300.css");
+@import url("/vendor/fonts/inter/400.css");
+@import url("/vendor/fonts/inter/500.css");
+@import url("/vendor/fonts/inter/600.css");
+
+/* Newsreader — corps de texte */
+@import url("/vendor/fonts/newsreader/300.css");
+@import url("/vendor/fonts/newsreader/400.css");
+@import url("/vendor/fonts/newsreader/500.css");
+@import url("/vendor/fonts/newsreader/600.css");
+@import url("/vendor/fonts/newsreader/400-italic.css");
+
+/* JetBrains Mono — code */
+@import url("/vendor/fonts/jetbrains-mono/400.css");
+@import url("/vendor/fonts/jetbrains-mono/500.css");

@@ -76,17 +76,17 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-reveal-zone" id="sidebarRevealZone">
       <div class="sidebar-header">
-        <button class="brand" id="brandRevealBtn" type="button" aria-expanded="false" aria-controls="headerActions sidebarNewAction" title="Afficher les actions">
+        <button class="brand" id="brandRevealBtn" type="button" aria-expanded="false" aria-controls="headerActions sidebarNewAction" data-i18n-title="sidebar.reveal_title">
           Scriptorium<span class="brand-dot">.</span>
         </button>
         <div class="header-actions" id="headerActions">
-        <button class="icon-btn" id="searchBtn" title="Rechercher (Ctrl+P)">
+        <button class="icon-btn" id="searchBtn" data-i18n-title="header.search_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </button>
-        <button class="icon-btn" id="openSettingsBtn" title="Dossier de travail">
+        <button class="icon-btn" id="openSettingsBtn" data-i18n-title="header.settings_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
-        <button class="icon-btn" id="lockToggleBtn" title="Verrouiller/Déverrouiller les modifications et suppressions">
+        <button class="icon-btn" id="lockToggleBtn" data-i18n-title="header.lock_title">
           <svg class="icon-unlocked" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
             <path d="M7 11V7a5 5 0 0 1 9.9-1"/>
@@ -96,10 +96,10 @@
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </button>
-        <button class="icon-btn" id="openFolderBtn" title="Ouvrir dans l'explorateur">
+        <button class="icon-btn" id="openFolderBtn" data-i18n-title="header.open_folder_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         </button>
-        <button class="icon-btn" id="sortDocsBtn" title="Tri A à Z — cliquer pour trier par date" aria-label="Tri A à Z — cliquer pour trier par date">
+        <button class="icon-btn" id="sortDocsBtn" data-i18n-title="sort.by_alpha_tooltip" aria-label="Tri A à Z — cliquer pour trier par date">
           <svg class="sort-icon-alpha" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h8M4 12h6M4 18h4"/><path d="M18 5v14M15 16l3 3 3-3"/></svg>
           <svg class="sort-icon-date hidden" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
         </button>
@@ -109,12 +109,12 @@
       <div class="sidebar-new-action" id="sidebarNewAction">
         <button class="new-btn" id="newDocBtn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-          Nouveau texte
+          <span data-i18n="nav.new_document">Nouveau texte</span>
           <span class="shortcut">Ctrl+N</span>
         </button>
         <button class="new-btn secondary-action-btn" id="addSectionBtn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-          Nouvelle section
+          <span data-i18n="nav.new_section">Nouvelle section</span>
         </button>
       </div>
     </div>
@@ -123,9 +123,9 @@
 
     <div class="sidebar-footer">
       <span class="dot"></span>
-      <span class="workspace-label" id="workspaceLabel" title="Workspace actuel">Local</span>
+      <span class="workspace-label" id="workspaceLabel" data-i18n-title="nav.workspace_tooltip">Local</span>
       <span class="spacer"></span>
-      <button class="icon-btn" id="importBtn" title="Importer des fichiers .md / .txt">
+      <button class="icon-btn" id="importBtn" data-i18n-title="nav.import_title">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
       </button>
     </div>
@@ -146,35 +146,35 @@
       <div class="topbar-actions">
         <div class="save-indicator saved" id="saveIndicator">
           <span class="dot"></span>
-          <span id="saveText">Enregistré</span>
+          <span id="saveText" data-i18n="save.saved">Enregistré</span>
         </div>
 
-        <button class="clear-highlight-btn hidden" id="clearHighlightBtn" title="Effacer le surlignage">
+        <button class="clear-highlight-btn hidden" id="clearHighlightBtn" data-i18n-title="topbar.clear_highlight_title">
           <span id="highlightQueryLabel"></span>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
 
-        <button class="icon-btn hidden" id="previewToggle" title="Aperçu (Ctrl+P)">
+        <button class="icon-btn hidden" id="previewToggle" data-i18n-title="topbar.preview_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
 
-        <button class="icon-btn" id="typewriterToggle" title="Mode Machine à écrire (Ligne centrée)">
+        <button class="icon-btn" id="typewriterToggle" data-i18n-title="topbar.typewriter_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
         </button>
 
-        <button class="icon-btn" id="focusLineBtn" title="Focus Paragraphe (atténuer le reste du texte)" type="button">
+        <button class="icon-btn" id="focusLineBtn" data-i18n-title="topbar.focus_line_title" type="button">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M7 6h10M7 18h10"/></svg>
         </button>
 
-        <button class="icon-btn" id="readingToggle" title="Mode lecture (texte continu, sans blocs)">
+        <button class="icon-btn" id="readingToggle" data-i18n-title="topbar.reading_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         </button>
 
-        <button class="icon-btn" id="focusToggle" title="Mode focus (F)">
+        <button class="icon-btn" id="focusToggle" data-i18n-title="topbar.focus_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         </button>
 
-        <button class="icon-btn" id="exportBtn" title="Exporter / Imprimer (PDF Livre, HTML, Markdown)">
+        <button class="icon-btn" id="exportBtn" data-i18n-title="topbar.export_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
         </button>
 
@@ -198,7 +198,7 @@
 
     <!-- TABLE OF CONTENTS -->
     <aside class="toc-aside empty" id="tocAside">
-      <button class="toc-top-btn" id="tocTopBtn" title="Retour en haut">Sur cette page</button>
+      <button class="toc-top-btn" id="tocTopBtn" data-i18n-title="toc.top_button_title">Sur cette page</button>
       <div class="toc-wrap">
         <div class="toc-relative-container">
           <svg class="toc-svg" id="tocSvg" aria-hidden="true">
@@ -215,16 +215,16 @@
       <div class="stat"><strong id="rt">0 min</strong></div>
       <div class="chord-indicator" id="chordIndicator">Ctrl+K…</div>
       <div class="right">
-        <button class="icon-btn statusbar-btn" id="removeEmptyLinesBtn" title="Supprimer toutes les lignes vides du document" type="button">
+        <button class="icon-btn statusbar-btn" id="removeEmptyLinesBtn" data-i18n-title="statusbar.remove_empty_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 3v5M9.5 5.5 12 8l2.5-2.5"/><path d="M12 21v-5M9.5 18.5 12 16l2.5 2.5"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn" id="justifyBtn" title="Justifier le texte (aligner à gauche et à droite)" type="button">
+        <button class="icon-btn statusbar-btn" id="justifyBtn" data-i18n-title="statusbar.justify_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn" id="spellcheckBtn" title="Vérification orthographique (Correcteur)" type="button">
+        <button class="icon-btn statusbar-btn" id="spellcheckBtn" data-i18n-title="statusbar.spellcheck_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 3-8 3 8"/><path d="M7 13h4"/><path d="m16 8 2 3-2 3"/><path d="M14 16.5 16 18.5 22 12.5"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn" id="findReplaceBtn" title="Rechercher / remplacer (Ctrl+F)" type="button">
+        <button class="icon-btn statusbar-btn" id="findReplaceBtn" data-i18n-title="statusbar.find_replace_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </button>
       </div>
@@ -239,7 +239,7 @@
         <button class="panel-tab" id="panelTabToc">Sommaire</button>
         <button class="panel-tab" id="panelTabSnapshots">Instantanés</button>
       </div>
-      <button class="icon-btn ideas-only" id="importIdeasBtn" title="Importer thème .md">
+      <button class="icon-btn ideas-only" id="importIdeasBtn" data-i18n-title="ideas.import_theme_title">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
       </button>
     </div>
@@ -265,7 +265,7 @@
     <!-- TOC VIEW -->
     <div class="ideas-view view-toc">
       <div class="toc-side-top">
-        <button class="toc-top-btn" id="tocTopBtnSide" title="Retour en haut">Sur cette page</button>
+        <button class="toc-top-btn" id="tocTopBtnSide" data-i18n-title="toc.top_button_title">Sur cette page</button>
       </div>
       <div class="toc-wrap" id="tocWrapSide">
         <div class="toc-relative-container">
@@ -308,7 +308,7 @@
           <label for="workspacePathInput">Dossier des documents (Workspace) :</label>
           <div class="input-with-btn">
             <input type="text" id="workspacePathInput" placeholder="C:\chemin\vers\votre\workspace" />
-            <button class="picker-btn" id="pickWorkspaceFolderBtn" type="button" title="Parcourir / Choisir un dossier">
+            <button class="picker-btn" id="pickWorkspaceFolderBtn" type="button" data-i18n-title="settings.folder_browse_title">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
@@ -319,7 +319,7 @@
           <label for="ideasPathInput">Dossier des idées (optionnel) :</label>
           <div class="input-with-btn">
             <input type="text" id="ideasPathInput" placeholder="Par défaut : sous-dossier 'ideas' du workspace" />
-            <button class="picker-btn" id="pickIdeasFolderBtn" type="button" title="Parcourir / Choisir un dossier">
+            <button class="picker-btn" id="pickIdeasFolderBtn" type="button" data-i18n-title="settings.folder_browse_title">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
@@ -464,14 +464,14 @@
 
 <!-- FLOATING SELECTION TOOLBAR -->
 <div class="sel-toolbar" id="selToolbar" role="toolbar" aria-label="Mise en forme">
-  <button class="sel-btn" data-act="bold" title="Gras (Ctrl+G)"><b>B</b></button>
-  <button class="sel-btn" data-act="italic" title="Italique (Ctrl+I)"><i>I</i></button>
-  <button class="sel-btn" data-act="underline" title="Souligné"><u>U</u></button>
-  <button class="sel-btn" data-act="strike" title="Barré"><s>S</s></button>
-  <button class="sel-btn" data-act="code" title="Code inline">
+  <button class="sel-btn" data-act="bold" data-i18n-title="editor.selection_bold_title"><b>B</b></button>
+  <button class="sel-btn" data-act="italic" data-i18n-title="editor.selection_italic_title"><i>I</i></button>
+  <button class="sel-btn" data-act="underline" data-i18n-title="editor.selection_underline_title"><u>U</u></button>
+  <button class="sel-btn" data-act="strike" data-i18n-title="editor.selection_strike_title"><s>S</s></button>
+  <button class="sel-btn" data-act="code" data-i18n-title="editor.selection_code_title">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
   </button>
-  <button class="sel-btn" data-act="link" title="Lien">
+  <button class="sel-btn" data-act="link" data-i18n-title="editor.selection_link_title">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
   </button>
   <span class="sel-sep"></span>
@@ -486,11 +486,11 @@
 <!-- MULTI-BLOCK SELECTION TOOLBAR (Ctrl+clic) -->
 <div class="multi-sel-toolbar" id="multiSelToolbar" role="toolbar" aria-label="Blocs sélectionnés">
   <span class="msel-count" id="multiSelCount"></span>
-  <button class="msel-btn" id="multiMergeBtn" type="button" title="Fusionner les blocs sélectionnés en un seul bloc (contenu et mise en forme conservés)">
+  <button class="msel-btn" id="multiMergeBtn" type="button" data-i18n-title="multi.merge_title">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M9 7.5 12 10l3-2.5"/><path d="M12 21v-7M9 16.5 12 14l3 2.5"/></svg>
     Fusionner
   </button>
-  <button class="msel-btn msel-danger" id="multiDeleteBtn" type="button" title="Supprimer les blocs sélectionnés">
+  <button class="msel-btn msel-danger" id="multiDeleteBtn" type="button" data-i18n-title="multi.delete_title">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
     Supprimer
   </button>
@@ -501,7 +501,7 @@
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
 </button>
 
-<button class="block-drag-btn" id="blockDragBtn" title="Glisser pour réorganiser le bloc" aria-label="Déplacer le bloc">
+<button class="block-drag-btn" id="blockDragBtn" data-i18n-title="editor.block_drag_title" aria-label="Déplacer le bloc">
   <svg width="12" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="8" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/>
     <circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/>
@@ -538,16 +538,16 @@
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     <input type="text" id="findInput" placeholder="Rechercher…" autocomplete="off" spellcheck="false" />
     <span class="fr-count" id="findCount">0/0</span>
-    <button class="fr-icon-btn" id="findPrevBtn" title="Précédent (Maj+Entrée)" type="button">
+    <button class="fr-icon-btn" id="findPrevBtn" data-i18n-title="find.prev_title" type="button">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
     </button>
-    <button class="fr-icon-btn" id="findNextBtn" title="Suivant (Entrée)" type="button">
+    <button class="fr-icon-btn" id="findNextBtn" data-i18n-title="find.next_title" type="button">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </button>
-    <label class="fr-case-toggle" title="Respecter la casse">
+    <label class="fr-case-toggle" data-i18n-title="find.match_case_title">
       <input type="checkbox" id="findMatchCase" />Aa
     </label>
-    <button class="fr-icon-btn fr-close" id="findCloseBtn" title="Fermer (Échap)" type="button">
+    <button class="fr-icon-btn fr-close" id="findCloseBtn" data-i18n-title="find.close_title" type="button">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
   </div>

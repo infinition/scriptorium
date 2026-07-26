@@ -95,6 +95,7 @@
   "ideas.no_theme": "No theme \u2014 create one with the + theme button.",
   "ideas.empty_active": "No ideas \u2014 add one.",
   "ideas.empty_archived": "No archived ideas.",
+  "ideas.import_theme_title": "Import .md theme",
   "ideas.insert_title": "Insert at cursor",
   "ideas.edit_title": "Edit",
   "ideas.archive_title": "Archive",
@@ -111,6 +112,7 @@
 
   "toc.side_empty": "No headings in this document.",
   "toc.top_button": "On this page",
+  "toc.top_button_title": "Back to top",
 
   "panel.ideas_title": "Ideas",
   "panel.toc_title": "Table of Contents",
@@ -192,6 +194,7 @@
   "topbar.focus_title": "Focus mode (F)",
   "topbar.export_title": "Export / Print (PDF Book, HTML, Markdown)",
   "topbar.preview_title": "Preview (Ctrl+P)",
+  "topbar.clear_highlight_title": "Clear highlight",
 
   "find.replace": "Replace",
   "find.replace_all": "Replace all",

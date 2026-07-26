@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Scriptorium">
+  <rect width="512" height="512" rx="112" fill="#0d0d0f"/>
+  <!-- Une page, et la plume qui l'écrit. -->
+  <path d="M150 118h150l62 62v214a16 16 0 0 1-16 16H150a16 16 0 0 1-16-16V134a16 16 0 0 1 16-16z"
+        fill="none" stroke="#c9a96a" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M300 118v62h62" fill="none" stroke="#c9a96a" stroke-width="18" stroke-linejoin="round"/>
+  <path d="M182 250h100M182 300h148M182 350h96" stroke="#6b6b73" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="368" cy="352" r="14" fill="#c9a96a"/>
+</svg>

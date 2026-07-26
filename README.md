@@ -17,9 +17,39 @@ npm start
 Then open `http://localhost:3000`.
 
 On first launch the server reads `config.json` (created next to `server.js`)
-to find your workspace folder. The default points at
-`C:\DEV\coding\nexearch\solutions\manifest`; change it from the gear icon in
-the sidebar, or edit `config.json` directly.
+to find your workspace folder. The default is `~/Scriptorium`; change it from
+the gear icon in the sidebar, or edit `config.json` directly. To run against a
+different folder for one session without touching the saved config, set
+`SCRIPTORIUM_WORKSPACE`.
+
+### From a phone or tablet
+
+The server binds to `127.0.0.1` by default, so nothing outside this machine can
+reach your files. To use Scriptorium from another device on your network:
+
+```bash
+HOST=0.0.0.0 npm start
+```
+
+It then prints a URL containing an access token:
+
+```
+  Téléphone : http://192.168.1.20:3000/?token=xxxxxxxx
+```
+
+Open that link once on the phone — the token is stored in `localStorage` and
+removed from the address bar, and every later visit works from the plain URL.
+The token lives in `config.json`; delete it there to revoke access.
+
+Add it to your home screen and it installs as a standalone app: the shell is
+cached by a service worker, so it opens without a network. Editing still needs
+the server, since that is what reads and writes your files.
+
+## Offline
+
+No CDN, no external font host — KaTeX, highlight.js and the three typefaces are
+installed by `npm install` and served from `node_modules`. The only network
+traffic is between your browser and your own machine.
 
 ## Workspace layout
 
@@ -69,6 +99,41 @@ A floating toolbar appears whenever you select text. A small `+` button shows
 up in the gutter on the active line; click it for headings, lists, checkbox,
 quote, code block, divider.
 
+Clicking in the space between two blocks inserts a new one there. That space is
+the only place an insertion happens: a click anywhere inside a block always
+edits that block, with no exception. The cursor says which one you will get —
+`text` over a block, `cell` over a gap — and only one of the two highlights is
+ever shown. On touch, a short vibration marks the gap.
+
+Pasting always inserts plain text: content copied from a word processor or a
+web page arrives as the markdown source you can see and edit, and multi-line
+pastes become real lines rather than one glued-together paragraph.
+
+## Touch
+
+- Swipe from the left edge to open the sidebar, from the right for the ideas
+  panel; swipe back to close.
+- Long-press a document in the sidebar to move it to another section (this
+  replaces the drag-and-drop, which touch browsers do not fire). Right-click
+  does the same on desktop.
+- The drag handle on the active line works with a finger.
+
+## Snapshots
+
+Restoring a snapshot swaps it with what is currently in the editor rather than
+overwriting it: the version you were looking at takes the snapshot's place in
+the list, so clicking Restore again takes you straight back. The entry keeps
+its id and position; only its contents move.
+
+## Concurrent edits
+
+Documents are saved with the timestamp they were opened at. If the file changed
+in the meantime — the same document open on your phone, in another tab, or in
+an external editor — the save is refused and you are asked which version to
+keep, instead of one silently overwriting the other. When the conflict happens
+as the page is closing, and there is nobody to ask, the incoming version is
+written next to the original as `<name>.conflit-<date>.md`.
+
 ## Markdown support
 
 Standard CommonMark plus a few extras used by Obsidian/GitHub:
@@ -92,10 +157,17 @@ in source.
 
 - Node.js + Express on the server side. The whole API is in `server.js`.
 - No framework on the client: `public/{index.html, app.js, style.css}`.
-- `highlight.js` and `KaTeX` are loaded from a CDN; they degrade gracefully
-  if offline (formulas show as inline code, blocks lose syntax colours but
-  stay readable).
-- Fonts: Newsreader (body), Inter (UI), JetBrains Mono (code).
+- `highlight.js` and `KaTeX` are installed as dependencies and served from
+  `node_modules` under `/vendor`.
+- Fonts: Newsreader (body), Inter (UI), JetBrains Mono (code), self-hosted via
+  `@fontsource`.
+- `public/sw.js` caches the app shell so it opens offline; `/api/` is never
+  cached.
+
+Paths coming from the client are confined to the workspace folder
+(`safeJoin`/`assertSegment` in `server.js`): a section or document name can
+only ever be a single path segment. The padlock in the sidebar is enforced by
+the server, not just the UI.
 
 ## Star History
 

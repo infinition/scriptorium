@@ -95,6 +95,7 @@
   "ideas.no_theme": "Aucun th\u00e8me \u2014 cr\u00e9ez-en un avec le bouton + th\u00e8me.",
   "ideas.empty_active": "Aucune id\u00e9e \u2014 ajoutez-en une.",
   "ideas.empty_archived": "Aucune id\u00e9e archiv\u00e9e.",
+  "ideas.import_theme_title": "Importer th\u00e8me .md",
   "ideas.insert_title": "Ins\u00e9rer au curseur",
   "ideas.edit_title": "Modifier",
   "ideas.archive_title": "Archiver",
@@ -111,6 +112,7 @@
 
   "toc.side_empty": "Aucun titre dans ce document.",
   "toc.top_button": "Sur cette page",
+  "toc.top_button_title": "Retour en haut",
 
   "panel.ideas_title": "Id\u00e9es",
   "panel.toc_title": "Sommaire",
@@ -192,6 +194,7 @@
   "topbar.focus_title": "Mode focus (F)",
   "topbar.export_title": "Exporter / Imprimer (PDF Livre, HTML, Markdown)",
   "topbar.preview_title": "Aper\u00e7u (Ctrl+P)",
+  "topbar.clear_highlight_title": "Effacer le surlignage",
 
   "find.replace": "Remplacer",
   "find.replace_all": "Tout remplacer",
