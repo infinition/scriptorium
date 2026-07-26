@@ -1002,20 +1002,24 @@ button { font: inherit; color: inherit; }
 .ideas-header {
   padding: 22px 20px 12px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+.ideas-header .ideas-title {
+  width: 100%;
+  flex: 0 0 100%;
 }
 .ideas-title {
   font-family: var(--serif);
   font-size: 18px;
   font-style: italic;
   color: var(--text);
-  flex: 1;
   display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-bottom: 2px;
 }
 
 .themes-tabs {
