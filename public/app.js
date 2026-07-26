@@ -194,8 +194,6 @@ async function saveDocumentOnDisk() {
       saveText.textContent = __('save.saved');
       dirty = false;
 
-      showToast('toast.doc_saved');
-
       renderNav();
       updateBreadcrumbAndMeta();
     }
