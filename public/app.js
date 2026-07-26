@@ -5948,7 +5948,7 @@ function applyTextJustify(enable) {
 
 function applySpellcheck(enable) {
   spellcheckState = enable;
-  showToast('toast.spellcheck_toggled', { state: enable ? 'on' : 'off' });
+  showToast('toast.spellcheck_toggled', { state: enable ? __('toast.state_on') : __('toast.state_off') });
   const attr = enable ? 'true' : 'false';
   
   if (content) {

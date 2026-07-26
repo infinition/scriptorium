@@ -408,5 +408,7 @@
   "toast.focus_off": "Mode focus d\u00e9sactiv\u00e9",
   "toast.empty_lines_removed": "Lignes vides supprim\u00e9es",
   "toast.theme_applied": "Th\u00e8me appliqu\u00e9",
-  "toast.custom_theme_saved": "Th\u00e8me personnalis\u00e9 enregistr\u00e9"
+  "toast.custom_theme_saved": "Th\u00e8me personnalis\u00e9 enregistr\u00e9",
+  "toast.state_on": "activ\u00e9",
+  "toast.state_off": "d\u00e9sactiv\u00e9"
 }
