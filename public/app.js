@@ -6056,7 +6056,10 @@ function removeAllEmptyLines() {
       : (line.dataset.raw !== undefined ? line.dataset.raw : line.textContent);
     return raw === '';
   });
-  if (!toRemove.length) return;
+  if (!toRemove.length) {
+    showToast('toast.no_empty_lines');
+    return;
+  }
 
   saveHistory(state.activeDocId, true);
   toRemove.forEach(line => {

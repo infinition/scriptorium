@@ -412,6 +412,7 @@
   "toast.focus_on": "Focus mode on",
   "toast.focus_off": "Focus mode off",
   "toast.empty_lines_removed": "Empty lines removed",
+  "toast.no_empty_lines": "No empty lines to remove",
   "toast.theme_applied": "Theme applied",
   "toast.custom_theme_saved": "Custom theme saved",
   "toast.state_on": "on",

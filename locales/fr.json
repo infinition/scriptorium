@@ -417,4 +417,6 @@
   "editor.block_menu_aria": "Type de bloc",
   "settings.syntax_colors_title": "Couleurs des éléments markdown",
   "settings.language_select_label": "Langue / Language :"
+,
+  "toast.no_empty_lines": "Aucune ligne vide à supprimer"
 }
