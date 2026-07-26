@@ -1002,15 +1002,20 @@ button { font: inherit; color: inherit; }
 .ideas-header {
   padding: 22px 20px 12px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
 }
 .ideas-title {
   font-family: var(--serif);
-  font-size: 16px;
+  font-size: 18px;
   font-style: italic;
   color: var(--text);
   flex: 1;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .themes-tabs {
@@ -2408,26 +2413,25 @@ mark.search-match.first-match {
   padding: 4px 12px;
   border-radius: 999px;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: all 0.15s ease;
   position: relative;
   font-weight: 500;
 }
-.panel-tab:hover { color: var(--text); }
+.panel-tab:hover { color: var(--text); background: var(--bg-hover); }
 .panel-tab.active {
-  background: var(--accent-soft);
-  color: var(--accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+  background: var(--bg-active);
+  color: var(--text);
+  font-weight: 600;
 }
 .panel-tab.active::after {
   content: '';
   position: absolute;
-  bottom: -3px;
+  top: -5px;
   left: 50%;
   transform: translateX(-50%);
-  width: 60%;
-  max-width: 20px;
-  height: 2px;
-  border-radius: 1px;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
   background: var(--accent);
 }
 

@@ -4509,6 +4509,13 @@ function setRightPanelView(view) {
   if (panelTabIdeas)     panelTabIdeas.classList.toggle('active', !isToc && !isSnapshots);
   if (panelTabToc)       panelTabToc.classList.toggle('active', isToc);
   if (panelTabSnapshots) panelTabSnapshots.classList.toggle('active', isSnapshots);
+  // Update panel title
+  var titleEl = $('ideasPanelTitle');
+  if (titleEl) {
+    var titleKey = isToc ? 'ideas.tab_toc' : (isSnapshots ? 'ideas.tab_snapshots' : 'ideas.tab_ideas');
+    titleEl.textContent = __(titleKey);
+    titleEl.setAttribute('data-i18n', titleKey);
+  }
   try { localStorage.setItem('rightPanelView', view); } catch (e) {}
 
   if (isSnapshots) {
