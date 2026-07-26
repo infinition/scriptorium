@@ -235,11 +235,10 @@
   <aside class="ideas-panel" id="ideasPanel">
     <div class="ideas-header">
       <span class="ideas-title" id="ideasPanelTitle" data-i18n="ideas.tab_ideas">Ideas</span>
-      <div class="header-row"><div class="panel-tabs">
-        <button class="panel-tab active" id="panelTabIdeas"></button>
-        <button class="panel-tab" id="panelTabToc"></button>
-        <button class="panel-tab" id="panelTabSnapshots"></button>
-      </div>
+      <div class="header-row">
+      <button class="panel-cycle-btn" id="panelCycleBtn" data-i18n="ideas.tab_ideas" title="Switch panel">
+        <span class="panel-cycle-label" id="panelCycleLabel" data-i18n="ideas.tab_ideas">Ideas</span>
+      </button>
       <button class="icon-btn ideas-only" id="importIdeasBtn" data-i18n-title="ideas.import_theme_title">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
       </button>
@@ -327,7 +326,7 @@
               </svg>
             </button>
           </div>
-          <
+          
         </div>
         <div class="modal-actions" style="margin-top: 20px;">
           <button class="btn btn-secondary" id="cancelSettingsBtn"></button>

@@ -4506,15 +4506,16 @@ function setRightPanelView(view) {
   const isSnapshots = view === 'snapshots';
   ideasPanel.classList.toggle('view-toc-mode', isToc);
   ideasPanel.classList.toggle('view-snapshots-mode', isSnapshots);
-  if (panelTabIdeas)     panelTabIdeas.classList.toggle('active', !isToc && !isSnapshots);
-  if (panelTabToc)       panelTabToc.classList.toggle('active', isToc);
-  if (panelTabSnapshots) panelTabSnapshots.classList.toggle('active', isSnapshots);
-  // Update panel title
+  // Update panel title and cycle button label
+  var titleKey = isToc ? 'ideas.tab_toc' : (isSnapshots ? 'ideas.tab_snapshots' : 'ideas.tab_ideas');
   var titleEl = $('ideasPanelTitle');
   if (titleEl) {
-    var titleKey = isToc ? 'ideas.tab_toc' : (isSnapshots ? 'ideas.tab_snapshots' : 'ideas.tab_ideas');
     titleEl.textContent = __(titleKey);
     titleEl.setAttribute('data-i18n', titleKey);
+  }
+  if (panelCycleLabel) {
+    panelCycleLabel.textContent = __(titleKey);
+    panelCycleLabel.setAttribute('data-i18n', titleKey);
   }
   try { localStorage.setItem('rightPanelView', view); } catch (e) {}
 
@@ -4529,13 +4530,27 @@ function setRightPanelView(view) {
   });
 }
 
-if (panelTabIdeas)     panelTabIdeas.addEventListener('click', () => setRightPanelView('ideas'));
-if (panelTabToc)       panelTabToc.addEventListener('click', () => setRightPanelView('toc'));
-if (panelTabSnapshots) panelTabSnapshots.addEventListener('click', () => setRightPanelView('snapshots'));
+// Panel cycle button: cycles through Ideas -> TOC -> Snapshots -> Ideas
+var PANEL_VIEWS = ['ideas', 'toc', 'snapshots'];
+var panelCycleBtn = $('panelCycleBtn');
+var panelCycleLabel = $('panelCycleLabel');
+
+function cyclePanel() {
+  var current = ideasPanel.classList.contains('view-toc-mode') ? 'toc'
+    : ideasPanel.classList.contains('view-snapshots-mode') ? 'snapshots'
+    : 'ideas';
+  var idx = PANEL_VIEWS.indexOf(current);
+  var next = PANEL_VIEWS[(idx + 1) % PANEL_VIEWS.length];
+  setRightPanelView(next);
+}
+
+if (panelCycleBtn) {
+  panelCycleBtn.addEventListener('click', cyclePanel);
+}
 
 // Restore preferred view
 try {
-  const stored = localStorage.getItem('rightPanelView');
+  var stored = localStorage.getItem('rightPanelView');
   if (stored === 'toc' || stored === 'snapshots') setRightPanelView(stored);
 } catch (e) {}
 
