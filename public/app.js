@@ -4497,10 +4497,6 @@ window.addEventListener('resize', () => {
 });
 
 // ============ RIGHT-PANEL VIEW SWITCHER ============
-const panelTabIdeas = $('panelTabIdeas');
-const panelTabToc = $('panelTabToc');
-const panelTabSnapshots = $('panelTabSnapshots');
-
 function setRightPanelView(view) {
   const isToc = view === 'toc';
   const isSnapshots = view === 'snapshots';
@@ -4508,11 +4504,6 @@ function setRightPanelView(view) {
   ideasPanel.classList.toggle('view-snapshots-mode', isSnapshots);
   // Update panel title and cycle button label
   var titleKey = isToc ? 'ideas.tab_toc' : (isSnapshots ? 'ideas.tab_snapshots' : 'ideas.tab_ideas');
-  var titleEl = $('ideasPanelTitle');
-  if (titleEl) {
-    titleEl.textContent = __(titleKey);
-    titleEl.setAttribute('data-i18n', titleKey);
-  }
   if (panelCycleLabel) {
     panelCycleLabel.textContent = __(titleKey);
     panelCycleLabel.setAttribute('data-i18n', titleKey);

@@ -1000,18 +1000,7 @@ button { font: inherit; color: inherit; }
 }
 
 .ideas-header {
-  padding: 22px 20px 12px;
-}
-.ideas-header .ideas-title {
-  display: block;
-  font-family: var(--serif);
-  font-size: 18px;
-  font-style: italic;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 10px;
+  padding: 20px 20px 12px;
 }
 .ideas-header .header-row {
   display: flex;
