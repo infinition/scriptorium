@@ -412,5 +412,9 @@
   "toast.theme_applied": "Th\u00e8me appliqu\u00e9",
   "toast.custom_theme_saved": "Th\u00e8me personnalis\u00e9 enregistr\u00e9",
   "toast.state_on": "activ\u00e9",
-  "toast.state_off": "d\u00e9sactiv\u00e9"
+  "toast.state_off": "d\u00e9sactiv\u00e9",
+  "search.title": "Recherche",
+  "editor.block_menu_aria": "Type de bloc",
+  "settings.syntax_colors_title": "Couleurs des éléments markdown",
+  "settings.language_select_label": "Langue / Language :"
 }

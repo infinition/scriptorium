@@ -158,6 +158,8 @@
   "settings.reset_font_btn": "Reset sizes",
   "settings.cancel_btn": "Cancel",
   "settings.save_btn": "Save",
+  "settings.syntax_colors_title": "Markdown element colors",
+  "settings.language_select_label": "Language / Langue :",
   "settings.language_desc": "Choose the application language. Changes apply immediately.",
 
   "appearance.theme_default": "Default",
@@ -206,6 +208,7 @@
   "find.match_case_title": "Match case",
   "find.matches_ok": "{count} \u2713",
 
+  "search.title": "Search",
   "search.placeholder": "Search documents and ideas\u2026",
   "search.waiting": "Start typing to search across all your texts and ideas\u2026",
   "search.no_results": "No results.",
@@ -412,5 +415,7 @@
   "toast.theme_applied": "Theme applied",
   "toast.custom_theme_saved": "Custom theme saved",
   "toast.state_on": "on",
-  "toast.state_off": "off"
+  "toast.state_off": "off",
+  "search.title": "Search",
+  "editor.block_menu_aria": "Block type"
 }
