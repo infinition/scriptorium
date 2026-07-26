@@ -189,8 +189,8 @@
       <div class="editor-container" id="editorContainer">
         <div class="editor-pane" id="editorPane">
           <div class="doc-meta" id="docMeta"></div>
-          <textarea class="title-input" id="title" placeholder="Sans titre" rows="1" autocomplete="off" spellcheck="true" lang="fr"></textarea>
-          <textarea class="subtitle-input" id="subtitle" placeholder="Sous-titre, ou une ligne pour situer le texte" rows="1" autocomplete="off" spellcheck="true" lang="fr"></textarea>
+          <textarea class="title-input" id="title" data-i18n-placeholder="new_doc.placeholder_title" placeholder="Untitled" rows="1" autocomplete="off" spellcheck="true" lang="en"></textarea>
+          <textarea class="subtitle-input" id="subtitle" data-i18n-placeholder="new_doc.placeholder_subtitle" placeholder="Subtitle" rows="1" autocomplete="off" spellcheck="true" lang="en"></textarea>
           <div class="content-area" id="content" contenteditable="true" placeholder="Commence à écrire…" spellcheck="true" lang="fr"></div>
         </div>
       </div>
@@ -198,7 +198,7 @@
 
     <!-- TABLE OF CONTENTS -->
     <aside class="toc-aside empty" id="tocAside">
-      <button class="toc-top-btn" id="tocTopBtn" data-i18n-title="toc.top_button_title">Sur cette page</button>
+      <button class="toc-top-btn" id="tocTopBtn" data-i18n-title="toc.top_button_title"><span data-i18n="toc.top_button">Sur cette page</span></button>
       <div class="toc-wrap">
         <div class="toc-relative-container">
           <svg class="toc-svg" id="tocSvg" aria-hidden="true">
@@ -210,8 +210,8 @@
     </aside>
 
     <div class="statusbar">
-      <div class="stat"><strong id="wc">0</strong> mots</div>
-      <div class="stat stat-chars"><strong id="cc">0</strong> signes</div>
+      <div class="stat"><strong id="wc">0</strong> <span data-i18n="statusbar.mots"></span></div>
+      <div class="stat stat-chars"><strong id="cc">0</strong> <span data-i18n="statusbar.signes"></span></div>
       <div class="stat"><strong id="rt">0 min</strong></div>
       <div class="chord-indicator" id="chordIndicator">Ctrl+K…</div>
       <div class="right">
@@ -235,9 +235,9 @@
   <aside class="ideas-panel" id="ideasPanel">
     <div class="ideas-header">
       <div class="panel-tabs">
-        <button class="panel-tab active" id="panelTabIdeas">Idées</button>
-        <button class="panel-tab" id="panelTabToc">Sommaire</button>
-        <button class="panel-tab" id="panelTabSnapshots">Instantanés</button>
+        <button class="panel-tab active" id="panelTabIdeas"></button>
+        <button class="panel-tab" id="panelTabToc"></button>
+        <button class="panel-tab" id="panelTabSnapshots"></button>
       </div>
       <button class="icon-btn ideas-only" id="importIdeasBtn" data-i18n-title="ideas.import_theme_title">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
@@ -249,23 +249,23 @@
       <div class="themes-tabs" id="themesTabs"></div>
 
       <div class="ideas-toolbar">
-        <button class="pill-btn active" id="activeTab" data-mode="active">Actives <span id="activeCount" style="opacity: 0.6"></span></button>
-        <button class="pill-btn" id="archiveTab" data-mode="archived">Archive <span id="archivedCount" style="opacity: 0.6"></span></button>
+        <button class="pill-btn active" id="activeTab" data-mode="active"><span data-i18n="ideas.pill_active">Actives</span> <span id="activeCount" style="opacity: 0.6"></span></button>
+        <button class="pill-btn" id="archiveTab" data-mode="archived"><span data-i18n="ideas.pill_archived">Archive</span> <span id="archivedCount" style="opacity: 0.6"></span></button>
       </div>
 
       <div class="ideas-list" id="ideasList"></div>
 
       <textarea class="idea-add hidden" id="ideaAddInput" placeholder="Nouvelle idée — Entrée pour valider, Échap pour annuler" rows="2"></textarea>
 
-      <div class="ideas-footer">
+      <div class="ideas-footer"><span data-i18n-html="ideas.footer">
         <kbd>clic</kbd> archive · <kbd>clic droit</kbd> insère · <kbd>survol</kbd> texte complet
-      </div>
+      </span></div>
     </div>
 
     <!-- TOC VIEW -->
     <div class="ideas-view view-toc">
       <div class="toc-side-top">
-        <button class="toc-top-btn" id="tocTopBtnSide" data-i18n-title="toc.top_button_title">Sur cette page</button>
+        <button class="toc-top-btn" id="tocTopBtnSide" data-i18n-title="toc.top_button_title"><span data-i18n="toc.top_button">Sur cette page</span></button>
       </div>
       <div class="toc-wrap" id="tocWrapSide">
         <div class="toc-relative-container">
@@ -275,16 +275,16 @@
           <ul class="toc-list" id="tocListSide"></ul>
         </div>
       </div>
-      <div class="toc-side-empty hidden" id="tocSideEmpty">Aucun titre dans ce document.</div>
+      <div class="toc-side-empty hidden" id="tocSideEmpty"></div>
     </div>
 
     <!-- SNAPSHOTS VIEW -->
     <div class="ideas-view view-snapshots">
       <div class="snapshots-header" style="padding: 10px 14px; border-bottom: 1px solid var(--border);">
-        <button class="btn btn-primary btn-sm" id="createSnapshotBtn" type="button" style="width: 100%;">+ Créer un instantané</button>
+        <button class="btn btn-primary btn-sm" id="createSnapshotBtn" type="button" style="width: 100%;"><span data-i18n="snapshot.create_button">+ Créer un instantané</span></button>
       </div>
       <div class="snapshots-list" id="snapshotsList" style="padding: 12px; overflow-y: auto;"></div>
-      <div class="snapshots-empty hidden" id="snapshotsEmpty" style="padding: 20px; text-align: center; color: var(--text-faint); font-size: 13px;">Aucun instantané enregistré pour ce document.</div>
+      <div class="snapshots-empty hidden" id="snapshotsEmpty" style="padding: 20px; text-align: center; color: var(--text-faint); font-size: 13px;"></div>
     </div>
   </aside>
 </div>
@@ -293,21 +293,21 @@
 <div class="modal-overlay" id="settingsModal">
   <div class="modal modal-wide">
     <div class="modal-header">
-      <h3>Paramètres</h3>
+      <h3 data-i18n="settings.title">Paramètres</h3>
       <button class="close-btn" id="closeSettingsBtn">&times;</button>
     </div>
     <div class="settings-tabs" role="tablist">
-      <button class="settings-tab active" id="settingsTabFolders" data-panel="folders" role="tab" type="button">Dossiers</button>
-      <button class="settings-tab" id="settingsTabAppearance" data-panel="appearance" role="tab" type="button">Apparence</button>
-      <button class="settings-tab" id="settingsTabLanguage" data-panel="language" role="tab" type="button">Langue</button>
+      <button class="settings-tab active" id="settingsTabFolders" data-panel="folders" role="tab" type="button" data-i18n="settings.tab_folders">Dossiers</button>
+      <button class="settings-tab" id="settingsTabAppearance" data-panel="appearance" role="tab" type="button" data-i18n="settings.tab_appearance">Apparence</button>
+      <button class="settings-tab" id="settingsTabLanguage" data-panel="language" role="tab" type="button" data-i18n="settings.tab_language">Langue</button>
     </div>
     <div class="modal-body">
       <div class="settings-panel" data-panel="folders">
-        <p class="modal-desc">Définissez les dossiers locaux sur votre ordinateur pour vos documents et vos thèmes d'idées.</p>
+        <p class="modal-desc" data-i18n="settings.folders_desc">Définissez les dossiers locaux sur votre ordinateur pour vos documents et vos thèmes d'idées.</p>
         <div class="form-group">
-          <label for="workspacePathInput">Dossier des documents (Workspace) :</label>
+          <label for="workspacePathInput" data-i18n="settings.documents_label">Dossier des documents (Workspace) :</label>
           <div class="input-with-btn">
-            <input type="text" id="workspacePathInput" placeholder="C:\chemin\vers\votre\workspace" />
+            <input type="text" id="workspacePathInput" data-i18n-placeholder="settings.documents_placeholder" placeholder="C:\path\to\workspace" />
             <button class="picker-btn" id="pickWorkspaceFolderBtn" type="button" data-i18n-title="settings.folder_browse_title">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -316,7 +316,7 @@
           </div>
         </div>
         <div class="form-group" style="margin-top: 14px;">
-          <label for="ideasPathInput">Dossier des idées (optionnel) :</label>
+          <label for="ideasPathInput" data-i18n="settings.ideas_label">Dossier des idées (optionnel) :</label>
           <div class="input-with-btn">
             <input type="text" id="ideasPathInput" placeholder="Par défaut : sous-dossier 'ideas' du workspace" />
             <button class="picker-btn" id="pickIdeasFolderBtn" type="button" data-i18n-title="settings.folder_browse_title">
@@ -325,21 +325,21 @@
               </svg>
             </button>
           </div>
-          <span class="field-hint" style="display: block; font-size: 11px; color: var(--text-tertiary, #888); margin-top: 4px;">Laissez vide pour utiliser le dossier "ideas" à l'intérieur du workspace.</span>
+          <
         </div>
         <div class="modal-actions" style="margin-top: 20px;">
-          <button class="btn btn-secondary" id="cancelSettingsBtn">Annuler</button>
-          <button class="btn btn-primary" id="saveSettingsBtn">Enregistrer</button>
+          <button class="btn btn-secondary" id="cancelSettingsBtn"></button>
+          <button class="btn btn-primary" id="saveSettingsBtn"></button>
         </div>
       </div>
 
       <div class="settings-panel hidden" data-panel="appearance">
-        <p class="modal-desc">Choisissez un thème visuel. Le changement s'applique immédiatement.</p>
+        <p class="modal-desc"><span data-i18n="settings.appearance_desc">Choisissez un thème visuel. Le changement s'applique immédiatement.</span></p>
         <div class="color-theme-swatches" id="colorThemeSwatches"></div>
 
         <label class="checkbox-row" style="margin-top: 18px;">
           <input type="checkbox" id="mdColorToggle" />
-          <span>Colorer différemment les titres (H1-H6), le gras, les citations, les liens, le code, le texte barré, etc.</span>
+          <span><span data-i18n="settings.mdcolor_label">Colorer différemment les titres (H1-H6), le gras, les citations, les liens, le code, le texte barré, etc.</span></span>
         </label>
 
         <label class="checkbox-row" style="margin-top: 10px;">
@@ -348,90 +348,89 @@
         </label>
 
         <div class="custom-theme-editor hidden" id="customThemeEditor">
-          <p class="modal-desc" style="margin-top: 18px;">
-            Thème personnalisé — enregistré dans <code>theme.custom.json</code> à la racine du projet Scriptorium.
+          <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.custom_theme_desc">Thème personnalisé &mdash; enregistré dans</span> <code>theme.custom.json</code> à la racine du projet Scriptorium.
           </p>
           <div class="color-field-grid" id="customThemeBaseFields"></div>
-          <div class="color-field-grid-title hidden" id="customThemeSyntaxTitle">Couleurs des éléments markdown</div>
+          <div class="color-field-grid-title hidden" id="customThemeSyntaxTitle"><span data-i18n="settings.syntax_colors_title">Couleurs des éléments markdown</span></div>
           <div class="color-field-grid hidden" id="customThemeSyntaxFields"></div>
           <div class="modal-actions" style="margin-top: 16px; justify-content: flex-start;">
-            <button class="btn btn-secondary" id="resetCustomThemeBtn" type="button">Repartir du thème "Par défaut"</button>
-            <button class="btn btn-primary" id="saveCustomThemeBtn" type="button">Enregistrer le thème personnalisé</button>
+            <button class="btn btn-secondary" id="resetCustomThemeBtn" type="button"></button>
+            <button class="btn btn-primary" id="saveCustomThemeBtn" type="button"></button>
             <span class="field-hint" id="customThemeSaveStatus"></span>
           </div>
         </div>
 
-        <p class="modal-desc" style="margin-top: 22px;">Taille du texte — chaque niveau est réglable indépendamment.</p>
+        <p class="modal-desc" style="margin-top: 22px;"><span data-i18n="settings.font_sizes_desc">Taille du texte &mdash; chaque niveau est réglable indépendamment.</span></p>
         <div class="font-size-rows">
           <div class="font-size-row">
-            <label for="fsSliderDocTitle">Titre document</label>
+            <label for="fsSliderDocTitle"><span data-i18n="settings.font_doc_title_label">Titre document</span></label>
             <input type="range" id="fsSliderDocTitle" data-fs-key="--fs-doc-title" min="20" max="60" step="1" />
             <span class="font-size-value" id="fsValueDocTitle"></span>
           </div>
           <div class="font-size-row">
-            <label for="fsSliderDocSubtitle">Sous-titre doc</label>
+            <label for="fsSliderDocSubtitle"><span data-i18n="settings.font_doc_subtitle_label">Sous-titre doc</span></label>
             <input type="range" id="fsSliderDocSubtitle" data-fs-key="--fs-doc-subtitle" min="12" max="30" step="0.5" />
             <span class="font-size-value" id="fsValueDocSubtitle"></span>
           </div>
           <div class="font-size-row">
-            <label for="fsSliderBase">Texte normal</label>
+            <label for="fsSliderBase"><span data-i18n="settings.font_base_label">Texte normal</span></label>
             <input type="range" id="fsSliderBase" data-fs-key="--fs-base" min="13" max="24" step="0.5" />
             <span class="font-size-value" id="fsValueBase"></span>
           </div>
           <div class="font-size-row">
-            <label for="fsSliderH1">Titre H1</label>
+            <label for="fsSliderH1"><span data-i18n="settings.font_h1_label">Titre H1</span></label>
             <input type="range" id="fsSliderH1" data-fs-key="--fs-h1" min="24" max="56" step="1" />
             <span class="font-size-value" id="fsValueH1"></span>
           </div>
           <div class="font-size-row">
-            <label for="fsSliderH2">Titre H2</label>
+            <label for="fsSliderH2"><span data-i18n="settings.font_h2_label">Titre H2</span></label>
             <input type="range" id="fsSliderH2" data-fs-key="--fs-h2" min="20" max="46" step="1" />
             <span class="font-size-value" id="fsValueH2"></span>
           </div>
           <div class="font-size-row">
-            <label for="fsSliderH3">Titre H3</label>
+            <label for="fsSliderH3"><span data-i18n="settings.font_h3_label">Titre H3</span></label>
             <input type="range" id="fsSliderH3" data-fs-key="--fs-h3" min="17" max="38" step="1" />
             <span class="font-size-value" id="fsValueH3"></span>
           </div>
           <div class="font-size-row">
-            <label for="fsSliderH4">Titre H4</label>
+            <label for="fsSliderH4"><span data-i18n="settings.font_h4_label">Titre H4</span></label>
             <input type="range" id="fsSliderH4" data-fs-key="--fs-h4" min="15" max="32" step="1" />
             <span class="font-size-value" id="fsValueH4"></span>
           </div>
           <div class="font-size-row">
-            <label for="fsSliderH5">Titre H5</label>
+            <label for="fsSliderH5"><span data-i18n="settings.font_h5_label">Titre H5</span></label>
             <input type="range" id="fsSliderH5" data-fs-key="--fs-h5" min="13" max="26" step="0.5" />
             <span class="font-size-value" id="fsValueH5"></span>
           </div>
           <div class="font-size-row">
-            <label for="fsSliderH6">Titre H6</label>
+            <label for="fsSliderH6"><span data-i18n="settings.font_h6_label">Titre H6</span></label>
             <input type="range" id="fsSliderH6" data-fs-key="--fs-h6" min="12" max="24" step="0.5" />
             <span class="font-size-value" id="fsValueH6"></span>
           </div>
         </div>
 
         <div class="font-size-preview" id="fontSizePreview">
-          <div class="fsp-doc-title">Titre du document</div>
-          <div class="fsp-doc-subtitle">Sous-titre ou description du document</div>
-          <div class="fsp-h1">Titre principal (H1)</div>
-          <div class="fsp-h2">Titre de section (H2)</div>
-          <div class="fsp-h3">Sous-titre (H3)</div>
-          <div class="fsp-h4">Titre H4</div>
-          <div class="fsp-h5">Titre H5</div>
-          <div class="fsp-h6">Titre H6</div>
-          <div class="fsp-quote"><blockquote>Une citation d'exemple pour l'aperçu du style</blockquote></div>
-          <div class="fsp-p">Texte normal avec du <strong>gras</strong>, de l'<em>italique</em>, du <code>code</code>, un <a href="#">lien</a> et du <del>barré</del>.</div>
+          <div class="fsp-doc-title"><span data-i18n="font_preview.doc_title">Titre du document</span></div>
+          <div class="fsp-doc-subtitle"><span data-i18n="font_preview.doc_subtitle">Sous-titre ou description du document</span></div>
+          <div class="fsp-h1"><span data-i18n="font_preview.h1">Titre principal (H1)</span></div>
+          <div class="fsp-h2"><span data-i18n="font_preview.h2">Titre de section (H2)</span></div>
+          <div class="fsp-h3"><span data-i18n="font_preview.h3">Sous-titre (H3)</span></div>
+          <div class="fsp-h4"><span data-i18n="font_preview.h4">Titre H4</span></div>
+          <div class="fsp-h5"><span data-i18n="font_preview.h5">Titre H5</span></div>
+          <div class="fsp-h6"><span data-i18n="font_preview.h6">Titre H6</span></div>
+          <div class="fsp-quote"><blockquote><span data-i18n="font_preview.quote">Une citation d'exemple pour l'aperçu du style</span></blockquote></div>
+          <div class="fsp-p"><span data-i18n-html="font_preview.body">Texte normal avec du <strong>gras</strong></span></strong>, de l'<em>italique</em>, du <code>code</code>, un <a href="#">lien</a> et du <del>barré</del>.</div>
         </div>
 
         <div class="modal-actions" style="margin-top: 12px; justify-content: flex-start;">
-          <button class="btn btn-secondary" id="resetFontSizesBtn" type="button">Réinitialiser les tailles</button>
+          <button class="btn btn-secondary" id="resetFontSizesBtn" type="button"></button>
         </div>
       </div>
 
       <div class="settings-panel hidden" data-panel="language">
-        <p class="modal-desc">Choose the application language. Changes apply immediately.</p>
+        <p class="modal-desc"><span data-i18n="settings.language_desc">Choose the application language</span>. Changes apply immediately.</p>
         <div class="form-group">
-          <label for="languageSelect">Language / Langue :</label>
+          <label for="languageSelect"><span data-i18n="settings.language_select_label">Language / Langue :</span></label>
           <select id="languageSelect" class="language-select">
             <option value="en">English</option>
             <option value="fr">Français</option>
@@ -444,26 +443,26 @@
 
 <!-- SEARCH PALETTE -->
 <div class="search-modal-overlay" id="searchModalOverlay">
-  <div class="search-modal" role="dialog" aria-label="Recherche">
+  <div class="search-modal" role="dialog" data-i18n-aria-label="search.title" aria-label="Search">
     <div class="search-input-wrap">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input type="text" id="searchInput" placeholder="Rechercher dans les documents et les idées…" autocomplete="off" spellcheck="false" />
+      <input type="text" id="searchInput" data-i18n-placeholder="search.placeholder" placeholder="Search documents and ideas" autocomplete="off" spellcheck="false" />
       <kbd class="search-esc">Esc</kbd>
     </div>
     <div class="search-results" id="searchResults">
-      <div class="search-placeholder">Tapez pour rechercher dans tous vos textes et idées…</div>
+      <div class="search-placeholder"><span data-i18n="search.waiting">Tapez pour rechercher</span></div>
     </div>
     <div class="search-footer">
-      <span><kbd>↑</kbd><kbd>↓</kbd> naviguer</span>
-      <span><kbd>↵</kbd> ouvrir</span>
-      <span><kbd>Esc</kbd> fermer</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="search.nav_up">naviguer</span></span>
+      <span><kbd>↵</kbd> <span data-i18n="search.nav_open">ouvrir</span></span>
+      <span><kbd>Esc</kbd> <span data-i18n="search.nav_close">fermer</span></span>
       <span class="search-count" id="searchCount"></span>
     </div>
   </div>
 </div>
 
 <!-- FLOATING SELECTION TOOLBAR -->
-<div class="sel-toolbar" id="selToolbar" role="toolbar" aria-label="Mise en forme">
+<div class="sel-toolbar" id="selToolbar" role="toolbar" data-i18n-aria-label="editor.selection_toolbar_aria" aria-label="Formatting">
   <button class="sel-btn" data-act="bold" data-i18n-title="editor.selection_bold_title"><b>B</b></button>
   <button class="sel-btn" data-act="italic" data-i18n-title="editor.selection_italic_title"><i>I</i></button>
   <button class="sel-btn" data-act="underline" data-i18n-title="editor.selection_underline_title"><u>U</u></button>
@@ -484,7 +483,7 @@
 </div>
 
 <!-- MULTI-BLOCK SELECTION TOOLBAR (Ctrl+clic) -->
-<div class="multi-sel-toolbar" id="multiSelToolbar" role="toolbar" aria-label="Blocs sélectionnés">
+<div class="multi-sel-toolbar" id="multiSelToolbar" role="toolbar" data-i18n-aria-label="editor.selection_toolbar_aria" aria-label="Formatting">
   <span class="msel-count" id="multiSelCount"></span>
   <button class="msel-btn" id="multiMergeBtn" type="button" data-i18n-title="multi.merge_title">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M9 7.5 12 10l3-2.5"/><path d="M12 21v-7M9 16.5 12 14l3 2.5"/></svg>
@@ -501,7 +500,7 @@
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
 </button>
 
-<button class="block-drag-btn" id="blockDragBtn" data-i18n-title="editor.block_drag_title" aria-label="Déplacer le bloc">
+<button class="block-drag-btn" id="blockDragBtn" data-i18n-title="editor.block_drag_title" data-i18n-aria-label="editor.block_drag_aria" aria-label="Move block">
   <svg width="12" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="8" cy="4" r="1.5"/><circle cx="16" cy="4" r="1.5"/>
     <circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/>
@@ -509,34 +508,34 @@
   </svg>
 </button>
 
-<button class="block-trash-btn" id="blockTrashBtn" title="Supprimer le bloc" aria-label="Supprimer le bloc">
+<button class="block-trash-btn" id="blockTrashBtn" data-i18n-title="editor.block_trash_title" data-i18n-aria-label="editor.block_trash_aria">
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/><path d="M10 11v6M14 11v6"/></svg>
 </button>
 
-<div class="block-menu" id="blockMenu" role="menu" aria-label="Type de bloc">
-  <div class="block-menu-section">Texte</div>
-  <button class="block-menu-item" data-block="p" role="menuitem"><span class="ico">¶</span>Paragraphe</button>
-  <button class="block-menu-item" data-block="h1" role="menuitem"><span class="ico">H1</span>Titre 1<span class="hint">#</span></button>
-  <button class="block-menu-item" data-block="h2" role="menuitem"><span class="ico">H2</span>Titre 2<span class="hint">##</span></button>
-  <button class="block-menu-item" data-block="h3" role="menuitem"><span class="ico">H3</span>Titre 3<span class="hint">###</span></button>
+<div class="block-menu" id="blockMenu" role="menu" data-i18n-aria-label="editor.block_menu_aria" aria-label="Block type">
+  <div class="block-menu-section" data-i18n="editor.block_menu_text">Texte</div></div>
+  <button class="block-menu-item" data-block="p" role="menuitem"><span class="ico">¶</span><span data-i18n="editor.block_paragraph">Paragraphe</span></button>
+  <button class="block-menu-item" data-block="h1" role="menuitem"><span class="ico">H1</span><span data-i18n="editor.block_heading1">Titre 1</span><span class="hint">#</span></button>
+  <button class="block-menu-item" data-block="h2" role="menuitem"><span class="ico">H2</span><span data-i18n="editor.block_heading2">Titre 2</span><span class="hint">##</span></button>
+  <button class="block-menu-item" data-block="h3" role="menuitem"><span class="ico">H3</span><span data-i18n="editor.block_heading3">Titre 3</span><span class="hint">###</span></button>
   <div class="block-menu-sep"></div>
-  <div class="block-menu-section">Listes</div>
-  <button class="block-menu-item" data-block="ul" role="menuitem"><span class="ico">•</span>Liste à puces<span class="hint">-</span></button>
-  <button class="block-menu-item" data-block="ol" role="menuitem"><span class="ico">1.</span>Liste numérotée<span class="hint">1.</span></button>
-  <button class="block-menu-item" data-block="task" role="menuitem"><span class="ico">☐</span>Case à cocher<span class="hint">- [ ]</span></button>
+  <div class="block-menu-section" data-i18n="editor.block_menu_lists">Listes</div></div>
+  <button class="block-menu-item" data-block="ul" role="menuitem"><span class="ico">•</span><span data-i18n="editor.block_bullet_list">Liste à puces</span><span class="hint">-</span></button>
+  <button class="block-menu-item" data-block="ol" role="menuitem"><span class="ico">1.</span><span data-i18n="editor.block_numbered_list">Liste numérotée</span><span class="hint">1.</span></button>
+  <button class="block-menu-item" data-block="task" role="menuitem"><span class="ico">☐</span><span data-i18n="editor.block_task">Case à cocher</span><span class="hint">- [ ]</span></button>
   <div class="block-menu-sep"></div>
-  <div class="block-menu-section">Blocs</div>
-  <button class="block-menu-item" data-block="quote" role="menuitem"><span class="ico">"</span>Citation<span class="hint">&gt;</span></button>
+  <div class="block-menu-section" data-i18n="editor.block_menu_blocks">Blocs</div></div>
+  <button class="block-menu-item" data-block="quote" role="menuitem"><span class="ico">"</span><span data-i18n="editor.block_quote">Citation</span><span class="hint">&gt;</span></button>
   <button class="block-menu-item" data-block="code" role="menuitem"><span class="ico">{}</span>Bloc de code<span class="hint">```</span></button>
-  <button class="block-menu-item" data-block="image" role="menuitem"><span class="ico">🖼️</span>Image<span class="hint">![]()</span></button>
-  <button class="block-menu-item" data-block="hr" role="menuitem"><span class="ico">―</span>Séparateur<span class="hint">---</span></button>
+  <button class="block-menu-item" data-block="image" role="menuitem"><span class="ico">🖼️</span><span data-i18n="editor.block_image">Image</span><span class="hint">![]()</span></button>
+  <button class="block-menu-item" data-block="hr" role="menuitem"><span class="ico">―</span><span data-i18n="editor.block_divider">Séparateur</span><span class="hint">---</span></button>
 </div>
 
 <!-- FIND / REPLACE -->
 <div class="find-replace-bar" id="findReplaceBar">
   <div class="fr-row">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <input type="text" id="findInput" placeholder="Rechercher…" autocomplete="off" spellcheck="false" />
+    <input type="text" id="findInput" data-i18n-placeholder="find.placeholder" placeholder="Search" autocomplete="off" spellcheck="false" />
     <span class="fr-count" id="findCount">0/0</span>
     <button class="fr-icon-btn" id="findPrevBtn" data-i18n-title="find.prev_title" type="button">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
@@ -553,9 +552,9 @@
   </div>
   <div class="fr-row">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v6h6M14 4l6 6M10 20v-6H4M10 20l-6-6"/></svg>
-    <input type="text" id="replaceInput" placeholder="Remplacer par…" autocomplete="off" spellcheck="false" />
-    <button class="fr-text-btn" id="replaceOneBtn" type="button">Remplacer</button>
-    <button class="fr-text-btn" id="replaceAllBtn" type="button">Tout remplacer</button>
+    <input type="text" id="replaceInput" data-i18n-placeholder="find.replace_placeholder" placeholder="Replace with" autocomplete="off" spellcheck="false" />
+    <button class="fr-text-btn" id="replaceOneBtn" type="button"></button>
+    <button class="fr-text-btn" id="replaceAllBtn" type="button"></button>
   </div>
 </div>
 
@@ -563,15 +562,15 @@
 <div class="export-menu" id="exportMenu">
   <button class="export-menu-item" id="exportPdfBtn" type="button">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-    <span>Imprimer / PDF Livre</span>
+    <span><span data-i18n="export.title_pdf">Imprimer / PDF Livre</span></span>
   </button>
   <button class="export-menu-item" id="exportHtmlBtn" type="button">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-    <span>Exporter en HTML Autonome</span>
+    <span><span data-i18n="export.title_html">Exporter en HTML Autonome</span></span>
   </button>
   <button class="export-menu-item" id="exportMdBtn" type="button">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-    <span>Exporter en Markdown (.md)</span>
+    <span><span data-i18n="export.title_md">Exporter en Markdown (.md)</span></span>
   </button>
 </div>
 
@@ -579,25 +578,24 @@
 <div class="modal-overlay" id="diffModal">
   <div class="modal modal-wide diff-modal">
     <div class="modal-header">
-      <h3 id="diffModalTitle">Comparatif de révision (Diff)</h3>
-      <button class="close-btn" id="closeDiffBtn">&times;</button>
+      <h3 id="diffModalTitle"><span data-i18n="snapshot.diff_title">Comparatif de révision (Diff)</span></h3>
+      <button class="close-btn" id="closeDiffBtn"></button>
     </div>
     <div class="modal-body" style="max-height: 65vh; overflow-y: auto;">
       <div class="diff-meta" id="diffMeta" style="margin-bottom: 12px; font-size: 12.5px; color: var(--text-muted);"></div>
       <div class="diff-content" id="diffContent" style="font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; background: var(--bg); padding: 14px; border: 1px solid var(--border); border-radius: 6px;"></div>
     </div>
     <div class="modal-actions" style="padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between;">
-      <button class="btn btn-secondary" id="closeDiffModalBtn" type="button">Fermer</button>
-      <button class="btn btn-primary" id="restoreSnapshotBtn" type="button">Restaurer cet instantané</button>
+      <button class="btn btn-secondary" id="closeDiffModalBtn" type="button"></button>
+      <button class="btn btn-primary" id="restoreSnapshotBtn" type="button"></button>
     </div>
   </div>
 </div>
 
 <!-- GLOBAL DROP OVERLAY -->
 <div class="drop-overlay" id="dropOverlay">
-  <div class="inner">
-    Déposer le(s) fichier .md
-    <div class="hint">Glissez sur une section (gauche) pour importer comme document — sur le panneau idées (droite) pour importer un thème</div>
+  <div class="inner"><span data-i18n="drop.overlay_text">Déposer le(s) fichier .md</span>
+    <div class="hint"><span data-i18n="drop.overlay_hint">Glissez sur une section (gauche) pour importer comme document — sur le panneau idées (droite) pour importer un thème</span></div>
   </div>
 </div>
 
