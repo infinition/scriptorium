@@ -370,6 +370,8 @@
   "font_preview.body": "Body text with <strong>bold</strong>, <em>italic</em>, <code>code</code>, a <a href=\"#\">link</a> and <del>strikethrough</del>.",
 
   "toast.doc_saved": "Document saved",
+  "toast.doc_created": "Document created",
+  "toast.doc_moved": "Document moved",
   "toast.doc_deleted": "Document deleted",
   "toast.doc_conflict": "Conflict detected",
   "toast.doc_reloaded": "Document reloaded",

@@ -271,6 +271,7 @@ async function createDocument(sectionId) {
       state.activeDocId = data.document.id;
       await fetchWorkspace();
       setTimeout(() => title.focus(), 50);
+      showToast('toast.doc_created');
     }
   } catch (err) {
     console.error(err);
@@ -391,6 +392,7 @@ async function moveDocument(docId, targetSectionId) {
         state.activeDocId = data.id;
       }
       await fetchWorkspace();
+      showToast('toast.doc_moved');
     }
   } catch (err) {
     console.error(err);
@@ -413,8 +415,9 @@ async function toggleIdea(themeId, ideaText, archived) {
         idea.archived = archived;
       }
     }
-    
+
     renderIdeas();
+    showToast(archived ? 'toast.idea_archived' : 'toast.idea_unarchived');
   } catch (err) {
     console.error(err);
   }
@@ -448,6 +451,7 @@ async function addIdea(themeId, ideaText) {
         }
       }
       renderIdeas();
+      showToast('toast.idea_added');
     }
   } catch (err) {
     console.error(err);
@@ -521,6 +525,7 @@ async function importFileToServer(file, sectionId) {
         state.activeDocId = data.document.id;
         await fetchWorkspace();
       }
+      showToast('toast.doc_imported');
     } catch (err) {
       console.error(err);
     }
@@ -545,6 +550,7 @@ async function importIdeasFileToServer(file) {
         state.activeThemeId = data.theme.id;
         await fetchWorkspace();
       }
+      showToast('toast.theme_imported');
     } catch (err) {
       console.error(err);
     }
@@ -1203,6 +1209,7 @@ async function commitDeleteIdea(themeId, ideaText) {
     const theme = state.ideaThemes.find(t => t.id === themeId);
     if (theme) {
       theme.ideas = theme.ideas.filter(i => i.text !== ideaText);
+      showToast('toast.idea_deleted');
     }
     renderIdeas();
   } catch (err) {
@@ -1287,6 +1294,7 @@ async function commitEditIdea(themeId, oldText, newText, ideaObj) {
     if (!res.ok) throw new Error('Edit failed');
     if (ideaObj) ideaObj.text = newText;
     renderIdeas();
+    showToast('toast.idea_edited');
   } catch (err) {
     console.error('Failed to edit idea:', err);
     alert(__('alert.idea_edit_error'));
@@ -3159,6 +3167,7 @@ $('saveCustomThemeBtn')?.addEventListener('click', async () => {
     const data = await res.json();
     if (data.success) {
       localStorage.setItem('scriptoriumCustomThemeVars', JSON.stringify(payload));
+      showToast('toast.custom_theme_saved');
       if (status) {
         status.textContent = __('save.saved_ok');
         setTimeout(function () { if (status.textContent === __('save.saved_ok')) status.textContent = ''; }, 2500);
@@ -3327,6 +3336,7 @@ async function saveAndCloseSettings() {
         state.activeDocId = null;
         state.activeThemeId = null;
         await fetchWorkspace();
+        showToast('toast.settings_saved');
       }
     } catch (err) {
       console.error(__('alert.config_save_error') + ':', err);
@@ -5424,6 +5434,8 @@ function applyBlockChoice(kind) {
       activeLineNode.textContent = '---';
       activeLineNode.dataset.raw = '---';
       applyLineKind(activeLineNode, '---');
+      showToast('toast.blocks_deleted');
+      showToast('toast.blocks_merged');
     } else {
       const hr = makeLineNode('---');
       activeLineNode.parentNode.insertBefore(hr, activeLineNode.nextSibling);
@@ -6243,6 +6255,7 @@ function diffStrings(oldStr, newStr) {
       result += escapeHtml(newLines[j]) + '\n';
       i++;
       j++;
+      showToast('toast.snapshot_created');
     } else if (j < newLines.length && (!oldLines.slice(i).includes(newLines[j]))) {
       result += `<span class="diff-add">+ ${escapeHtml(newLines[j])}</span>\n`;
       j++;
@@ -6377,6 +6390,7 @@ function renderSnapshotsList() {
     card.querySelector('.restore-btn').addEventListener('click', () => {
       activeDiffSnapshot = snap;
       restoreActiveSnapshot();
+      showToast('toast.snapshot_restored');
     });
     card.querySelector('.delete-btn').addEventListener('click', () => deleteSnapshot(snap.id));
 
