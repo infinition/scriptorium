@@ -1001,14 +1001,28 @@ button { font: inherit; color: inherit; }
 
 .ideas-header {
   padding: 22px 20px 12px;
+}
+.ideas-header .ideas-title {
+  display: block;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-style: italic;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 10px;
+}
+.ideas-header .header-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
-.ideas-header .ideas-title {
-  width: 100%;
-  flex: 0 0 100%;
+.ideas-header .panel-tabs {
+  flex: 1;
+}
+.ideas-header .ideas-only {
+  flex-shrink: 0;
 }
 .ideas-title {
   font-family: var(--serif);
