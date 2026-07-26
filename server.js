@@ -1,21 +1,69 @@
 const express = require('express');
-const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const crypto = require('crypto');
+const { execFile } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Bind to loopback unless explicitly told otherwise. Serving the API on
+// 0.0.0.0 hands every device on the LAN full read/write access to the
+// workspace, so exposing it is an opt-in that also turns the token on.
+const HOST = process.env.HOST || process.env.SCRIPTORIUM_HOST || '127.0.0.1';
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '::ffff:127.0.0.1']);
+const isLoopbackHost = (h) => LOOPBACK_HOSTS.has(String(h || '').replace(/^\[|\]$/g, ''));
+const LOOPBACK_ONLY = isLoopbackHost(HOST);
+
+// Simple server-side i18n: accepts Accept-Language header or ?lang= query param.
+// Falls back to English if the requested locale is not 'fr'.
+const LOCALE_MESSAGES = {
+  en: require('./locales/en.json'),
+  fr: require('./locales/fr.json'),
+};
+
+function serverMsg(req, key, vars) {
+  var lang = 'en';
+  if (req && req.query && req.query.lang === 'fr') lang = 'fr';
+  else if (req && req.headers && req.headers['accept-language'] && req.headers['accept-language'].startsWith('fr')) lang = 'fr';
+  var msg = (LOCALE_MESSAGES[lang] && LOCALE_MESSAGES[lang][key]) || key;
+  if (vars) {
+    for (var k in vars) {
+      if (vars.hasOwnProperty(k)) msg = msg.replace(new RegExp('\\{' + k + '\\}', 'g'), String(vars[k]));
+    }
+  }
+  return msg;
+}
+
+app.disable('x-powered-by');
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Determine client language from request (query param or Accept-Language header)
+function getLang(req) {
+  if (req && req.query && req.query.lang === 'fr') return 'fr';
+  if (req && req.headers && req.headers['accept-language'] && req.headers['accept-language'].startsWith('fr')) return 'fr';
+  return 'en';
+}
 
 // Persistent config
 const CONFIG_FILE = path.join(__dirname, 'config.json');
-let workspaceDir = 'C:\\DEV\\coding\\nexearch\\solutions\\manifest';
+const CUSTOM_THEME_FILE = path.join(__dirname, 'theme.custom.json');
+let workspaceDir = path.join(require('os').homedir(), 'Scriptorium');
 let ideasDirSetting = '';
+let accessToken = '';
+let workspaceLocked = false;
+
+function loadCustomTheme() {
+  try {
+    if (fs.existsSync(CUSTOM_THEME_FILE)) {
+      return JSON.parse(fs.readFileSync(CUSTOM_THEME_FILE, 'utf8'));
+    }
+  } catch (err) {
+    console.error('Error loading custom theme:', err);
+  }
+  return null;
+}
 
 function getIdeasDir() {
   if (ideasDirSetting && ideasDirSetting.trim() !== '') {
@@ -34,6 +82,12 @@ function loadConfig() {
       if (data.ideasDir !== undefined) {
         ideasDirSetting = data.ideasDir;
       }
+      if (typeof data.accessToken === 'string') {
+        accessToken = data.accessToken;
+      }
+      if (typeof data.locked === 'boolean') {
+        workspaceLocked = data.locked;
+      }
     }
   } catch (err) {
     console.error('Error loading config:', err);
@@ -42,13 +96,191 @@ function loadConfig() {
 
 function saveConfig() {
   try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ workspaceDir, ideasDir: ideasDirSetting }, null, 2), 'utf8');
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify({
+      // An env override is for this run only — it must not leak into the file.
+      workspaceDir: process.env.SCRIPTORIUM_WORKSPACE ? configuredWorkspaceDir : workspaceDir,
+      ideasDir: ideasDirSetting,
+      accessToken,
+      locked: workspaceLocked
+    }, null, 2), 'utf8');
   } catch (err) {
     console.error('Error saving config:', err);
   }
 }
 
 loadConfig();
+
+// Lets you run against a throwaway workspace (tests, a second corpus) without
+// touching the saved config: SCRIPTORIUM_WORKSPACE=/tmp/scratch npm start
+let configuredWorkspaceDir = workspaceDir;
+if (process.env.SCRIPTORIUM_WORKSPACE) {
+  workspaceDir = path.resolve(process.env.SCRIPTORIUM_WORKSPACE);
+  console.log(`Workspace overridden by SCRIPTORIUM_WORKSPACE: ${workspaceDir}`);
+}
+
+// A token is only meaningful once the server is reachable from outside this
+// machine; on loopback the OS already scopes access to the local user.
+if (!LOOPBACK_ONLY && !accessToken) {
+  accessToken = crypto.randomBytes(24).toString('base64url');
+  saveConfig();
+}
+
+// ============ PATH SAFETY ============
+// Every path the client can influence goes through here. Without it, a section
+// id like "../../.." escapes the workspace and reaches the rest of the disk —
+// including fs.rmSync(recursive) on DELETE /api/sections.
+
+class PathError extends Error {
+  constructor(message) {
+    super(message);
+    this.status = 400;
+  }
+}
+
+// One path segment: a folder or file name, never a path.
+function assertSegment(value, label, req) {
+  const s = typeof value === 'string' ? value.trim() : '';
+  if (!s) throw new PathError(serverMsg(req, 'server.error_path_missing', { label: label }));
+  if (s === '.' || s === '..') throw new PathError(serverMsg(req, 'server.error_path_invalid', { label: label }));
+  if (/[\\/]/.test(s)) throw new PathError(serverMsg(req, 'server.error_path_separator', { label: label }));
+  if (/[\0<>:"|?*]/.test(s)) throw new PathError(serverMsg(req, 'server.error_path_forbidden_char', { label: label }));
+  // Reserved device names on Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(s)) {
+    throw new PathError(serverMsg(req, 'server.error_path_reserved', { label: label }));
+  }
+  return s;
+}
+
+// Join under `base` and refuse anything that lands outside it, even via
+// symlink-free trickery like "a/../../b".
+function safeJoin(base, ...segments) {
+  const root = path.resolve(base);
+  const target = path.resolve(root, ...segments);
+  if (target !== root && !target.startsWith(root + path.sep)) {
+    throw new PathError(serverMsg(null, 'server.error_path_outside'));
+  }
+  return target;
+}
+
+// "<section>/<filename>" as produced by the client. `_general` means the
+// workspace root itself.
+function resolveDocPath(id, req) {
+  if (typeof id !== 'string' || !id.includes('/')) {
+    throw new PathError(serverMsg(req, 'server.error_invalid_doc_id'));
+  }
+  const slash = id.indexOf('/');
+  const sectionId = id.slice(0, slash);
+  const filename = assertSegment(id.slice(slash + 1), 'Nom de fichier', req);
+  if (!/\.(md|markdown|txt)$/i.test(filename)) {
+    throw new PathError(serverMsg(req, 'server.error_extension'));
+  }
+  const folder = resolveSectionFolder(sectionId, req);
+  return { sectionId, filename, folder, fullPath: safeJoin(folder, filename) };
+}
+
+function resolveSectionFolder(sectionId, req) {
+  if (sectionId === '_general') return path.resolve(workspaceDir);
+  return safeJoin(workspaceDir, assertSegment(sectionId, 'Section', req));
+}
+
+function resolveThemeFile(themeId, req) {
+  const id = assertSegment(themeId, 'Thème');
+  return safeJoin(getIdeasDir(), `${id.replace(/\.(md|markdown|txt)$/i, '')}.md`);
+}
+
+// Wraps a route so PathError becomes a clean 400 instead of a 500 stack.
+function guarded(handler) {
+  return (req, res) => {
+    try {
+      return handler(req, res);
+    } catch (err) {
+      if (err instanceof PathError) return res.status(err.status).json({ error: err.message });
+      console.error('Route error:', err);
+      return res.status(500).json({ error: err.message || 'Internal server error' });
+    }
+  };
+}
+
+// Destructive routes respect the padlock in the UI. Previously the lock was
+// purely cosmetic: the API deleted regardless of it.
+function requireUnlocked(req, res) {
+  if (workspaceLocked) {
+    res.status(423).json({ error: 'Espace de travail verrouillé' });
+    return false;
+  }
+  return true;
+}
+
+// ============ ACCESS GUARDS ============
+
+function hostnameOf(value) {
+  const s = String(value || '');
+  const m = s.match(/^\[([^\]]+)\]/); // [::1]:3000
+  if (m) return m[1];
+  return s.split(':')[0];
+}
+
+// A page on any other origin must not be able to drive this API. Dropping the
+// permissive CORS layer makes browsers preflight cross-origin JSON calls and
+// get refused; this check covers the rest (and DNS rebinding on loopback).
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && origin !== 'null') {
+    let originHost;
+    try {
+      originHost = new URL(origin).hostname;
+    } catch {
+      return res.status(403).json({ error: 'Origine refusée' });
+    }
+    if (originHost !== hostnameOf(req.headers.host)) {
+      return res.status(403).json({ error: 'Origine refusée' });
+    }
+  }
+  if (LOOPBACK_ONLY && !isLoopbackHost(hostnameOf(req.headers.host))) {
+    return res.status(403).json({ error: 'Hôte refusé' });
+  }
+  next();
+});
+
+// When the server is reachable from the LAN (phone, tablet), every API call
+// must carry the token printed at startup.
+app.use('/api', (req, res, next) => {
+  if (!accessToken) return next();
+  const provided = req.get('x-scriptorium-token') || req.query.token;
+  if (provided && crypto.timingSafeEqual(
+    Buffer.from(String(provided).padEnd(accessToken.length).slice(0, accessToken.length)),
+    Buffer.from(accessToken)
+  )) {
+    return next();
+  }
+  res.status(401).json({ error: 'Jeton d\'accès manquant ou invalide' });
+});
+
+// ============ VENDORED ASSETS ============
+// Served from node_modules instead of a CDN: the app writes to your own disk
+// and must keep working with no network — offline, on a plane, on a phone that
+// dropped its connection. Without this, formulas fall back to inline code,
+// code blocks lose their colours and the typography reverts to system fonts.
+const VENDOR_MOUNTS = {
+  '/vendor/katex': 'katex/dist',
+  // @highlightjs/cdn-assets, not highlight.js: the main package only ships
+  // CommonJS, which a browser cannot import. This one is the browser build.
+  '/vendor/highlight': '@highlightjs/cdn-assets',
+  '/vendor/fonts/inter': '@fontsource/inter',
+  '/vendor/fonts/newsreader': '@fontsource/newsreader',
+  '/vendor/fonts/jetbrains-mono': '@fontsource/jetbrains-mono'
+};
+for (const [route, pkg] of Object.entries(VENDOR_MOUNTS)) {
+  const dir = path.join(__dirname, 'node_modules', pkg);
+  if (fs.existsSync(dir)) {
+    app.use(route, express.static(dir, { maxAge: '30d', immutable: true }));
+  } else {
+    console.warn(`Asset manquant : ${pkg} — lancez "npm install".`);
+  }
+}
+
+app.use('/locales', express.static(path.join(__dirname, 'locales'), { maxAge: '1h' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Ensure default workspace structure exists
 function ensureWorkspaceDirs() {
@@ -141,7 +373,8 @@ function safeFilename(s) {
 
 // Markdown parsing helpers
 function parseMarkdownDoc(text, filename) {
-  const lines = text.split('\n');
+  const cleanText = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = cleanText.split('\n');
   let title = filename.replace(/\.(md|markdown|txt)$/i, '');
   let subtitle = '';
   let bodyStart = 0;
@@ -248,8 +481,21 @@ app.get('/api/config', (req, res) => {
   res.json({
     workspaceDir,
     ideasDir: ideasDirSetting,
-    effectiveIdeasDir: getIdeasDir()
+    effectiveIdeasDir: getIdeasDir(),
+    locked: workspaceLocked
   });
+});
+
+// The padlock is enforced server-side, so it has to be persisted here rather
+// than in localStorage only.
+app.post('/api/lock', (req, res) => {
+  const { locked } = req.body || {};
+  if (typeof locked !== 'boolean') {
+    return res.status(400).json({ error: 'locked (boolean) is required' });
+  }
+  workspaceLocked = locked;
+  saveConfig();
+  res.json({ success: true, locked: workspaceLocked });
 });
 
 // Update config
@@ -274,20 +520,93 @@ app.post('/api/config', (req, res) => {
   });
 });
 
-// Open workspace or ideas folder in Windows Explorer
+// Custom color theme (Settings > Apparence), saved at the project root
+app.get('/api/color-theme', (req, res) => {
+  res.json({ theme: loadCustomTheme() });
+});
+
+app.post('/api/color-theme', (req, res) => {
+  const theme = req.body;
+  if (!theme || typeof theme !== 'object' || Array.isArray(theme)) {
+    return res.status(400).json({ error: 'Invalid theme payload' });
+  }
+  try {
+    fs.writeFileSync(CUSTOM_THEME_FILE, JSON.stringify(theme, null, 2), 'utf8');
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error saving custom theme:', err);
+    res.status(500).json({ error: 'Failed to save theme' });
+  }
+});
+
+// Snapshots (revision history) — persisted on disk in the workspace, one JSON
+// file per document, under <workspace>/.snapshots/
+function snapshotsDir() {
+  return path.join(workspaceDir, '.snapshots');
+}
+
+function snapshotsFileFor(docId) {
+  if (typeof docId !== 'string' || !docId.trim()) throw new PathError('docId invalide');
+  // encodeURIComponent already neutralises separators; safeJoin is the backstop.
+  return safeJoin(snapshotsDir(), encodeURIComponent(docId) + '.json');
+}
+
+app.get('/api/snapshots', (req, res) => {
+  const docId = req.query.docId;
+  if (!docId) return res.status(400).json({ error: 'docId is required' });
+  try {
+    const file = snapshotsFileFor(docId);
+    if (fs.existsSync(file)) {
+      return res.json({ snapshots: JSON.parse(fs.readFileSync(file, 'utf8')) });
+    }
+    res.json({ snapshots: [] });
+  } catch (err) {
+    console.error('Error reading snapshots:', err);
+    res.status(500).json({ error: 'Failed to read snapshots' });
+  }
+});
+
+app.post('/api/snapshots', (req, res) => {
+  const { docId, snapshots } = req.body || {};
+  if (!docId || !Array.isArray(snapshots)) {
+    return res.status(400).json({ error: 'docId and snapshots array are required' });
+  }
+  try {
+    const file = snapshotsFileFor(docId);
+    if (snapshots.length === 0) {
+      if (fs.existsSync(file)) fs.unlinkSync(file);
+    } else {
+      fs.mkdirSync(snapshotsDir(), { recursive: true });
+      fs.writeFileSync(file, JSON.stringify(snapshots, null, 2), 'utf8');
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error saving snapshots:', err);
+    res.status(500).json({ error: 'Failed to save snapshots' });
+  }
+});
+
+// Open workspace or ideas folder in the OS file manager
 app.post('/api/open-folder', (req, res) => {
   const { type } = req.body || {};
   const targetFolder = type === 'ideas' ? getIdeasDir() : workspaceDir;
-  if (fs.existsSync(targetFolder)) {
-    exec(`explorer "${targetFolder}"`);
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ error: 'Folder not found' });
+  if (!fs.existsSync(targetFolder)) {
+    return res.status(404).json({ error: 'Folder not found' });
   }
+  // execFile passes the path as an argv entry, so quotes and & in a folder
+  // name can no longer break out into a second shell command.
+  const opener = process.platform === 'win32' ? 'explorer'
+    : process.platform === 'darwin' ? 'open'
+    : 'xdg-open';
+  execFile(opener, [targetFolder], () => {});
+  res.json({ success: true });
 });
 
 // Pick folder via native Windows FolderBrowserDialog
 app.post('/api/pick-folder', (req, res) => {
+  if (process.platform !== 'win32') {
+    return res.status(501).json({ error: 'Le sélecteur natif n\'est disponible que sur Windows — saisissez le chemin à la main.' });
+  }
   const { currentPath } = req.body || {};
   let initial = '';
   if (currentPath && typeof currentPath === 'string' && fs.existsSync(currentPath)) {
@@ -311,7 +630,7 @@ app.post('/api/pick-folder', (req, res) => {
   const buffer = Buffer.from(psScript, 'utf16le');
   const encoded = buffer.toString('base64');
 
-  exec(`powershell -NoProfile -STA -EncodedCommand ${encoded}`, {
+  execFile('powershell', ['-NoProfile', '-STA', '-EncodedCommand', encoded], {
     env: { ...process.env, PICKER_INITIAL_PATH: initial }
   }, (err, stdout, stderr) => {
     if (err) {
@@ -434,17 +753,46 @@ app.get('/api/workspace', (req, res) => {
   }
 });
 
+// Last-chance save from navigator.sendBeacon (page closing / app backgrounded).
+// Beacons are POST-only, hence the alias. Nobody is around to arbitrate a
+// conflict at this point, so a colliding save is written next to the original
+// rather than dropped or forced over someone else's version.
+function saveViaBeacon(req, res) {
+  const { id, title, subtitle, content, knownUpdatedAt } = req.body;
+  const { filename, folder, fullPath } = resolveDocPath(id, req);
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'Document not found on disk' });
+
+  let fileContent = '';
+  if (title) fileContent += `# ${String(title).trim()}\n\n`;
+  if (subtitle) fileContent += `*${String(subtitle).trim()}*\n\n`;
+  fileContent += content || '';
+
+  const current = fs.statSync(fullPath).mtimeMs;
+  if (typeof knownUpdatedAt === 'number' && current - knownUpdatedAt > 1000) {
+    const base = filename.replace(/\.(md|markdown|txt)$/i, '');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const sidecar = safeJoin(folder, `${base}.conflit-${stamp}.md`);
+    fs.writeFileSync(sidecar, fileContent, 'utf8');
+    return res.status(409).json({ error: 'Conflit — version enregistrée à côté', savedAs: path.basename(sidecar) });
+  }
+
+  fs.writeFileSync(fullPath, fileContent, 'utf8');
+  res.json({ success: true, updatedAt: fs.statSync(fullPath).mtimeMs });
+}
+
 // Create document
-app.post('/api/documents', (req, res) => {
-  const { sectionId } = req.body;
+app.post('/api/documents', guarded((req, res) => {
+  const { sectionId, id } = req.body;
+  // A body carrying an id but no section is a beacon save, not a creation.
+  if (!sectionId && id) return saveViaBeacon(req, res);
   if (!sectionId) return res.status(400).json({ error: 'Section is required' });
-  
+
   try {
-    const sectionFolder = sectionId === '_general' ? workspaceDir : path.join(workspaceDir, sectionId);
+    const sectionFolder = resolveSectionFolder(sectionId, req);
     if (!fs.existsSync(sectionFolder)) {
       fs.mkdirSync(sectionFolder, { recursive: true });
     }
-    
+
     let baseFilename = 'sans-titre.md';
     let fileIndex = 1;
     let filename = baseFilename;
@@ -473,28 +821,40 @@ app.post('/api/documents', (req, res) => {
       }
     });
   } catch (err) {
+    if (err instanceof PathError) throw err;
     console.error('Error creating document:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Save document (Update content / Title / Subtitle)
-app.put('/api/documents', (req, res) => {
-  const { id, title, subtitle, content } = req.body;
+app.put('/api/documents', guarded((req, res) => {
+  const { id, title, subtitle, content, knownUpdatedAt } = req.body;
   if (!id) return res.status(400).json({ error: 'Document ID is required' });
-  
+
   try {
-    const parts = id.split('/');
-    const sectionId = parts[0];
-    const oldFilename = parts[1];
-    
-    const sectionFolder = sectionId === '_general' ? workspaceDir : path.join(workspaceDir, sectionId);
-    const oldPath = path.join(sectionFolder, oldFilename);
-    
+    const { sectionId, filename: oldFilename, folder: sectionFolder, fullPath: oldPath } = resolveDocPath(id, req);
+
     if (!fs.existsSync(oldPath)) {
       return res.status(404).json({ error: 'Document not found on disk' });
     }
-    
+
+    // Optimistic concurrency: if the file moved on since the client last read
+    // it (edited on the phone, on another tab, or from an external editor),
+    // refuse rather than silently overwrite the other version.
+    if (typeof knownUpdatedAt === 'number') {
+      const current = fs.statSync(oldPath).mtimeMs;
+      // 1s of slack: mtime resolution varies across filesystems.
+      if (current - knownUpdatedAt > 1000) {
+        return res.status(409).json({
+          error: 'Le fichier a été modifié ailleurs depuis son ouverture',
+          conflict: true,
+          diskUpdatedAt: current,
+          diskContent: fs.readFileSync(oldPath, 'utf8')
+        });
+      }
+    }
+
     // Construct new file content
     let fileContent = '';
     if (title) fileContent += `# ${title.trim()}\n\n`;
@@ -508,8 +868,8 @@ app.put('/api/documents', (req, res) => {
       newFilename = `${safe}.md`;
     }
     
-    let targetPath = path.join(sectionFolder, newFilename);
-    
+    let targetPath = safeJoin(sectionFolder, newFilename);
+
     // Resolve name collision if renaming
     if (newFilename !== oldFilename && fs.existsSync(targetPath)) {
       let index = 1;
@@ -518,7 +878,7 @@ app.put('/api/documents', (req, res) => {
         index++;
       }
       newFilename = `${base}-${index}.md`;
-      targetPath = path.join(sectionFolder, newFilename);
+      targetPath = safeJoin(sectionFolder, newFilename);
     }
     
     // Write contents to disk
@@ -545,43 +905,41 @@ app.put('/api/documents', (req, res) => {
       }
     });
   } catch (err) {
+    if (err instanceof PathError) throw err;
     console.error('Error saving document:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Delete document
-app.delete('/api/documents', (req, res) => {
+app.delete('/api/documents', guarded((req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'ID is required' });
-  
+  if (!requireUnlocked(req, res)) return;
+
   try {
-    const parts = id.split('/');
-    const sectionId = parts[0];
-    const filename = parts[1];
-    
-    const sectionFolder = sectionId === '_general' ? workspaceDir : path.join(workspaceDir, sectionId);
-    const filePath = path.join(sectionFolder, filename);
-    
+    const { fullPath: filePath } = resolveDocPath(id, req);
+
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
-    
+
     res.json({ success: true });
   } catch (err) {
+    if (err instanceof PathError) throw err;
     console.error('Error deleting document:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Create Section (Folder)
-app.post('/api/sections', (req, res) => {
+app.post('/api/sections', guarded((req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Name is required' });
-  
-  const folderName = name.trim();
-  const folderPath = path.join(workspaceDir, folderName);
-  
+
+  const folderName = assertSegment(name, 'Nom de section');
+  const folderPath = safeJoin(workspaceDir, folderName);
+
   try {
     if (fs.existsSync(folderPath)) {
       return res.status(400).json({ error: 'Section folder already exists' });
@@ -589,20 +947,21 @@ app.post('/api/sections', (req, res) => {
     fs.mkdirSync(folderPath, { recursive: true });
     res.json({ success: true, section: { id: folderName, name: folderName, documents: [] } });
   } catch (err) {
+    if (err instanceof PathError) throw err;
     console.error('Error creating section:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Rename Section (Folder)
-app.post('/api/sections/rename', (req, res) => {
+app.post('/api/sections/rename', guarded((req, res) => {
   const { oldId, newName } = req.body;
   if (!oldId || !newName || !newName.trim()) return res.status(400).json({ error: 'Old ID and new name required' });
   
-  const oldPath = path.join(workspaceDir, oldId);
-  const newId = newName.trim();
-  const newPath = path.join(workspaceDir, newId);
-  
+  const oldPath = safeJoin(workspaceDir, assertSegment(oldId, 'Section'));
+  const newId = assertSegment(newName, 'Nom de section');
+  const newPath = safeJoin(workspaceDir, newId);
+
   try {
     if (!fs.existsSync(oldPath)) {
       return res.status(404).json({ error: 'Section folder not found' });
@@ -613,22 +972,24 @@ app.post('/api/sections/rename', (req, res) => {
     fs.renameSync(oldPath, newPath);
     res.json({ success: true, id: newId, name: newId });
   } catch (err) {
+    if (err instanceof PathError) throw err;
     console.error('Error renaming section:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Delete Section (Folder)
-app.delete('/api/sections', (req, res) => {
+app.delete('/api/sections', guarded((req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'ID is required' });
-  
+
   if (id === '_general') {
     return res.status(400).json({ error: 'Cannot delete the General section folder' });
   }
-  
-  const folderPath = path.join(workspaceDir, id);
-  
+  if (!requireUnlocked(req, res)) return;
+
+  const folderPath = safeJoin(workspaceDir, assertSegment(id, 'Section'));
+
   try {
     if (fs.existsSync(folderPath)) {
       // Remove folder and its contents recursively
@@ -636,33 +997,28 @@ app.delete('/api/sections', (req, res) => {
     }
     res.json({ success: true });
   } catch (err) {
+    if (err instanceof PathError) throw err;
     console.error('Error deleting section:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Move document between section folders
-app.post('/api/documents/move', (req, res) => {
+app.post('/api/documents/move', guarded((req, res) => {
   const { id, targetSectionId } = req.body;
   if (!id || !targetSectionId) return res.status(400).json({ error: 'Document ID and target section required' });
-  
+
   try {
-    const parts = id.split('/');
-    const sourceSectionId = parts[0];
-    const filename = parts[1];
-    
-    const sourceFolder = sourceSectionId === '_general' ? workspaceDir : path.join(workspaceDir, sourceSectionId);
-    const targetFolder = targetSectionId === '_general' ? workspaceDir : path.join(workspaceDir, targetSectionId);
-    
+    const { filename, fullPath: sourcePath } = resolveDocPath(id, req);
+    const targetFolder = resolveSectionFolder(targetSectionId);
+
     if (!fs.existsSync(targetFolder)) {
       fs.mkdirSync(targetFolder, { recursive: true });
     }
-    
-    const sourcePath = path.join(sourceFolder, filename);
-    
+
     // Resolve name collision in target folder if necessary
     let destFilename = filename;
-    let destPath = path.join(targetFolder, destFilename);
+    let destPath = safeJoin(targetFolder, destFilename);
     if (fs.existsSync(destPath)) {
       let index = 1;
       const base = filename.replace(/\.(md|txt)$/i, '');
@@ -671,30 +1027,31 @@ app.post('/api/documents/move', (req, res) => {
         index++;
       }
       destFilename = `${base}-${index}${ext}`;
-      destPath = path.join(targetFolder, destFilename);
+      destPath = safeJoin(targetFolder, destFilename);
     }
-    
+
     if (!fs.existsSync(sourcePath)) {
       return res.status(404).json({ error: 'Source document not found on disk' });
     }
-    
+
     fs.renameSync(sourcePath, destPath);
-    
+
     const finalId = targetSectionId === '_general' ? `_general/${destFilename}` : `${targetSectionId}/${destFilename}`;
-    
+
     res.json({ success: true, id: finalId, filename: destFilename });
   } catch (err) {
+    if (err instanceof PathError) throw err;
     console.error('Error moving document:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Toggle an idea's checkmark status in a theme file
-app.post('/api/ideas/toggle', (req, res) => {
+app.post('/api/ideas/toggle', guarded((req, res) => {
   const { themeId, ideaText, archived } = req.body;
   if (!themeId || !ideaText) return res.status(400).json({ error: 'Theme ID and idea text required' });
   
-  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
+  const themeFile = resolveThemeFile(themeId, req);
   
   try {
     if (!fs.existsSync(themeFile)) {
@@ -754,16 +1111,16 @@ app.post('/api/ideas/toggle', (req, res) => {
     console.error('Error toggling idea:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Edit an idea's text (preserve its checkbox state / prefix style)
-app.post('/api/ideas/edit', (req, res) => {
+app.post('/api/ideas/edit', guarded((req, res) => {
   const { themeId, oldText, newText } = req.body;
   if (!themeId || !oldText || typeof newText !== 'string' || !newText.trim()) {
     return res.status(400).json({ error: 'Theme ID, old text, and new text are required' });
   }
 
-  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
+  const themeFile = resolveThemeFile(themeId, req);
 
   try {
     if (!fs.existsSync(themeFile)) {
@@ -809,16 +1166,16 @@ app.post('/api/ideas/edit', (req, res) => {
     console.error('Error editing idea:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Delete an idea entirely from a theme file
-app.post('/api/ideas/delete', (req, res) => {
+app.post('/api/ideas/delete', guarded((req, res) => {
   const { themeId, ideaText } = req.body;
   if (!themeId || !ideaText) {
     return res.status(400).json({ error: 'Theme ID and idea text are required' });
   }
 
-  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
+  const themeFile = resolveThemeFile(themeId, req);
 
   try {
     if (!fs.existsSync(themeFile)) {
@@ -850,16 +1207,16 @@ app.post('/api/ideas/delete', (req, res) => {
     console.error('Error deleting idea:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Add an idea to a theme file
-app.post('/api/ideas/add', (req, res) => {
+app.post('/api/ideas/add', guarded((req, res) => {
   const { themeId, ideaText } = req.body;
   if (!themeId || !ideaText || (typeof ideaText === 'string' && !ideaText.trim())) {
     return res.status(400).json({ error: 'Theme ID and idea text are required' });
   }
   
-  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
+  const themeFile = resolveThemeFile(themeId, req);
   
   try {
     if (!fs.existsSync(themeFile)) {
@@ -890,15 +1247,15 @@ app.post('/api/ideas/add', (req, res) => {
     console.error('Error adding idea:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Create theme
-app.post('/api/themes', (req, res) => {
+app.post('/api/themes', guarded((req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'Theme name is required' });
   
   const themeId = safeFilename(name);
-  const themeFile = path.join(getIdeasDir(), `${themeId}.md`);
+  const themeFile = resolveThemeFile(themeId, req);
   
   try {
     if (fs.existsSync(themeFile)) {
@@ -912,10 +1269,10 @@ app.post('/api/themes', (req, res) => {
     console.error('Error creating theme:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Delete theme
-app.delete('/api/themes', (req, res) => {
+app.delete('/api/themes', guarded((req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'ID is required' });
   
@@ -930,10 +1287,10 @@ app.delete('/api/themes', (req, res) => {
     console.error('Error deleting theme:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Import documents via drag and drop of file contents
-app.post('/api/documents/import', (req, res) => {
+app.post('/api/documents/import', guarded((req, res) => {
   const { sectionId, filename, fileContent } = req.body;
   if (!sectionId || !filename || !fileContent) {
     return res.status(400).json({ error: 'Section, filename, and content required' });
@@ -979,10 +1336,10 @@ app.post('/api/documents/import', (req, res) => {
     console.error('Error importing document:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
 // Import theme via drag and drop of file contents
-app.post('/api/themes/import', (req, res) => {
+app.post('/api/themes/import', guarded((req, res) => {
   const { filename, fileContent } = req.body;
   if (!filename || !fileContent) {
     return res.status(400).json({ error: 'Filename and content required' });
@@ -1023,9 +1380,31 @@ app.post('/api/themes/import', (req, res) => {
     console.error('Error importing theme:', err);
     res.status(500).json({ error: err.message });
   }
-});
+}));
 
-app.listen(PORT, () => {
-  console.log(`Scriptorium server running at http://localhost:${PORT}`);
-  console.log(`Workspace directory: ${workspaceDir}`);
+// Returns the LAN addresses the phone can actually reach.
+function lanAddresses() {
+  const nets = require('os').networkInterfaces();
+  const out = [];
+  for (const iface of Object.values(nets)) {
+    for (const net of iface || []) {
+      if (net.family === 'IPv4' && !net.internal) out.push(net.address);
+    }
+  }
+  return out;
+}
+
+app.listen(PORT, HOST, () => {
+  console.log(`\n  Scriptorium — http://localhost:${PORT}`);
+  console.log(`  Dossier de travail : ${workspaceDir}`);
+  if (LOOPBACK_ONLY) {
+    console.log(`\n  Accessible depuis cette machine uniquement.`);
+    console.log(`  Pour y accéder depuis un téléphone : HOST=0.0.0.0 npm start\n`);
+  } else {
+    console.log(`\n  ⚠  Exposé sur le réseau (${HOST}) — jeton d'accès requis.`);
+    for (const addr of lanAddresses()) {
+      console.log(`  Téléphone : http://${addr}:${PORT}/?token=${accessToken}`);
+    }
+    console.log('');
+  }
 });

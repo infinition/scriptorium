@@ -1,5 +1,32 @@
 'use strict';
 
+// ============ ACCESS TOKEN ============
+// When the server is exposed on the LAN (HOST=0.0.0.0), it prints a URL with
+// ?token=… — open that once on the phone and the token is remembered here.
+// Wrapping fetch keeps every existing call site untouched.
+(() => {
+  const TOKEN_KEY = 'scriptorium_token';
+  const fromUrl = new URLSearchParams(location.search).get('token');
+  if (fromUrl) {
+    localStorage.setItem(TOKEN_KEY, fromUrl);
+    // Drop the token from the address bar so it stays out of history/screenshots.
+    const url = new URL(location.href);
+    url.searchParams.delete('token');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (token && url.startsWith('/api/')) {
+      const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+      headers.set('X-Scriptorium-Token', token);
+      init = { ...init, headers };
+    }
+    return nativeFetch(input, init);
+  };
+})();
+
 // Application State
 let state = {
   sections: [],
@@ -49,7 +76,6 @@ const topbar = $('topbar');
 const wcEl = $('wc');
 const ccEl = $('cc');
 const rtEl = $('rt');
-const cursorEl = $('cursor');
 const saveIndicator = $('saveIndicator');
 const saveText = $('saveText');
 const themesTabs = $('themesTabs');
@@ -78,12 +104,22 @@ async function fetchWorkspace() {
   try {
     // Get config first
     const configRes = await fetch('/api/config');
+    if (configRes.status === 401) {
+      alert(__('alert.token_missing'));
+      return;
+    }
     const configData = await configRes.json();
     state.workspaceDir = configData.workspaceDir;
     state.ideasDir = configData.ideasDir || '';
+    // The server owns the padlock now — adopt its value rather than localStorage.
+    if (typeof configData.locked === 'boolean') {
+      state.isLocked = configData.locked;
+      localStorage.setItem('scriptorium_is_locked', state.isLocked);
+      updateLockStateUI();
+    }
     workspaceLabel.textContent = pathBasename(state.workspaceDir);
     workspaceLabel.title = state.workspaceDir;
-    
+
     // Get layout
     const res = await fetch('/api/workspace');
     const data = await res.json();
@@ -104,14 +140,14 @@ async function fetchWorkspace() {
     renderAll();
   } catch (err) {
     console.error('Error fetching workspace:', err);
-    alert('Erreur lors du chargement du dossier de travail : ' + err.message);
+    alert(__('alert.workspace_load_error', { message: err.message }));
   }
 }
 
 async function saveDocumentOnDisk() {
   const doc = activeDoc();
   if (!doc) return;
-  
+
   try {
     const res = await fetch('/api/documents', {
       method: 'PUT',
@@ -120,10 +156,20 @@ async function saveDocumentOnDisk() {
         id: doc.id,
         title: title.value,
         subtitle: subtitle.value,
-        content: getContentMarkdown()
+        content: getContentMarkdown(),
+        // Lets the server refuse the write if the file changed underneath us
+        // — the same document open on a phone, in another tab, or in an
+        // external editor used to overwrite whichever copy saved last.
+        knownUpdatedAt: doc.updatedAt
       })
     });
-    
+
+    if (res.status === 409) {
+      const conflict = await res.json();
+      handleSaveConflict(doc, conflict);
+      return;
+    }
+
     const data = await res.json();
     if (data.success) {
       // If filename/id changed due to renaming
@@ -145,7 +191,7 @@ async function saveDocumentOnDisk() {
       
       saveIndicator.classList.remove('dirty');
       saveIndicator.classList.add('saved');
-      saveText.textContent = 'Enregistré';
+      saveText.textContent = __('save.saved');
       dirty = false;
       
       renderNav();
@@ -153,8 +199,62 @@ async function saveDocumentOnDisk() {
     }
   } catch (err) {
     console.error('Error auto-saving:', err);
-    saveText.textContent = 'Erreur de sauvegarde';
+    saveText.textContent = __('save.error');
   }
+}
+
+// The file moved on since we opened it. Never resolve this silently: both
+// versions are someone's work, so the choice belongs to the user.
+function handleSaveConflict(doc, conflict) {
+  saveIndicator.classList.remove('saved');
+  saveIndicator.classList.add('dirty');
+  saveText.textContent = __('save.conflict');
+  dirty = true;
+
+  const keepMine = confirm(__('confirm.conflict_keep'));
+
+  if (keepMine) {
+    // Adopt the disk timestamp so the retry passes the freshness check.
+    doc.updatedAt = conflict.diskUpdatedAt;
+    saveDocumentOnDisk();
+    return;
+  }
+
+  // Reload from disk, keeping the local version one undo away.
+  saveHistory(state.activeDocId, true);
+  const parsed = parseIncomingMarkdown(conflict.diskContent || '', doc.filename || '');
+  doc.title = parsed.title;
+  doc.subtitle = parsed.subtitle;
+  doc.content = parsed.body;
+  doc.updatedAt = conflict.diskUpdatedAt;
+  loadActiveDoc();
+  dirty = false;
+  saveIndicator.classList.remove('dirty');
+  saveIndicator.classList.add('saved');
+  saveText.textContent = __('save.reloaded');
+}
+
+// Mirrors the server's parseMarkdownDoc: "# title", optional *subtitle*, body.
+function parseIncomingMarkdown(text, filename) {
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+  let title = filename.replace(/\.(md|markdown|txt)$/i, '');
+  let subtitle = '';
+  let i = 0;
+  while (i < lines.length && lines[i].trim() === '') i++;
+
+  const h1 = i < lines.length ? lines[i].trim().match(/^#\s+(.+)$/) : null;
+  if (h1) {
+    title = h1[1];
+    i++;
+    while (i < lines.length && lines[i].trim() === '') i++;
+    const sub = i < lines.length ? lines[i].match(/^\*([^*]+)\*\s*$|^_([^_]+)_\s*$/) : null;
+    if (sub) {
+      subtitle = sub[1] || sub[2];
+      i++;
+    }
+  }
+  while (i < lines.length && lines[i].trim() === '') i++;
+  return { title, subtitle, body: lines.slice(i).join('\n') };
 }
 
 async function createDocument(sectionId) {
@@ -177,10 +277,10 @@ async function createDocument(sectionId) {
 
 async function deleteDocument(docId) {
   if (state.isLocked) {
-    alert("Le workspace est verrouillé. Cliquez sur le cadenas en haut à gauche pour autoriser les suppressions.");
+    alert(__('alert.locked'));
     return;
   }
-  if (!confirm('Supprimer définitivement ce document du disque ?')) return;
+  if (!confirm(__('confirm.doc_delete'))) return;
   
   try {
     const res = await fetch('/api/documents', {
@@ -211,7 +311,7 @@ async function createSection(name) {
     if (data.success) {
       await fetchWorkspace();
     } else {
-      alert(data.error || 'Erreur lors de la création de la section');
+      alert(data.error || __('alert.section_create_error'));
     }
   } catch (err) {
     console.error(err);
@@ -233,7 +333,7 @@ async function renameSection(oldId, newName) {
       }
       await fetchWorkspace();
     } else {
-      alert(data.error || 'Erreur lors du renommage');
+      alert(data.error || __('alert.section_rename_error'));
     }
   } catch (err) {
     console.error(err);
@@ -242,16 +342,16 @@ async function renameSection(oldId, newName) {
 
 async function deleteSection(sectionId) {
   if (state.isLocked) {
-    alert("Le workspace est verrouillé. Cliquez sur le cadenas en haut à gauche pour autoriser les suppressions.");
+    alert(__('alert.locked'));
     return;
   }
   const section = state.sections.find(s => s.id === sectionId);
   if (!section) return;
   
   const count = section.documents.length;
-  if (count > 0 && !confirm(`La section "${section.name}" contient ${count} documents. Tout supprimer définitivement du disque ?`)) {
+  if (count > 0 && !confirm(__('confirm.section_delete_docs', { name: section.name, count: count }))) {
     return;
-  } else if (count === 0 && !confirm(`Supprimer la section "${section.name}" ?`)) {
+  } else if (count === 0 && !confirm(__('confirm.section_delete_empty', { name: section.name }))) {
     return;
   }
   
@@ -362,7 +462,7 @@ async function createTheme(name) {
       state.activeThemeId = data.theme.id;
       await fetchWorkspace();
     } else {
-      alert(data.error || 'Erreur lors de la création du thème');
+      alert(data.error || __('alert.theme_create_error'));
     }
   } catch (err) {
     console.error(err);
@@ -371,13 +471,13 @@ async function createTheme(name) {
 
 async function deleteTheme(id) {
   if (state.isLocked) {
-    alert("Le workspace est verrouillé. Cliquez sur le cadenas en haut à gauche pour autoriser les suppressions.");
+    alert(__('alert.locked'));
     return;
   }
   const theme = state.ideaThemes.find(t => t.id === id);
   if (!theme) return;
   
-  if (!confirm(`Supprimer le thème d'idées "${theme.name}" ?`)) return;
+  if (!confirm(__('confirm.theme_delete', { name: theme.name }))) return;
   
   try {
     const res = await fetch('/api/themes', {
@@ -471,14 +571,14 @@ function pathBasename(p) {
 }
 
 function relDate(ts) {
-  const d = new Date(ts);
-  const months = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return "aujourd'hui";
-  const y = new Date(); y.setDate(y.getDate() - 1);
-  if (d.toDateString() === y.toDateString()) return "hier";
-  if (d.getFullYear() === now.getFullYear()) return `${d.getDate()} ${months[d.getMonth()]}`;
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  var d = new Date(ts);
+  var months = [__('date.jan'),__('date.feb'),__('date.mar'),__('date.apr'),__('date.may'),__('date.jun'),__('date.jul'),__('date.aug'),__('date.sep'),__('date.oct'),__('date.nov'),__('date.dec')];
+  var now = new Date();
+  if (d.toDateString() === now.toDateString()) return __('date.today');
+  var y = new Date(); y.setDate(y.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return __('date.yesterday');
+  if (d.getFullYear() === now.getFullYear()) return d.getDate() + ' ' + months[d.getMonth()];
+  return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
 }
 
 function escapeHtml(s) {
@@ -491,9 +591,9 @@ function documentsForNav(documents) {
       const byDate = (Number(b.updatedAt) || 0) - (Number(a.updatedAt) || 0);
       if (byDate !== 0) return byDate;
     }
-    const aTitle = String(a.title || a.filename || 'Sans titre').trim();
-    const bTitle = String(b.title || b.filename || 'Sans titre').trim();
-    return aTitle.localeCompare(bTitle, 'fr', { sensitivity: 'base', numeric: true });
+    const aTitle = String(a.title || a.filename || __('new_doc.default_title')).trim();
+    const bTitle = String(b.title || b.filename || __('new_doc.default_title')).trim();
+    return aTitle.localeCompare(bTitle, getLocale() === 'fr' ? 'fr' : 'en', { sensitivity: 'base', numeric: true });
   });
 }
 
@@ -502,9 +602,7 @@ function updateDocSortButton() {
   const byDate = state.docSortMode === 'modified';
   const alphaIcon = sortDocsBtn.querySelector('.sort-icon-alpha');
   const dateIcon = sortDocsBtn.querySelector('.sort-icon-date');
-  const label = byDate
-    ? 'Tri par date de modification — cliquer pour trier de A à Z'
-    : 'Tri A à Z — cliquer pour trier par date de modification';
+  const label = byDate ? __('sort.by_date_tooltip') : __('sort.by_alpha_tooltip');
   if (alphaIcon) alphaIcon.classList.toggle('hidden', byDate);
   if (dateIcon) dateIcon.classList.toggle('hidden', !byDate);
   sortDocsBtn.title = label;
@@ -516,7 +614,7 @@ function renderNav() {
   nav.innerHTML = '';
   
   if (state.sections.length === 0) {
-    nav.innerHTML = '<div class="ideas-empty">Aucune section. Créez-en une avec le bouton ci-dessous.</div>';
+    nav.innerHTML = '<div class="ideas-empty">' + __('nav.no_sections') + '</div>';
     return;
   }
   
@@ -558,7 +656,7 @@ function renderNav() {
     header.querySelector('[data-act="rename"]').addEventListener('click', (e) => {
       e.stopPropagation();
       if (section.id === '_general') {
-        alert('Impossible de renommer la section Général');
+        alert(__('nav.section_rename'));
         return;
       }
       const titleEl = header.querySelector('.title');
@@ -657,7 +755,7 @@ function renderNav() {
       item.className = 'nav-item' + (doc.id === state.activeDocId ? ' active' : '');
       item.draggable = true;
       item.innerHTML = `
-        <span class="label">${escapeHtml(doc.title || 'Sans titre')}</span>
+        <span class="label">${escapeHtml(doc.title || __('new_doc.default_title'))}</span>
         <span class="meta">${relDate(doc.updatedAt)}</span>
         <button class="delete-doc" title="Supprimer">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -714,10 +812,11 @@ function loadActiveDoc() {
     title.value = '';
     subtitle.value = '';
     content.innerHTML = '';
-    breadcrumb.innerHTML = '<span>Aucun document</span>';
+    breadcrumb.innerHTML = '<span>' + __('breadcrumb.no_doc') + '</span>';
     docMeta.innerHTML = '';
     updateStats();
     if (typeof generateTOC === 'function') generateTOC();
+    if (typeof renderSnapshotsList === 'function') renderSnapshotsList();
     return;
   }
   
@@ -729,6 +828,8 @@ function loadActiveDoc() {
   autoGrow(title);
   autoGrow(subtitle);
   updateStats();
+  if (typeof renderSnapshotsList === 'function') renderSnapshotsList();
+  if (typeof loadSnapshotsForDoc === 'function') loadSnapshotsForDoc(doc.id);
 
   // Regenerate TOC for the new document
   setTimeout(() => { if (typeof generateTOC === 'function') generateTOC(); }, 40);
@@ -755,21 +856,21 @@ function updateBreadcrumbAndMeta() {
   if (!doc) return;
 
   const parts = doc.id.split('/');
-  const sectionName = parts[0] === '_general' ? 'Général' : parts[0];
+  const sectionName = parts[0] === '_general' ? __('nav.general_section') : parts[0];
   // Fallback to extracting from id if the doc object doesn't carry .filename
   const filename = doc.filename || (parts[1] || '');
 
   breadcrumb.innerHTML = `
     <span>${escapeHtml(sectionName)}</span>
     <span class="sep">/</span>
-    <span class="current">${escapeHtml(doc.title || 'Sans titre')}</span>
-    ${filename ? `<span class="sep">/</span><span class="breadcrumb-filename" title="Cliquer pour copier le nom du fichier">${escapeHtml(filename)}</span>` : ''}
+    <span class="current">${escapeHtml(doc.title || __('new_doc.default_title'))}</span>
+    ${filename ? `<span class="sep">/</span><span class="breadcrumb-filename" title="${__('breadcrumb.filename_tooltip')}">${escapeHtml(filename)}</span>` : ''}
   `;
 
   docMeta.innerHTML = `
-    <span>créé ${relDate(doc.createdAt)}</span>
+    <span>${__('meta.created', { date: relDate(doc.createdAt) })}</span>
     <span>·</span>
-    <span>modifié ${relDate(doc.updatedAt)}</span>
+    <span>${__('meta.modified', { date: relDate(doc.updatedAt) })}</span>
   `;
 
   // Copy filename to clipboard on click (in breadcrumb only)
@@ -779,7 +880,7 @@ function updateBreadcrumbAndMeta() {
       await navigator.clipboard.writeText(filename);
       e.target.classList.add('copied');
       const prev = e.target.textContent;
-      e.target.textContent = '✓ copié';
+      e.target.textContent = __('meta.copied');
       setTimeout(() => {
         e.target.classList.remove('copied');
         e.target.textContent = prev;
@@ -789,6 +890,19 @@ function updateBreadcrumbAndMeta() {
 
   const fnInBc = breadcrumb.querySelector('.breadcrumb-filename');
   if (fnInBc) fnInBc.addEventListener('click', onFilenameClick);
+}
+
+if (breadcrumb) {
+  breadcrumb.title = 'Cliquer ou toucher pour revenir en haut du document';
+  breadcrumb.addEventListener('click', (e) => {
+    if (e.target.closest('.breadcrumb-filename')) return;
+    if (editorWrap) {
+      editorWrap.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+  });
 }
 
 // Render theme tabs
@@ -815,9 +929,9 @@ function renderThemesTabs() {
   
   const addBtn = document.createElement('button');
   addBtn.className = 'theme-tab add';
-  addBtn.textContent = '+ thème';
+  addBtn.textContent = __('theme.add');
   addBtn.addEventListener('click', () => {
-    const name = prompt('Nom du thème ?');
+    const name = prompt(__('prompt.theme_name'));
     if (!name || !name.trim()) return;
     createTheme(name);
   });
@@ -832,7 +946,7 @@ function renderIdeas() {
   ideaAddInput.value = '';
 
   if (!theme) {
-    ideasList.innerHTML = '<div class="ideas-empty">Aucun thème — créez-en un avec le bouton + thème.</div>';
+    ideasList.innerHTML = '<div class="ideas-empty">' + __('ideas.no_theme') + '</div>';
     activeCountEl.textContent = '';
     archivedCountEl.textContent = '';
     return;
@@ -846,7 +960,7 @@ function renderIdeas() {
   const shown = state.ideasMode === 'archived' ? archived : active;
 
   if (shown.length === 0) {
-    ideasList.innerHTML = `<div class="ideas-empty">${state.ideasMode === 'archived' ? 'Aucune idée archivée.' : 'Aucune idée — ajoutez-en une.'}</div>`;
+    ideasList.innerHTML = `<div class="ideas-empty">${state.ideasMode === 'archived' ? __('ideas.empty_archived') : __('ideas.empty_active')}</div>`;
   } else {
     shown.forEach(idea => {
       const chip = document.createElement('div');
@@ -869,7 +983,7 @@ function renderIdeas() {
       // Insert button (plus icon)
       const insertBtn = document.createElement('button');
       insertBtn.className = 'chip-action-btn insert-btn';
-      insertBtn.title = "Insérer au curseur";
+      insertBtn.title = __('ideas.insert_title');
       insertBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>`;
       insertBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -881,7 +995,7 @@ function renderIdeas() {
       // Edit button (pencil)
       const editBtn = document.createElement('button');
       editBtn.className = 'chip-action-btn edit-btn';
-      editBtn.title = "Modifier";
+      editBtn.title = __('ideas.edit_title');
       editBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
       editBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -893,14 +1007,14 @@ function renderIdeas() {
       archiveBtn.className = 'chip-action-btn archive-btn';
 
       if (idea.archived) {
-        archiveBtn.title = "Désarchiver";
+        archiveBtn.title = __('ideas.unarchive_title');
         archiveBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`;
         archiveBtn.addEventListener('click', (e) => {
           e.stopPropagation();
           toggleIdea(theme.id, idea.text, false);
         });
       } else {
-        archiveBtn.title = "Archiver";
+        archiveBtn.title = __('ideas.archive_title');
         archiveBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
         archiveBtn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -915,7 +1029,7 @@ function renderIdeas() {
       // Delete button (X) — 5s fade-out, click again during fade to cancel
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'chip-action-btn delete-btn';
-      deleteBtn.title = "Supprimer (5 s pour annuler)";
+      deleteBtn.title = __('ideas.delete_title');
       deleteBtn.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
       deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -951,7 +1065,7 @@ function renderIdeas() {
   if (state.ideasMode === 'active') {
     const addBtn = document.createElement('button');
     addBtn.className = 'idea-add';
-    addBtn.textContent = '+ ajouter une idée';
+    addBtn.textContent = __('ideas.add_button');
     addBtn.addEventListener('click', () => {
       ideaAddInput.classList.remove('hidden');
       ideaAddInput.focus();
@@ -993,7 +1107,7 @@ const deleteTimers = new Map(); // ideaText -> { timer, element }
 
 function startDeleting(themeId, ideaText, chip) {
   if (state.isLocked) {
-    alert("Le workspace est verrouillé. Cliquez sur le cadenas en haut à gauche pour autoriser les suppressions.");
+    alert(__('alert.locked'));
     return;
   }
   // If archive was pending, cancel it first
@@ -1034,7 +1148,7 @@ async function commitDeleteIdea(themeId, ideaText) {
     renderIdeas();
   } catch (err) {
     console.error('Failed to delete idea:', err);
-    alert('Erreur lors de la suppression de l’idée');
+    alert(__('alert.idea_delete_error'));
     renderIdeas();
   }
 }
@@ -1116,7 +1230,7 @@ async function commitEditIdea(themeId, oldText, newText, ideaObj) {
     renderIdeas();
   } catch (err) {
     console.error('Failed to edit idea:', err);
-    alert('Erreur lors de la modification de l’idée');
+    alert(__('alert.idea_edit_error'));
     renderIdeas();
   }
 }
@@ -1232,32 +1346,47 @@ function autoGrow(el) {
   editor.style.minHeight = '';
 }
 
+// On a phone the statusbar has ~350px for three counters plus four buttons, and
+// a long text turns "111 228 signes" into something that shoves the icons off
+// the edge. Wide screens keep the exact figure — a writer working to a target
+// wants the unit, not an approximation.
+const narrowStatusbar = window.matchMedia('(max-width: 720px)');
+
+function formatCount(n) {
+  if (!narrowStatusbar.matches || n < 10000) return n.toLocaleString(localeStr());
+  if (n >= 1000000) return (Math.round(n / 100000) / 10).toLocaleString(localeStr()) + 'M';
+  if (n < 100000) {
+    return (Math.round(n / 100) / 10).toLocaleString(localeStr()) + 'k';
+  }
+  var k = Math.round(n / 1000);
+  return k >= 1000 ? '1,0M' : k + 'k';
+}
+
+function localeStr() { return getLocale() === 'fr' ? 'fr-FR' : 'en-US'; }
+
 function updateStats() {
   const text = getContentMarkdown().trim();
   const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
   const chars = getContentMarkdown().length;
   const minutes = words ? Math.max(1, Math.round(words / 220)) : 0;
-  wcEl.textContent = words.toLocaleString('fr-FR');
-  ccEl.textContent = chars.toLocaleString('fr-FR');
-  rtEl.textContent = minutes + ' min';
-  updateCursor();
+
+  wcEl.textContent = formatCount(words);
+  ccEl.textContent = formatCount(chars);
+  rtEl.textContent = formatCount(minutes) + ' ' + __('statusbar.min');
+
+  // The exact figure stays reachable when the display is rounded.
+  wcEl.title = words.toLocaleString(getLocale() === 'fr' ? 'fr-FR' : 'en-US') + ' ' + __('statusbar.mots');
+  ccEl.title = chars.toLocaleString(getLocale() === 'fr' ? 'fr-FR' : 'en-US') + ' ' + __('statusbar.signes');
 }
 
-function updateCursor() {
-  if (activeLineNode) {
-    const index = Array.from(content.children).indexOf(activeLineNode);
-    const caretOffset = getCaretCharacterOffsetWithin(activeLineNode);
-    cursorEl.textContent = `ln ${index + 1} · col ${caretOffset + 1}`;
-  } else {
-    cursorEl.textContent = `ln 1 · col 1`;
-  }
-}
+// Rotating the phone, or resizing on desktop, has to reformat what is shown.
+narrowStatusbar.addEventListener('change', () => updateStats());
 
 function markDirty() {
   dirty = true;
   saveIndicator.classList.remove('saved');
   saveIndicator.classList.add('dirty');
-  saveText.textContent = 'Modifié…';
+  saveText.textContent = __('save.modified');
   
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
@@ -1266,6 +1395,8 @@ function markDirty() {
 }
 
 function insertTextAtCaret(text) {
+  // execCommand('insertText') cannot create new lines in the line model.
+  if (/[\r\n]/.test(text || '')) return insertMarkdownAtCaret(text);
   if (!activeLineNode) {
     const lastLine = content.lastChild;
     if (lastLine && lastLine.classList.contains('editor-line')) {
@@ -1605,13 +1736,21 @@ function renderMath(formula, displayMode) {
       trust: false
     });
   } catch (e) {
-    return `<span class="math-error" title="${escapeHtml(e.message || 'Erreur LaTeX')}">${escapeHtml(formula)}</span>`;
+    return `<span class="math-error" title="${escapeHtml(e.message || __('math.error'))}">${escapeHtml(formula)}</span>`;
   }
 }
 
 let activeLineNode = null;
 
 function renderMarkdownLine(line) {
+  // Merged block: render each markdown line on its own, wrapped so every
+  // sub-line keeps its block styling (headings, quotes, bold... intact)
+  if (line.indexOf('\n') !== -1) {
+    return line.split('\n')
+      .map(sub => `<span class="md-subline">${sub.trim() === '' ? '<br>' : renderMarkdownLine(sub)}</span>`)
+      .join('');
+  }
+  line = line.replace(/\r$/, '');
   if (line.trim() === '') return '<br>';
 
   // Code fence — content not rendered here (post-pass groups + highlights)
@@ -1757,8 +1896,10 @@ function getContentMarkdown() {
 }
 
 function loadContentMarkdown(markdown) {
+  if (typeof clearMultiSelection === 'function') clearMultiSelection();
   content.innerHTML = '';
-  const lines = markdown.split('\n');
+  const cleanMarkdown = (markdown || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = cleanMarkdown.split('\n');
   lines.forEach(line => {
     const lineDiv = document.createElement('div');
     lineDiv.className = 'editor-line';
@@ -1780,7 +1921,10 @@ function loadContentMarkdown(markdown) {
 
 function getLineKind(raw) {
   if (raw == null) return 'p';
-  const t = raw;
+  // A merged block holds several markdown lines; each sub-line carries its own
+  // styling (.md-subline), so the block itself stays a plain paragraph.
+  if (raw.indexOf('\n') !== -1) return 'p';
+  const t = raw.replace(/\r$/, '');
   // Code fence open/close
   if (/^```/.test(t)) return 'code-fence';
   // Display math (single-line)
@@ -1834,10 +1978,10 @@ function calloutIcon(type) {
 }
 function calloutDefaultTitle(type) {
   const map = {
-    info: 'Info', tip: 'Astuce', note: 'Note', success: 'Succès',
-    warning: 'Attention', danger: 'Danger', error: 'Erreur', quote: 'Citation',
-    abstract: 'Résumé', todo: 'À faire', question: 'Question', failure: 'Échec',
-    bug: 'Bug', example: 'Exemple', cite: 'Citation'
+    info: __('callout.info'), tip: __('callout.tip'), note: __('callout.note'), success: __('callout.success'),
+    warning: __('callout.warning'), danger: __('callout.danger'), error: __('callout.error'), quote: __('callout.quote'),
+    abstract: __('callout.abstract'), todo: __('callout.todo'), question: __('callout.question'), failure: __('callout.failure'),
+    bug: __('callout.bug'), example: __('callout.example'), cite: __('callout.quote')
   };
   return map[type] || type.charAt(0).toUpperCase() + type.slice(1);
 }
@@ -2007,6 +2151,31 @@ function postProcessRenderedLines() {
   processCodeBlocks();
   processCallouts();
   processTables();
+  markFrontmatterLines();
+}
+
+// Tag the lines of a leading YAML frontmatter block (Obsidian-style: the very
+// first line is "---", closed by the next "---" or "..." line) so the
+// "Masquer le frontmatter" setting can hide them via CSS. The block stays in
+// the document markdown — only its display is affected.
+function markFrontmatterLines() {
+  const lines = Array.from(content.children).filter(el => el.classList && el.classList.contains('editor-line'));
+  lines.forEach(l => l.classList.remove('is-frontmatter'));
+  if (!lines.length) return;
+
+  const rawOf = (l) => {
+    if (l === activeLineNode) return l.textContent;
+    return (l.dataset.raw !== undefined) ? l.dataset.raw : l.textContent;
+  };
+
+  if (rawOf(lines[0]).trim() !== '---') return;
+  let end = -1;
+  for (let i = 1; i < lines.length; i++) {
+    const t = rawOf(lines[i]).trim();
+    if (t === '---' || t === '...') { end = i; break; }
+  }
+  if (end === -1) return;
+  for (let i = 0; i <= end; i++) lines[i].classList.add('is-frontmatter');
 }
 
 let postProcessTimer;
@@ -2068,8 +2237,12 @@ function setCaretInLine(line, charOffset) {
 function makeLineRawAndActive(line) {
   if (!line) return;
   const raw = (line.dataset.raw !== undefined) ? line.dataset.raw : line.textContent;
+  // Only on a true activation — a repeat call on the already-active line must
+  // not overwrite the remembered on-activation content.
+  if (line !== activeLineNode) line.dataset.rawOnActivate = raw;
   line.dataset.raw = raw;
   line.textContent = raw;
+  if (activeLineNode && activeLineNode !== line) removeAbandonedEmptyLine(activeLineNode);
   if (activeLineNode && activeLineNode !== line && content.contains(activeLineNode)) {
     // commit old active line back to rendered HTML
     const oldRaw = activeLineNode.textContent;
@@ -2138,7 +2311,35 @@ function deleteRangeAcrossLines(range) {
   setCaretInLine(startLine, textBefore.length);
 }
 
+// A block is discarded when the caret leaves it while it holds zero characters
+// and it either (a) was created by clicking the editor background, or (b) had
+// content when it became active and was emptied by the user. A block holding
+// anything — even a single space — is kept, as are empty lines the caret merely
+// passed through (paragraph breaks) and lines created with Enter.
+function removeAbandonedEmptyLine(line) {
+  if (!line || !line.dataset) return false;
+  if (line.textContent !== '') {
+    delete line.dataset.gutterCreated;
+    delete line.dataset.rawOnActivate;
+    return false;
+  }
+  const wasClickCreated = !!line.dataset.gutterCreated;
+  const wasEmptiedByUser = line.dataset.rawOnActivate !== undefined && line.dataset.rawOnActivate !== '';
+  if (!wasClickCreated && !wasEmptiedByUser) {
+    delete line.dataset.rawOnActivate;
+    return false;
+  }
+  if (!content.contains(line)) return false;
+  content.removeChild(line);
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+  return true;
+}
+
 function updateActiveLine() {
+  if (readingModeState) return;
   const sel = window.getSelection();
   if (!sel.rangeCount) return;
   
@@ -2154,8 +2355,10 @@ function updateActiveLine() {
   
   if (node && node.parentNode === content) {
     if (node !== activeLineNode) {
-      // Transition old active line to rendered HTML
-      if (activeLineNode && content.contains(activeLineNode)) {
+      hideBlockTrashBtnNow();
+      // Transition old active line to rendered HTML (unless it was a still-empty
+      // click-created block, which is dropped instead)
+      if (activeLineNode && !removeAbandonedEmptyLine(activeLineNode) && content.contains(activeLineNode)) {
         const raw = activeLineNode.textContent;
         activeLineNode.dataset.raw = raw;
         applyLineKind(activeLineNode, raw);
@@ -2166,8 +2369,12 @@ function updateActiveLine() {
       // Transition new active line to raw text
       activeLineNode = node;
       activeLineNode.classList.add('active-line');
+      if (typewriterState) centerActiveLine(true);
 
       const rawText = activeLineNode.dataset.raw !== undefined ? activeLineNode.dataset.raw : activeLineNode.textContent;
+      // Remember what the block held on activation, so an emptied-out block can
+      // be told apart from one that was already empty (see removeAbandonedEmptyLine)
+      activeLineNode.dataset.rawOnActivate = rawText;
       const offset = getCaretCharacterOffsetWithin(activeLineNode);
 
       activeLineNode.textContent = rawText;
@@ -2178,7 +2385,9 @@ function updateActiveLine() {
     }
   } else {
     // Clicked outside content lines
-    if (activeLineNode && content.contains(activeLineNode)) {
+    if (activeLineNode && removeAbandonedEmptyLine(activeLineNode)) {
+      activeLineNode = null;
+    } else if (activeLineNode && content.contains(activeLineNode)) {
       const raw = activeLineNode.textContent;
       activeLineNode.dataset.raw = raw;
       applyLineKind(activeLineNode, raw);
@@ -2188,6 +2397,81 @@ function updateActiveLine() {
       debouncedPostProcess();
     }
   }
+}
+
+// True when [s,e) sits immediately inside `prefix`/`suffix` in `text` (selection
+// excludes the markers themselves, e.g. selecting "test" inside "**test**").
+// Rejects matches that are actually part of a longer run of the same character
+// (e.g. a lone '*' check must not fire on text that's really wrapped in '**').
+// Not used for asterisk markers — see markerRunDepth() for those, which
+// handles combined "***bold italic***" runs instead of just rejecting them.
+function isExactlyNestedInPair(text, s, e, prefix, suffix) {
+  const before = text.slice(Math.max(0, s - prefix.length), s);
+  const after = text.slice(e, e + suffix.length);
+  if (before !== prefix || after !== suffix) return false;
+  const pChar = prefix.charAt(prefix.length - 1);
+  const sChar = suffix.charAt(0);
+  if (text.charAt(s - prefix.length - 1) === pChar) return false;
+  if (text.charAt(e + suffix.length) === sChar) return false;
+  return true;
+}
+
+function runLengthBefore(text, pos, ch) {
+  let n = 0;
+  while (pos - n - 1 >= 0 && text.charAt(pos - n - 1) === ch) n++;
+  return n;
+}
+function runLengthAfter(text, pos, ch) {
+  let n = 0;
+  while (text.charAt(pos + n) === ch) n++;
+  return n;
+}
+
+// How many layers of a repeated character (e.g. '*') wrap [s,e) — counting
+// markers whether the selection includes them (dragged across the asterisks)
+// or sits just inside them. This lets "***bold italic***" register as both
+// bold (depth>=2) and italic (depth===1 or >=3) depending on which button is
+// toggled, instead of only ever matching the outermost pair.
+function markerRunDepth(text, s, e, ch) {
+  let innerS = s, innerE = e;
+  while (innerS < innerE && text.charAt(innerS) === ch) innerS++;
+  while (innerE > innerS && text.charAt(innerE - 1) === ch) innerE--;
+  const leadInSel = innerS - s;
+  const trailInSel = e - innerE;
+  const before = leadInSel > 0 ? leadInSel : runLengthBefore(text, s, ch);
+  const after = trailInSel > 0 ? trailInSel : runLengthAfter(text, e, ch);
+  return { depth: Math.min(before, after), innerS, innerE };
+}
+
+// Toggle `prefix`/`suffix` markup on/off around [s,e) in `text`, returning the
+// new text plus the new [start,end) of the (still-selected) inner text.
+function toggleInlineMarkers(text, s, e, prefix, suffix) {
+  const selectedText = text.slice(s, e);
+
+  if (prefix === suffix && /^\*+$/.test(prefix)) {
+    const n = prefix.length;
+    const { depth, innerS, innerE } = markerRunDepth(text, s, e, '*');
+    if (depth >= n) {
+      const newText = text.slice(0, innerS - n) + text.slice(innerS, innerE) + text.slice(innerE + n);
+      return { newText, newStart: innerS - n, newEnd: (innerS - n) + (innerE - innerS) };
+    }
+    const wrapped = prefix + selectedText + suffix;
+    const newText = text.slice(0, s) + wrapped + text.slice(e);
+    return { newText, newStart: s + prefix.length, newEnd: s + prefix.length + selectedText.length };
+  }
+
+  if (selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length >= prefix.length + suffix.length) {
+    const unwrapped = selectedText.slice(prefix.length, selectedText.length - suffix.length);
+    const newText = text.slice(0, s) + unwrapped + text.slice(e);
+    return { newText, newStart: s, newEnd: s + unwrapped.length };
+  }
+  if (isExactlyNestedInPair(text, s, e, prefix, suffix)) {
+    const newText = text.slice(0, s - prefix.length) + selectedText + text.slice(e + suffix.length);
+    return { newText, newStart: s - prefix.length, newEnd: (s - prefix.length) + selectedText.length };
+  }
+  const wrapped = prefix + selectedText + suffix;
+  const newText = text.slice(0, s) + wrapped + text.slice(e);
+  return { newText, newStart: s + prefix.length, newEnd: s + prefix.length + selectedText.length };
 }
 
 function wrapSelectionInline(prefix, suffix = prefix) {
@@ -2237,22 +2521,10 @@ function wrapSelectionInline(prefix, suffix = prefix) {
     const selectedText = text.substring(s, e);
     if (!selectedText) return;
 
-    let newText = '';
-    let newStart = s;
-    let newEnd = e;
-
-    // Check if already wrapped to toggle off
-    if (selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length >= prefix.length + suffix.length) {
-      const unwrapped = selectedText.slice(prefix.length, selectedText.length - suffix.length);
-      newText = text.substring(0, s) + unwrapped + text.substring(e);
-      newStart = s;
-      newEnd = s + unwrapped.length;
-    } else {
-      const wrapped = prefix + selectedText + suffix;
-      newText = text.substring(0, s) + wrapped + text.substring(e);
-      newStart = s + prefix.length;
-      newEnd = newStart + selectedText.length;
-    }
+    // Toggles off if already wrapped — whether the selection includes the
+    // markers themselves or sits just inside them (e.g. selecting exactly
+    // "test" within "**test**", or within "***test***" for bold+italic).
+    const { newText, newStart, newEnd } = toggleInlineMarkers(text, s, e, prefix, suffix);
 
     line.textContent = newText;
     line.dataset.raw = newText;
@@ -2292,14 +2564,7 @@ function wrapSelectionInline(prefix, suffix = prefix) {
       const selectedText = text.substring(s, e);
       if (!selectedText.trim()) return;
 
-      let newText = '';
-      if (selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length >= prefix.length + suffix.length) {
-        const unwrapped = selectedText.slice(prefix.length, selectedText.length - suffix.length);
-        newText = text.substring(0, s) + unwrapped + text.substring(e);
-      } else {
-        const wrapped = prefix + selectedText + suffix;
-        newText = text.substring(0, s) + wrapped + text.substring(e);
-      }
+      const { newText } = toggleInlineMarkers(text, s, e, prefix, suffix);
 
       line.textContent = newText;
       line.dataset.raw = newText;
@@ -2619,38 +2884,431 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// ============ COLOR THEME (Settings > Apparence) ============
+// Separate concept from state.ideaThemes/state.activeThemeId (document topic
+// tabs) — "color theme" here means the app's visual palette.
+
+const COLOR_THEME_FIELD_GROUPS = {
+  base: [
+    { key: '--bg', label: function () { return __('color.bg'); } },
+    { key: '--bg-elevated', label: function () { return __('color.bg_elevated'); } },
+    { key: '--bg-hover', label: function () { return __('color.bg_hover'); } },
+    { key: '--bg-active', label: function () { return __('color.bg_active'); } },
+    { key: '--border', label: function () { return __('color.border'); } },
+    { key: '--border-strong', label: function () { return __('color.border_strong'); } },
+    { key: '--text', label: function () { return __('color.text'); } },
+    { key: '--text-muted', label: function () { return __('color.text_muted'); } },
+    { key: '--text-faint', label: function () { return __('color.text_faint'); } },
+    { key: '--accent', label: function () { return __('color.accent'); } },
+    { key: '--danger', label: function () { return __('color.danger'); } },
+  ],
+  syntax: [
+    { key: '--syn-h1', label: function () { return __('color.syn_h1'); } },
+    { key: '--syn-h2', label: function () { return __('color.syn_h2'); } },
+    { key: '--syn-h3', label: function () { return __('color.syn_h3'); } },
+    { key: '--syn-h4', label: function () { return __('color.syn_h4'); } },
+    { key: '--syn-h5', label: function () { return __('color.syn_h5'); } },
+    { key: '--syn-h6', label: function () { return __('color.syn_h6'); } },
+    { key: '--syn-bold', label: function () { return __('color.syn_bold'); } },
+    { key: '--syn-quote', label: function () { return __('color.syn_quote'); } },
+    { key: '--syn-link', label: function () { return __('color.syn_link'); } },
+    { key: '--syn-code', label: function () { return __('color.syn_code'); } },
+    { key: '--syn-strike', label: function () { return __('color.syn_strike'); } },
+  ],
+};
+const COLOR_THEME_ALL_VARS = [
+  ...COLOR_THEME_FIELD_GROUPS.base.map(f => f.key),
+  ...COLOR_THEME_FIELD_GROUPS.syntax.map(f => f.key),
+];
+
+function getBuiltinColorThemes() {
+  return [
+    { id: 'default', name: __('appearance.theme_default'), bg: '#0d0d0e', dot: '#c9a96a' },
+    { id: 'ivoire',  name: __('appearance.theme_ivoire'),  bg: '#f5efe3', dot: '#a8632f' },
+    { id: 'polaire', name: __('appearance.theme_polaire'), bg: '#0a0f14', dot: '#5fb3c9' },
+  ];
+}
+
+let colorThemeState = {
+  id: localStorage.getItem('scriptoriumColorTheme') || 'default',
+  mdColor: localStorage.getItem('scriptoriumMdColor') === '1',
+  customVars: null,
+};
+
+function toHexColor(v) {
+  if (v && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim())) return v.trim();
+  return null;
+}
+
+function deriveAccentSoft(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec((hex || '').trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, 0.15)`;
+}
+
+// Reads the CSS-declared values for a built-in theme without leaving a visible
+// flash — swap data-theme, read computed vars, restore, all in one sync pass.
+function getComputedThemeVars(themeId) {
+  const root = document.documentElement;
+  const prevTheme = root.getAttribute('data-theme');
+  const prevInline = {};
+  COLOR_THEME_ALL_VARS.forEach(v => { prevInline[v] = root.style.getPropertyValue(v); });
+  COLOR_THEME_ALL_VARS.forEach(v => root.style.removeProperty(v));
+  root.setAttribute('data-theme', themeId);
+  const computed = getComputedStyle(root);
+  const out = {};
+  COLOR_THEME_ALL_VARS.forEach(v => { out[v] = computed.getPropertyValue(v).trim(); });
+  if (prevTheme) root.setAttribute('data-theme', prevTheme); else root.removeAttribute('data-theme');
+  COLOR_THEME_ALL_VARS.forEach(v => { if (prevInline[v]) root.style.setProperty(v, prevInline[v]); });
+  return out;
+}
+
+function applyColorTheme(id, opts = {}) {
+  colorThemeState.id = id;
+  const root = document.documentElement;
+  COLOR_THEME_ALL_VARS.forEach(v => root.style.removeProperty(v));
+  root.style.removeProperty('--accent-soft');
+
+  if (id === 'custom') {
+    const vars = colorThemeState.customVars || getComputedThemeVars('default');
+    colorThemeState.customVars = vars;
+    root.setAttribute('data-theme', 'custom');
+    COLOR_THEME_ALL_VARS.forEach(v => { if (vars[v]) root.style.setProperty(v, vars[v]); });
+    const soft = deriveAccentSoft(vars['--accent']);
+    if (soft) root.style.setProperty('--accent-soft', soft);
+  } else {
+    root.setAttribute('data-theme', id);
+  }
+
+  if (!opts.skipPersist) localStorage.setItem('scriptoriumColorTheme', id);
+}
+
+function applyMdColor(on) {
+  colorThemeState.mdColor = on;
+  document.documentElement.classList.toggle('md-color-on', on);
+  localStorage.setItem('scriptoriumMdColor', on ? '1' : '0');
+}
+
+function renderColorThemeSwatches() {
+  const container = $('colorThemeSwatches');
+  if (!container) return;
+  container.innerHTML = '';
+  var themes = getBuiltinColorThemes();
+  var all = themes.concat([{ id: 'custom', name: __('appearance.theme_custom'), custom: true }]);
+  all.forEach(t => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'color-theme-swatch' + (colorThemeState.id === t.id ? ' active' : '');
+    const preview = t.custom
+      ? `<span class="color-theme-swatch-preview custom-preview">🎨</span>`
+      : `<span class="color-theme-swatch-preview" style="background:${t.bg}"><span style="background:${t.dot}"></span></span>`;
+    btn.innerHTML = `${preview}<span class="color-theme-swatch-label">${t.name}</span>`;
+    btn.addEventListener('click', () => selectColorTheme(t.id));
+    container.appendChild(btn);
+  });
+}
+
+function selectColorTheme(id) {
+  applyColorTheme(id);
+  renderColorThemeSwatches();
+  const editor = $('customThemeEditor');
+  if (editor) {
+    editor.classList.toggle('hidden', id !== 'custom');
+    if (id === 'custom') populateCustomThemeFields();
+  }
+}
+
+function buildColorFieldGrid(containerId, fields) {
+  const container = $(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  fields.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'color-field';
+    const inputId = 'colorField' + f.key;
+    row.innerHTML = `<label for="${inputId}">${f.label()}</label>`;
+    const input = document.createElement('input');
+    input.type = 'color';
+    input.id = inputId;
+    input.dataset.varKey = f.key;
+    input.addEventListener('input', onCustomColorInput);
+    row.appendChild(input);
+    container.appendChild(row);
+  });
+}
+
+function populateCustomThemeFields() {
+  const vars = colorThemeState.customVars || getComputedThemeVars('default');
+  colorThemeState.customVars = vars;
+
+  buildColorFieldGrid('customThemeBaseFields', COLOR_THEME_FIELD_GROUPS.base);
+  COLOR_THEME_FIELD_GROUPS.base.forEach(f => {
+    const input = $('colorField' + f.key);
+    if (input) input.value = toHexColor(vars[f.key]) || '#000000';
+  });
+
+  const syntaxTitle = $('customThemeSyntaxTitle');
+  const syntaxFields = $('customThemeSyntaxFields');
+  const showSyntax = colorThemeState.mdColor;
+  if (syntaxTitle) syntaxTitle.classList.toggle('hidden', !showSyntax);
+  if (syntaxFields) syntaxFields.classList.toggle('hidden', !showSyntax);
+  if (showSyntax) {
+    buildColorFieldGrid('customThemeSyntaxFields', COLOR_THEME_FIELD_GROUPS.syntax);
+    COLOR_THEME_FIELD_GROUPS.syntax.forEach(f => {
+      const input = $('colorField' + f.key);
+      if (input) input.value = toHexColor(vars[f.key]) || '#000000';
+    });
+  }
+}
+
+function onCustomColorInput(e) {
+  const key = e.target.dataset.varKey;
+  const value = e.target.value;
+  colorThemeState.customVars = colorThemeState.customVars || {};
+  colorThemeState.customVars[key] = value;
+  document.documentElement.style.setProperty(key, value);
+  if (key === '--accent') {
+    const soft = deriveAccentSoft(value);
+    if (soft) {
+      colorThemeState.customVars['--accent-soft'] = soft;
+      document.documentElement.style.setProperty('--accent-soft', soft);
+    }
+  }
+  const status = $('customThemeSaveStatus');
+  if (status) status.textContent = __('save.unsaved');
+}
+
+$('resetCustomThemeBtn')?.addEventListener('click', () => {
+  colorThemeState.customVars = getComputedThemeVars('default');
+  applyColorTheme('custom');
+  populateCustomThemeFields();
+  const status = $('customThemeSaveStatus');
+  if (status) status.textContent = '';
+});
+
+$('saveCustomThemeBtn')?.addEventListener('click', async () => {
+  const status = $('customThemeSaveStatus');
+  try {
+    const payload = colorThemeState.customVars || {};
+    const res = await fetch('/api/color-theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      localStorage.setItem('scriptoriumCustomThemeVars', JSON.stringify(payload));
+      if (status) {
+        status.textContent = __('save.saved_ok');
+        setTimeout(function () { if (status.textContent === __('save.saved_ok')) status.textContent = ''; }, 2500);
+      }
+    } else if (status) {
+      status.textContent = __('save.error');
+    }
+  } catch (err) {
+    if (status) status.textContent = __('save.error');
+  }
+});
+
+$('mdColorToggle')?.addEventListener('change', (e) => {
+  applyMdColor(e.target.checked);
+  if (colorThemeState.id === 'custom') populateCustomThemeFields();
+});
+
+// Obsidian frontmatter visibility (Settings > Apparence)
+let hideFrontmatterState = localStorage.getItem('scriptoriumHideFrontmatter') === '1';
+
+function applyHideFrontmatter(enable) {
+  hideFrontmatterState = enable;
+  document.documentElement.classList.toggle('hide-frontmatter', enable);
+  localStorage.setItem('scriptoriumHideFrontmatter', enable ? '1' : '0');
+  const toggle = $('frontmatterToggle');
+  if (toggle) toggle.checked = enable;
+  markFrontmatterLines();
+}
+
+$('frontmatterToggle')?.addEventListener('change', (e) => applyHideFrontmatter(e.target.checked));
+applyHideFrontmatter(hideFrontmatterState);
+
+function updateSettingsOverlayState() {
+  if (!settingsModal) return;
+  const activeTab = document.querySelector('.settings-tab.active');
+  const isAppearance = activeTab && activeTab.dataset.panel === 'appearance';
+  settingsModal.classList.toggle('transparent-overlay', isAppearance);
+}
+
+document.querySelectorAll('.settings-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.settings-panel').forEach(p => p.classList.add('hidden'));
+    tab.classList.add('active');
+    const panel = document.querySelector(`.settings-panel[data-panel="${tab.dataset.panel}"]`);
+    if (panel) panel.classList.remove('hidden');
+    updateSettingsOverlayState();
+  });
+});
+
+async function initColorTheme() {
+  const mdToggle = $('mdColorToggle');
+  if (mdToggle) mdToggle.checked = colorThemeState.mdColor;
+  document.documentElement.classList.toggle('md-color-on', colorThemeState.mdColor);
+
+  try {
+    const cached = localStorage.getItem('scriptoriumCustomThemeVars');
+    if (cached) colorThemeState.customVars = JSON.parse(cached);
+  } catch (e) {}
+
+  renderColorThemeSwatches();
+  if (colorThemeState.id === 'custom') {
+    $('customThemeEditor')?.classList.remove('hidden');
+  }
+
+  // Server file is the source of truth; refresh the local cache from it.
+  try {
+    const res = await fetch('/api/color-theme');
+    const data = await res.json();
+    if (data && data.theme) {
+      colorThemeState.customVars = data.theme;
+      localStorage.setItem('scriptoriumCustomThemeVars', JSON.stringify(data.theme));
+      if (colorThemeState.id === 'custom') applyColorTheme('custom');
+      if ($('customThemeEditor') && !$('customThemeEditor').classList.contains('hidden')) {
+        populateCustomThemeFields();
+      }
+    }
+  } catch (e) {}
+}
+
+// ============ FONT SIZES (Settings > Apparence) ============
+// Independent sliders per heading level + body text, each an absolute px
+// CSS var — so levels can be sized independently rather than scaling
+// together the way the old em-based sizing did.
+
+const FONT_SIZE_KEYS = ['--fs-doc-title', '--fs-doc-subtitle', '--fs-base', '--fs-h1', '--fs-h2', '--fs-h3', '--fs-h4', '--fs-h5', '--fs-h6'];
+const FONT_SIZE_DEFAULTS = {
+  '--fs-doc-title': 34, '--fs-doc-subtitle': 17, '--fs-base': 17.5, '--fs-h1': 35, '--fs-h2': 27, '--fs-h3': 22, '--fs-h4': 19, '--fs-h5': 16.6, '--fs-h6': 14.9,
+};
+
+function loadFontSizes() {
+  try {
+    const raw = localStorage.getItem('scriptoriumFontSizes');
+    if (raw) return { ...FONT_SIZE_DEFAULTS, ...JSON.parse(raw) };
+  } catch (e) {}
+  return { ...FONT_SIZE_DEFAULTS };
+}
+
+let fontSizeState = loadFontSizes();
+
+function saveFontSizes() {
+  localStorage.setItem('scriptoriumFontSizes', JSON.stringify(fontSizeState));
+}
+
+function applyFontSizes(sizes) {
+  FONT_SIZE_KEYS.forEach((key) => {
+    const v = sizes[key];
+    if (typeof v === 'number') document.documentElement.style.setProperty(key, v + 'px');
+  });
+}
+
+function formatFontSizePx(v) {
+  return (Number.isInteger(v) ? v : Math.round(v * 10) / 10) + 'px';
+}
+
+function syncFontSizeSliderUI() {
+  document.querySelectorAll('[data-fs-key]').forEach((input) => {
+    const key = input.dataset.fsKey;
+    const v = fontSizeState[key];
+    input.value = v;
+    const valueEl = $(input.id.replace('fsSlider', 'fsValue'));
+    if (valueEl) valueEl.textContent = formatFontSizePx(v);
+  });
+}
+
+function initFontSizeControls() {
+  applyFontSizes(fontSizeState);
+  syncFontSizeSliderUI();
+
+  document.querySelectorAll('[data-fs-key]').forEach((input) => {
+    input.addEventListener('input', () => {
+      const key = input.dataset.fsKey;
+      const v = parseFloat(input.value);
+      fontSizeState[key] = v;
+      document.documentElement.style.setProperty(key, v + 'px');
+      const valueEl = $(input.id.replace('fsSlider', 'fsValue'));
+      if (valueEl) valueEl.textContent = formatFontSizePx(v);
+      saveFontSizes();
+    });
+  });
+
+  $('resetFontSizesBtn')?.addEventListener('click', () => {
+    fontSizeState = { ...FONT_SIZE_DEFAULTS };
+    applyFontSizes(fontSizeState);
+    syncFontSizeSliderUI();
+    saveFontSizes();
+  });
+}
+
 // Settings Modal Events
+async function saveAndCloseSettings() {
+  const newPath = workspacePathInput ? workspacePathInput.value.trim() : '';
+  const ideasPath = ideasPathInput ? ideasPathInput.value.trim() : '';
+  
+  settingsModal.classList.remove('active');
+  
+  if (newPath && (newPath !== state.workspaceDir || (ideasPathInput && ideasPath !== state.ideasDir))) {
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPath, ideasPath })
+      });
+      const data = await res.json();
+      if (data.success) {
+        state.activeDocId = null;
+        state.activeThemeId = null;
+        await fetchWorkspace();
+      }
+    } catch (err) {
+      console.error(__('alert.config_save_error') + ':', err);
+    }
+  }
+}
+
 $('openSettingsBtn').addEventListener('click', () => {
   workspacePathInput.value = state.workspaceDir || '';
   ideasPathInput.value = state.ideasDir || '';
   settingsModal.classList.add('active');
+  updateSettingsOverlayState();
 });
 
-$('closeSettingsBtn').addEventListener('click', () => settingsModal.classList.remove('active'));
-$('cancelSettingsBtn').addEventListener('click', () => settingsModal.classList.remove('active'));
-
-$('saveSettingsBtn').addEventListener('click', async () => {
-  const newPath = workspacePathInput.value.trim();
-  const ideasPath = ideasPathInput ? ideasPathInput.value.trim() : '';
-  if (!newPath) return;
-  
-  try {
-    const res = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newPath, ideasPath })
-    });
-    const data = await res.json();
-    if (data.success) {
-      settingsModal.classList.remove('active');
-      state.activeDocId = null;
-      state.activeThemeId = null;
-      await fetchWorkspace();
-    }
-  } catch (err) {
-    alert('Erreur lors du changement de dossier de travail.');
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) {
+    saveAndCloseSettings();
   }
 });
+
+$('closeSettingsBtn').addEventListener('click', () => saveAndCloseSettings());
+$('cancelSettingsBtn').addEventListener('click', () => settingsModal.classList.remove('active'));
+
+$('saveSettingsBtn').addEventListener('click', () => saveAndCloseSettings());
+
+// ============ LANGUAGE SETTINGS (i18n) ============
+function initLanguageSettings() {
+  var select = $('languageSelect');
+  if (!select) return;
+  select.value = getLocale();
+  select.addEventListener('change', function () {
+    var locale = this.value;
+    setLocale(locale, function () {
+      renderAll();
+      updateLockStateUI();
+      updateDocSortButton();
+      if (typeof updateBreadcrumbAndMeta === 'function') updateBreadcrumbAndMeta();
+      if (typeof updateStats === 'function') updateStats();
+    });
+  });
+}
 
 async function handlePickFolder(inputEl, btnEl) {
   if (btnEl) btnEl.classList.add('loading');
@@ -2714,20 +3372,20 @@ function updateLockStateUI() {
   if (state.isLocked) {
     app.classList.add('workspace-locked');
     lockToggleBtn.classList.add('locked');
-    lockToggleBtn.title = "Mode verrouillé : Suppressions et corbeille bloquées";
+    lockToggleBtn.title = __('lock.locked_title');
     if (brandLockBtn) {
-      brandLockBtn.title = 'Déverrouiller Scriptorium';
-      brandLockBtn.setAttribute('aria-label', 'Déverrouiller Scriptorium');
+      brandLockBtn.title = __('lock.unlock_aria');
+      brandLockBtn.setAttribute('aria-label', __('lock.unlock_aria'));
     }
     if (iconUnlocked) iconUnlocked.classList.add('hidden');
     if (iconLocked) iconLocked.classList.remove('hidden');
   } else {
     app.classList.remove('workspace-locked');
     lockToggleBtn.classList.remove('locked');
-    lockToggleBtn.title = "Mode déverrouillé (cliquer pour verrouiller)";
+    lockToggleBtn.title = __('lock.unlocked_title');
     if (brandLockBtn) {
-      brandLockBtn.title = 'Verrouiller Scriptorium';
-      brandLockBtn.setAttribute('aria-label', 'Verrouiller Scriptorium');
+      brandLockBtn.title = __('lock.lock_aria');
+      brandLockBtn.setAttribute('aria-label', __('lock.lock_aria'));
     }
     if (iconUnlocked) iconUnlocked.classList.remove('hidden');
     if (iconLocked) iconLocked.classList.add('hidden');
@@ -2738,6 +3396,12 @@ function toggleWorkspaceLock() {
   state.isLocked = !state.isLocked;
   localStorage.setItem('scriptorium_is_locked', state.isLocked);
   updateLockStateUI();
+  // The server enforces the padlock on destructive routes, so it has to know.
+  fetch('/api/lock', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ locked: state.isLocked })
+  }).catch(() => {});
 }
 
 const lockToggleBtn = $('lockToggleBtn');
@@ -2817,7 +3481,7 @@ ideasPanel.addEventListener('dragover', (e) => {
       const addBtn = ideasPanel.querySelector('.idea-add');
       if (addBtn) {
         addBtn.classList.add('drag-target-active');
-        addBtn.textContent = 'Déposer pour ajouter l\'idée';
+        addBtn.textContent = __('ideas.drop_to_add');
       }
     }
   }
@@ -2828,7 +3492,7 @@ ideasPanel.addEventListener('dragleave', () => {
   const addBtn = ideasPanel.querySelector('.idea-add');
   if (addBtn) {
     addBtn.classList.remove('drag-target-active');
-    addBtn.textContent = '+ ajouter une idée';
+    addBtn.textContent = __('ideas.add_button');
   }
 });
 
@@ -2837,7 +3501,7 @@ ideasPanel.addEventListener('drop', async (e) => {
   const addBtn = ideasPanel.querySelector('.idea-add');
   if (addBtn) {
     addBtn.classList.remove('drag-target-active');
-    addBtn.textContent = '+ ajouter une idée';
+    addBtn.textContent = __('ideas.add_button');
   }
   
   if (e.dataTransfer.files.length > 0) {
@@ -2853,7 +3517,7 @@ ideasPanel.addEventListener('drop', async (e) => {
     e.preventDefault();
     const theme = activeTheme();
     if (!theme) {
-      alert("Veuillez sélectionner ou créer un thème d'idées d'abord.");
+      alert(__('alert.no_theme'));
       return;
     }
     
@@ -2925,6 +3589,7 @@ content.addEventListener('input', () => {
   if (activeLineNode && content.contains(activeLineNode)) {
     applyLineKind(activeLineNode, activeLineNode.textContent);
   }
+  if (typewriterState) centerActiveLine(true);
   updateStats();
   markDirty();
   saveHistory(state.activeDocId, false);
@@ -2958,7 +3623,7 @@ window.addEventListener('resize', () => {
 
 // Add Section action
 $('addSectionBtn').addEventListener('click', () => {
-  const name = prompt('Nom de la nouvelle section (dossier) ?');
+  const name = prompt(__('prompt.section_name'));
   if (!name || !name.trim()) return;
   createSection(name);
 });
@@ -2989,11 +3654,49 @@ ideaAddInput.addEventListener('keydown', (e) => {
   }
 });
 
-// Save on exit
-window.addEventListener('beforeunload', () => {
-  if (dirty) {
-    saveDocumentOnDisk();
+// ============ SAVE ON EXIT ============
+// beforeunload is unreliable: the async fetch it fired was routinely cancelled
+// mid-flight, and iOS Safari does not fire it at all — switching apps on a
+// phone simply lost the last edits. pagehide + visibilitychange cover both
+// desktop close and mobile backgrounding; sendBeacon survives the teardown.
+
+function flushSave() {
+  if (!dirty) return;
+  const doc = activeDoc();
+  if (!doc) return;
+
+  const payload = JSON.stringify({
+    id: doc.id,
+    title: title.value,
+    subtitle: subtitle.value,
+    content: getContentMarkdown(),
+    knownUpdatedAt: doc.updatedAt
+  });
+
+  // A beacon cannot carry custom headers, so the token rides in the query
+  // string here — it is a same-origin request that never leaves the machine.
+  const token = localStorage.getItem('scriptorium_token');
+  const url = '/api/documents' + (token ? '?token=' + encodeURIComponent(token) : '');
+
+  // sendBeacon is POST-only; the server accepts it as an alias of PUT below.
+  const sent = navigator.sendBeacon &&
+    navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
+
+  if (!sent) {
+    // keepalive lets the request outlive the page when beacon is unavailable.
+    fetch(url, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true
+    }).catch(() => {});
   }
+  dirty = false;
+}
+
+window.addEventListener('pagehide', flushSave);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushSave();
 });
 
 // ============ SEARCH ENGINE ============
@@ -3069,7 +3772,7 @@ function buildSnippet(text, query, before = 50, after = 110) {
 function performSearch(query) {
   const q = (query || '').trim();
   if (!q) {
-    searchResultsEl.innerHTML = '<div class="search-placeholder">Tapez pour rechercher dans tous vos textes et idées…</div>';
+    searchResultsEl.innerHTML = '<div class="search-placeholder">' + __('search.waiting') + '</div>';
     searchCountEl.textContent = '';
     currentSearchResults = [];
     searchSelectedIndex = -1;
@@ -3080,7 +3783,7 @@ function performSearch(query) {
 
   // --- Documents ---
   state.sections.forEach(section => {
-    const sectionLabel = section.id === '_general' ? 'Général' : section.name;
+    const sectionLabel = section.id === '_general' ? __('search.section_general') : section.name;
     section.documents.forEach(doc => {
       const tn = normalizeSearch(doc.title || '');
       const sn = normalizeSearch(doc.subtitle || '');
@@ -3108,7 +3811,7 @@ function performSearch(query) {
       results.push({
         type: 'doc',
         refId: doc.id,
-        title: doc.title || 'Sans titre',
+        title: doc.title || __('new_doc.default_title'),
         section: sectionLabel,
         snippet, score, query: q
       });
@@ -3147,17 +3850,17 @@ function performSearch(query) {
 
 function renderSearchResults(results) {
   if (!results.length) {
-    searchResultsEl.innerHTML = '<div class="search-empty">Aucun résultat.</div>';
+    searchResultsEl.innerHTML = '<div class="search-empty">' + __('search.no_results') + '</div>';
     searchCountEl.textContent = '0';
     searchSelectedIndex = -1;
     return;
   }
-  searchCountEl.textContent = `${results.length} résultat${results.length > 1 ? 's' : ''}`;
+  searchCountEl.textContent = results.length > 1 ? __('search.count_plural', { count: results.length }) : __('search.count', { count: results.length });
   const q = results[0].query;
   searchResultsEl.innerHTML = results.map((r, i) => {
     const titleHi = highlightAndEscape(r.title, q);
     const typeCls = r.type === 'idea' ? 'type-idea' : 'type-doc';
-    const typeLabel = r.type === 'idea' ? (r.archived ? 'idée arch.' : 'idée') : 'doc';
+    const typeLabel = r.type === 'idea' ? (r.archived ? __('search.result_idea_archived') : __('search.result_idea')) : __('search.result_doc');
     const meta = escapeHtml(r.section);
     return `<div class="search-result" data-idx="${i}">
       <div class="search-result-header">
@@ -3290,7 +3993,7 @@ function clearSearchHighlights(hideBtn = true) {
 function openSearch() {
   searchOverlay.classList.add('active');
   searchInput.value = '';
-  searchResultsEl.innerHTML = '<div class="search-placeholder">Tapez pour rechercher dans tous vos textes et idées…</div>';
+  searchResultsEl.innerHTML = '<div class="search-placeholder">' + __('search.waiting') + '</div>';
   searchCountEl.textContent = '';
   currentSearchResults = [];
   searchSelectedIndex = -1;
@@ -3344,13 +4047,45 @@ function setHeaderActionsRevealed(revealed) {
   brandRevealBtn.setAttribute('aria-expanded', String(revealed));
 }
 
+// A touch has no hover: pointerenter fires on tap and pointerleave fires the
+// instant the finger lifts, so the row collapsed before anything in it could
+// be tapped. Hover drives the reveal for a mouse only; touch toggles it.
+function isMouseEvent(event) {
+  if (event && typeof event.pointerType === 'string') return event.pointerType === 'mouse';
+  return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+}
+
 if (sidebarRevealZone && sidebarHeader && brandRevealBtn) {
-  brandRevealBtn.addEventListener('pointerenter', () => setHeaderActionsRevealed(true));
-  brandRevealBtn.addEventListener('click', () => {
+  brandRevealBtn.addEventListener('pointerenter', (event) => {
+    if (!isMouseEvent(event)) return;
+    setHeaderActionsRevealed(true);
+  });
+
+  sidebarRevealZone.addEventListener('pointerleave', (event) => {
+    if (!isMouseEvent(event)) return;
+    setHeaderActionsRevealed(false);
+  });
+
+  brandRevealBtn.addEventListener('click', (event) => {
+    if (!isMouseEvent(event)) {
+      // The padlock has its own button inside the row; making the tap that
+      // opens the row also lock the workspace hid "Nouveau texte" behind a
+      // gesture nobody asked for.
+      setHeaderActionsRevealed(!sidebarRevealZone.classList.contains('is-revealed'));
+      return;
+    }
     setHeaderActionsRevealed(true);
     toggleWorkspaceLock();
   });
-  sidebarRevealZone.addEventListener('pointerleave', () => setHeaderActionsRevealed(false));
+
+  // Tapping anywhere else closes it, the way the row used to close on mouse-out.
+  document.addEventListener('pointerdown', (event) => {
+    if (isMouseEvent(event)) return;
+    if (!sidebarRevealZone.classList.contains('is-revealed')) return;
+    if (sidebarRevealZone.contains(event.target)) return;
+    setHeaderActionsRevealed(false);
+  });
+
   sidebarRevealZone.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       setHeaderActionsRevealed(false);
@@ -3692,14 +4427,22 @@ window.addEventListener('resize', () => {
 // ============ RIGHT-PANEL VIEW SWITCHER ============
 const panelTabIdeas = $('panelTabIdeas');
 const panelTabToc = $('panelTabToc');
+const panelTabSnapshots = $('panelTabSnapshots');
 
 function setRightPanelView(view) {
   const isToc = view === 'toc';
+  const isSnapshots = view === 'snapshots';
   ideasPanel.classList.toggle('view-toc-mode', isToc);
-  if (panelTabIdeas) panelTabIdeas.classList.toggle('active', !isToc);
-  if (panelTabToc)   panelTabToc.classList.toggle('active', isToc);
+  ideasPanel.classList.toggle('view-snapshots-mode', isSnapshots);
+  if (panelTabIdeas)     panelTabIdeas.classList.toggle('active', !isToc && !isSnapshots);
+  if (panelTabToc)       panelTabToc.classList.toggle('active', isToc);
+  if (panelTabSnapshots) panelTabSnapshots.classList.toggle('active', isSnapshots);
   try { localStorage.setItem('rightPanelView', view); } catch (e) {}
-  
+
+  if (isSnapshots) {
+    renderSnapshotsList();
+    loadSnapshotsForDoc(state.activeDocId);
+  }
   requestAnimationFrame(() => {
     generateTOC();
     updateTOCSvgSize();
@@ -3707,13 +4450,14 @@ function setRightPanelView(view) {
   });
 }
 
-if (panelTabIdeas) panelTabIdeas.addEventListener('click', () => setRightPanelView('ideas'));
-if (panelTabToc)   panelTabToc.addEventListener('click', () => setRightPanelView('toc'));
+if (panelTabIdeas)     panelTabIdeas.addEventListener('click', () => setRightPanelView('ideas'));
+if (panelTabToc)       panelTabToc.addEventListener('click', () => setRightPanelView('toc'));
+if (panelTabSnapshots) panelTabSnapshots.addEventListener('click', () => setRightPanelView('snapshots'));
 
 // Restore preferred view
 try {
   const stored = localStorage.getItem('rightPanelView');
-  if (stored === 'toc') setRightPanelView('toc');
+  if (stored === 'toc' || stored === 'snapshots') setRightPanelView(stored);
 } catch (e) {}
 
 // ============ INLINE SELECTION TOOLBAR + BLOCK-ADD GUTTER BUTTON ============
@@ -3721,6 +4465,7 @@ try {
 const selToolbar = $('selToolbar');
 const blockAddBtn = $('blockAddBtn');
 const blockDragBtn = $('blockDragBtn');
+const blockTrashBtn = $('blockTrashBtn');
 const blockDropIndicator = $('blockDropIndicator');
 const blockMenu = $('blockMenu');
 
@@ -3755,10 +4500,62 @@ function showSelectionToolbar() {
   left = Math.max(8, Math.min(left, window.innerWidth - tbRect.width - 8));
   selToolbar.style.top = top + 'px';
   selToolbar.style.left = left + 'px';
+  updateToolbarActiveStates(range);
 }
 
 function hideSelectionToolbar() {
   if (selToolbar) selToolbar.classList.remove('visible');
+}
+
+function getLineRawText(line) {
+  if (line === activeLineNode) return line.textContent;
+  return (line.dataset.raw !== undefined) ? line.dataset.raw : line.textContent;
+}
+
+// Highlights B/I/U/S/H1/H2/H3/quote on the floating toolbar when the current
+// selection is already wrapped in that markup, so re-clicking removes it
+// instead of stacking another layer of markers.
+function updateToolbarActiveStates(range) {
+  if (!selToolbar) return;
+  const marks = { bold: false, italic: false, underline: false, strike: false, code: false };
+  let blockKind = null;
+
+  if (range) {
+    const startLine = getLineForNode(range.startContainer);
+    const endLine = getLineForNode(range.endContainer);
+    if (startLine && startLine === endLine) {
+      const raw = getLineRawText(startLine);
+      const startOffRendered = rangeOffsetIn(startLine, range.startContainer, range.startOffset);
+      const endOffRendered = rangeOffsetIn(startLine, range.endContainer, range.endOffset);
+      const startOffRaw = renderedToRawOffset(startLine, startOffRendered);
+      const endOffRaw = renderedToRawOffset(startLine, endOffRendered);
+      const s = Math.min(startOffRaw, endOffRaw);
+      const e = Math.max(startOffRaw, endOffRaw);
+
+      const isWrapped = (prefix, suffix = prefix) => {
+        const sel = raw.slice(s, e);
+        if (sel.startsWith(prefix) && sel.endsWith(suffix) && sel.length >= prefix.length + suffix.length) return true;
+        return isExactlyNestedInPair(raw, s, e, prefix, suffix);
+      };
+
+      // Asterisk depth handles "***bold italic***" as both at once, not just
+      // the outermost pair (a plain **/`*` prefix check would miss that).
+      const starDepth = markerRunDepth(raw, s, e, '*').depth;
+      marks.bold = starDepth >= 2;
+      marks.italic = starDepth === 1 || starDepth >= 3;
+      marks.strike = isWrapped('~~');
+      marks.underline = isWrapped('<u>', '</u>');
+      marks.code = isWrapped('`');
+
+      blockKind = currentBlockKind(raw);
+    }
+  }
+
+  selToolbar.querySelectorAll('.sel-btn').forEach(btn => {
+    const act = btn.dataset.act;
+    const isActive = (act in marks) ? marks[act] : (blockKind === act);
+    btn.classList.toggle('active', isActive);
+  });
 }
 
 document.addEventListener('selectionchange', () => {
@@ -3770,8 +4567,8 @@ document.addEventListener('selectionchange', () => {
     updateBlockDragPosition();
   }, 40);
 });
-editorWrap.addEventListener('scroll', () => { hideSelectionToolbar(); updateBlockAddPosition(); updateBlockDragPosition(); closeBlockMenu(); });
-window.addEventListener('resize', () => { hideSelectionToolbar(); updateBlockAddPosition(); updateBlockDragPosition(); closeBlockMenu(); });
+editorWrap.addEventListener('scroll', () => { hideSelectionToolbar(); updateBlockAddPosition(); updateBlockDragPosition(); closeBlockMenu(); hideBlockTrashBtnNow(); });
+window.addEventListener('resize', () => { hideSelectionToolbar(); updateBlockAddPosition(); updateBlockDragPosition(); closeBlockMenu(); hideBlockTrashBtnNow(); });
 
 // Prevent the buttons from stealing the selection on mousedown
 if (selToolbar) {
@@ -3804,7 +4601,7 @@ function applyInlineFormat(act) {
 }
 
 function insertLinkAroundSelection() {
-  const url = prompt('URL ?', 'https://');
+  var url = prompt(__('prompt.url'), 'https://');
   if (!url) return;
   wrapSelectionInline('[', `](${url})`);
 }
@@ -3819,13 +4616,26 @@ function stripBlockPrefix(text) {
     .replace(/^\d+\.\s+/, '');
 }
 
+// The block kind a raw line's prefix currently encodes, e.g. '# ' -> 'h1'.
+function currentBlockKind(text) {
+  const h = text.match(/^(#{1,6})\s/);
+  if (h) return 'h' + h[1].length;
+  if (/^>\s?/.test(text)) return 'quote';
+  if (/^[-*+]\s\[[ xX]\]\s/.test(text)) return 'task';
+  if (/^[-*+]\s/.test(text)) return 'ul';
+  if (/^\d+\.\s/.test(text)) return 'ol';
+  return 'p';
+}
+
 function setLineBlockType(kind) {
   if (!activeLineNode) return;
   saveHistory(state.activeDocId, true);
   const text = activeLineNode.textContent;
   const inner = stripBlockPrefix(text);
+  // Clicking the format that's already applied toggles it back to a plain paragraph.
+  const targetKind = currentBlockKind(text) === kind ? 'p' : kind;
   let newText = inner;
-  switch (kind) {
+  switch (targetKind) {
     case 'p':     newText = inner; break;
     case 'h1':    newText = '# '    + inner; break;
     case 'h2':    newText = '## '   + inner; break;
@@ -3875,15 +4685,17 @@ function updateBlockAddPosition() {
   // editor column is narrow (sidebar + ideas both open), we shrink the gap so
   // the button still sits just before the line rather than disappearing.
   // Minimum 10px gap so we never overlap the text itself.
+  const isMobile = window.innerWidth <= 720;
   const gap = Math.max(0, rect.left); // distance from viewport left to line
-  const desiredOffset = 30;
-  const minOffset = 10;
-  const offset = Math.max(minOffset, Math.min(desiredOffset, gap - 4));
-  const left = rect.left - offset;
-  const top = rect.top + (rect.height / 2) - 11;
+  const desiredOffset = isMobile ? 22 : 30;
+  const minOffset = isMobile ? 4 : 10;
+  const offset = Math.max(minOffset, Math.min(desiredOffset, gap - 2));
+  let left = rect.left - offset;
+  if (isMobile) left = Math.max(2, left);
+  const top = rect.top + (rect.height / 2) - (isMobile ? 12 : 11);
 
-  // Last-resort: if the button would go off-screen, hide it.
-  if (left < 2) {
+  // On desktop, if the button would go off-screen, hide it.
+  if (!isMobile && left < 2) {
     blockAddBtn.classList.remove('visible');
     return;
   }
@@ -3903,6 +4715,81 @@ let dropInsertBefore = true;
 let autoScrollAnimFrame = null;
 let autoScrollSpeed = 0;
 let lastDragEvent = null;
+let dragStartX = null;
+
+const DELETE_ZONE_PX = 36;    // this close to the edge = releasing here deletes the block
+const DELETE_APPROACH_PX = 110; // this close to the edge = start showing the zone at all
+const MIN_DELETE_DRAG_PX = 30;   // must also have dragged the block this far *toward* that edge
+const MIN_APPROACH_DRAG_PX = 18; // (smaller threshold — the preview can appear a bit earlier)
+let deleteZoneLeftEl = null;
+let deleteZoneRightEl = null;
+
+// Which edge of the EDITOR PANE (not the whole window — that would reach into
+// the right sidebar) the cursor is currently over, if any. On narrow panes the
+// drag handle already rests inside this zone, so proximity alone isn't enough —
+// the block must also have been dragged sideways, toward that edge, by at
+// least `minDrag` px from where the drag started. Otherwise a plain up/down
+// reorder (mouse X barely moving) would register as "dragged into the red zone".
+function getEdgeNearPoint(clientX, wrapRect, zonePx, minDrag) {
+  const nearLeft = clientX <= wrapRect.left + zonePx;
+  const nearRight = clientX >= wrapRect.right - zonePx;
+  if (!nearLeft && !nearRight) return null;
+  if (typeof dragStartX !== 'number') return nearLeft ? 'left' : 'right';
+  if (nearRight && (clientX - dragStartX) >= minDrag) return 'right';
+  if (nearLeft && (dragStartX - clientX) >= minDrag) return 'left';
+  return null;
+}
+
+function getDeleteEdge(clientX, wrapRect) {
+  return getEdgeNearPoint(clientX, wrapRect, DELETE_ZONE_PX, MIN_DELETE_DRAG_PX);
+}
+
+function getDeleteApproachEdge(clientX, wrapRect) {
+  return getEdgeNearPoint(clientX, wrapRect, DELETE_APPROACH_PX, MIN_APPROACH_DRAG_PX);
+}
+
+function ensureDeleteZoneEls() {
+  if (!deleteZoneLeftEl) {
+    deleteZoneLeftEl = document.createElement('div');
+    deleteZoneLeftEl.className = 'editor-delete-zone left';
+    document.body.appendChild(deleteZoneLeftEl);
+  }
+  if (!deleteZoneRightEl) {
+    deleteZoneRightEl = document.createElement('div');
+    deleteZoneRightEl.className = 'editor-delete-zone right';
+    document.body.appendChild(deleteZoneRightEl);
+  }
+}
+
+function positionDeleteZoneEls(wrapRect) {
+  [deleteZoneLeftEl, deleteZoneRightEl].forEach(el => {
+    el.style.top = wrapRect.top + 'px';
+    el.style.height = wrapRect.height + 'px';
+    el.style.width = DELETE_ZONE_PX + 'px';
+  });
+  deleteZoneLeftEl.style.left = wrapRect.left + 'px';
+  deleteZoneRightEl.style.left = (wrapRect.right - DELETE_ZONE_PX) + 'px';
+}
+
+// Only reveal a zone once the cursor is actually nearing that edge, so a plain
+// up/down drag (reordering, not deleting) never flashes red.
+function updateDeleteZoneVisibility(clientX, wrapRect) {
+  ensureDeleteZoneEls();
+  positionDeleteZoneEls(wrapRect);
+  const approachEdge = getDeleteApproachEdge(clientX, wrapRect);
+  deleteZoneLeftEl.style.display = approachEdge === 'left' ? 'block' : 'none';
+  deleteZoneRightEl.style.display = approachEdge === 'right' ? 'block' : 'none';
+}
+
+function updateDeleteZoneHighlight(edge) {
+  if (deleteZoneLeftEl) deleteZoneLeftEl.classList.toggle('active', edge === 'left');
+  if (deleteZoneRightEl) deleteZoneRightEl.classList.toggle('active', edge === 'right');
+}
+
+function hideDeleteZones() {
+  if (deleteZoneLeftEl) deleteZoneLeftEl.style.display = 'none';
+  if (deleteZoneRightEl) deleteZoneRightEl.style.display = 'none';
+}
 
 function updateBlockDragPosition() {
   if (!blockDragBtn) return;
@@ -3950,6 +4837,9 @@ function startBlockDrag(line, e) {
   draggedLineNode = line;
   draggedLineNode.classList.add('dragging-line');
   if (blockDragBtn) blockDragBtn.classList.add('dragging');
+  setHoveredLine(null);
+  hideBlockTrashBtnNow();
+  dragStartX = e.clientX;
 
   // Create drag ghost element
   if (blockDragGhostEl) blockDragGhostEl.remove();
@@ -3962,6 +4852,7 @@ function startBlockDrag(line, e) {
   if (blockDropIndicator) {
     blockDropIndicator.style.display = 'block';
   }
+  ensureDeleteZoneEls();
 
   window.addEventListener('mousemove', onBlockDragMove);
   window.addEventListener('mouseup', onBlockDragEnd);
@@ -3998,8 +4889,10 @@ function onBlockDragMove(e) {
     runAutoScrollLoop();
   }
 
-  const isDeleteZone = e.clientX > window.innerWidth - 80;
-  if (isDeleteZone) {
+  updateDeleteZoneVisibility(e.clientX, wrapRect);
+  const deleteEdge = getDeleteEdge(e.clientX, wrapRect);
+  updateDeleteZoneHighlight(deleteEdge);
+  if (deleteEdge) {
     blockDragGhostEl.classList.add('delete-mode');
     draggedLineNode.classList.add('delete-mode');
     if (blockDropIndicator) blockDropIndicator.style.display = 'none';
@@ -4064,6 +4957,69 @@ function runAutoScrollLoop() {
   autoScrollAnimFrame = requestAnimationFrame(runAutoScrollLoop);
 }
 
+// Marks a line for deletion with a 5s grace period — clicking it during that
+// window cancels the delete. Used by drag-to-edge deletion.
+// After a block is actually removed, leave the editor in a neutral state
+// instead of letting the browser drop the caret into whatever block now sits
+// where the deleted one was — no stray cursor, no handles floating over a
+// block the user didn't ask to edit.
+function clearEditorFocusAfterDelete() {
+  const sel = window.getSelection();
+  if (sel) sel.removeAllRanges();
+  updateBlockAddPosition();
+  updateBlockDragPosition();
+  hideBlockTrashBtnNow();
+}
+
+function softDeleteLine(nodeToDelete) {
+  nodeToDelete.classList.add('pending-delete');
+
+  const timeoutId = setTimeout(() => {
+    if (nodeToDelete.parentNode) {
+      saveHistory(state.activeDocId, true);
+      nodeToDelete.remove();
+      if (activeLineNode === nodeToDelete) {
+        activeLineNode = null;
+        clearEditorFocusAfterDelete();
+      }
+      markDirty();
+      updateStats();
+      debouncedRegenerateTOC();
+      saveHistory(state.activeDocId, true);
+    }
+  }, 5000);
+
+  const cancelDelete = (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    clearTimeout(timeoutId);
+    nodeToDelete.classList.remove('pending-delete');
+    nodeToDelete.removeEventListener('mousedown', cancelDelete);
+  };
+  nodeToDelete.addEventListener('mousedown', cancelDelete);
+
+  // Update stats and TOC without the node (it's hidden from getContentMarkdown)
+  markDirty();
+  updateStats();
+  debouncedRegenerateTOC();
+}
+
+// True instant delete, no grace period — used by the floating trash button
+// next to the drag handle.
+function deleteLineImmediately(line) {
+  if (!line || !line.parentNode) return;
+  saveHistory(state.activeDocId, true);
+  line.remove();
+  if (activeLineNode === line) {
+    activeLineNode = null;
+    clearEditorFocusAfterDelete();
+  }
+  markDirty();
+  updateStats();
+  debouncedRegenerateTOC();
+  saveHistory(state.activeDocId, true);
+}
+
 function onBlockDragEnd(e) {
   if (!isDraggingBlock) return;
 
@@ -4084,6 +5040,7 @@ function onBlockDragEnd(e) {
   if (blockDropIndicator) {
     blockDropIndicator.style.display = 'none';
   }
+  hideDeleteZones();
 
   if (blockDragBtn) {
     blockDragBtn.classList.remove('dragging');
@@ -4091,41 +5048,12 @@ function onBlockDragEnd(e) {
 
   if (draggedLineNode) {
     draggedLineNode.classList.remove('dragging-line');
-    
-    const isDeleteZone = e.clientX > window.innerWidth - 80;
+
+    const isDeleteZone = !!getDeleteEdge(e.clientX, editorWrap.getBoundingClientRect());
 
     if (isDeleteZone) {
       draggedLineNode.classList.remove('delete-mode');
-      
-      const nodeToDelete = draggedLineNode;
-      nodeToDelete.classList.add('pending-delete');
-      
-      const timeoutId = setTimeout(() => {
-        if (nodeToDelete.parentNode) {
-          saveHistory(state.activeDocId, true);
-          nodeToDelete.remove();
-          if (activeLineNode === nodeToDelete) activeLineNode = null;
-          markDirty();
-          updateStats();
-          debouncedRegenerateTOC();
-          saveHistory(state.activeDocId, true);
-        }
-      }, 5000);
-
-      const cancelDelete = (ev) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        clearTimeout(timeoutId);
-        nodeToDelete.classList.remove('pending-delete');
-        nodeToDelete.removeEventListener('mousedown', cancelDelete);
-      };
-      nodeToDelete.addEventListener('mousedown', cancelDelete);
-      
-      // Update stats and TOC without the node (it's hidden from getContentMarkdown)
-      markDirty();
-      updateStats();
-      debouncedRegenerateTOC();
-      
+      softDeleteLine(draggedLineNode);
     } else if (targetDropLine && targetDropLine !== draggedLineNode) {
       saveHistory(state.activeDocId, true);
 
@@ -4147,6 +5075,7 @@ function onBlockDragEnd(e) {
   draggedLineNode = null;
   targetDropLine = null;
   lastDragEvent = null;
+  dragStartX = null;
 
   updateBlockAddPosition();
   updateBlockDragPosition();
@@ -4154,6 +5083,7 @@ function onBlockDragEnd(e) {
 
 if (blockDragBtn) {
   blockDragBtn.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; // left button only — a right-click here must not start a drag
     e.preventDefault();
     e.stopPropagation();
     if (activeLineNode) {
@@ -4188,6 +5118,64 @@ if (blockAddBtn) {
   });
 }
 
+// ============ FLOATING QUICK-DELETE (hover the drag handle ~1s) ============
+// A separate button next to the drag handle — never replaces its icon.
+// Deletes instantly, no grace period (unlike drag-to-edge / softDeleteLine).
+
+let blockTrashRevealTimer = null;
+let blockTrashHideTimer = null;
+
+function positionBlockTrashBtn() {
+  if (!blockTrashBtn || !blockDragBtn) return;
+  const r = blockDragBtn.getBoundingClientRect();
+  blockTrashBtn.style.top = r.top + 'px';
+  blockTrashBtn.style.left = (r.left - 26) + 'px';
+}
+
+function showBlockTrashBtn() {
+  if (!blockTrashBtn || !activeLineNode || isDraggingBlock) return;
+  positionBlockTrashBtn();
+  blockTrashBtn.classList.add('visible');
+}
+
+function hideBlockTrashBtnNow() {
+  clearTimeout(blockTrashRevealTimer);
+  blockTrashRevealTimer = null;
+  if (blockTrashBtn) blockTrashBtn.classList.remove('visible');
+}
+
+function scheduleHideBlockTrashBtn() {
+  clearTimeout(blockTrashHideTimer);
+  blockTrashHideTimer = setTimeout(hideBlockTrashBtnNow, 650);
+}
+
+function cancelHideBlockTrashBtn() {
+  clearTimeout(blockTrashHideTimer);
+}
+
+if (blockDragBtn && blockTrashBtn) {
+  blockDragBtn.addEventListener('mouseenter', () => {
+    if (isDraggingBlock) return;
+    cancelHideBlockTrashBtn();
+    clearTimeout(blockTrashRevealTimer);
+    blockTrashRevealTimer = setTimeout(showBlockTrashBtn, 1000);
+  });
+  blockDragBtn.addEventListener('mouseleave', () => {
+    clearTimeout(blockTrashRevealTimer);
+    scheduleHideBlockTrashBtn();
+  });
+  // Bridge the hover across the small gap between the two buttons.
+  blockTrashBtn.addEventListener('mouseenter', cancelHideBlockTrashBtn);
+  blockTrashBtn.addEventListener('mouseleave', scheduleHideBlockTrashBtn);
+
+  blockTrashBtn.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  blockTrashBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    hideBlockTrashBtnNow();
+    if (activeLineNode) deleteLineImmediately(activeLineNode);
+  });
+}
+
 function closeBlockMenu() {
   if (!blockMenu) return;
   blockMenu.classList.remove('visible');
@@ -4216,6 +5204,140 @@ document.addEventListener('keydown', (e) => {
     closeBlockMenu();
   }
 });
+
+// ============ MULTI-BLOCK SELECTION (Ctrl+clic) ============
+// Ctrl+clic toggles blocks in/out of the selection; a floating toolbar offers
+// "Fusionner" (merge into one block, keeping every sub-line's markdown intact)
+// and "Supprimer".
+
+const multiSelToolbar = $('multiSelToolbar');
+let multiSelectedLines = new Set();
+
+function clearMultiSelection() {
+  multiSelectedLines.forEach(l => l.classList && l.classList.remove('multi-selected'));
+  multiSelectedLines.clear();
+  updateMultiSelToolbar();
+}
+
+function updateMultiSelToolbar() {
+  if (!multiSelToolbar) return;
+  multiSelectedLines.forEach(l => { if (!content.contains(l)) multiSelectedLines.delete(l); });
+  const n = multiSelectedLines.size;
+  if (!n) { multiSelToolbar.classList.remove('visible'); return; }
+
+  const countEl = $('multiSelCount');
+  if (countEl) countEl.textContent = n > 1 ? __('multi.block_count_plural', { count: n }) : __('multi.block_count', { count: n });
+  const mergeBtn = $('multiMergeBtn');
+  if (mergeBtn) mergeBtn.disabled = n < 2;
+  multiSelToolbar.classList.add('visible');
+
+  // Centre the toolbar above the selection's bounding box, clamped to the viewport
+  let top = Infinity, left = Infinity, right = -Infinity;
+  multiSelectedLines.forEach(l => {
+    const r = l.getBoundingClientRect();
+    top = Math.min(top, r.top);
+    left = Math.min(left, r.left);
+    right = Math.max(right, r.right);
+  });
+  const tbRect = multiSelToolbar.getBoundingClientRect();
+  const wrapRect = editorWrap.getBoundingClientRect();
+  let t = top - tbRect.height - 10;
+  if (t < wrapRect.top + 8) t = wrapRect.top + 8;
+  let x = (left + right) / 2 - tbRect.width / 2;
+  x = Math.max(8, Math.min(x, window.innerWidth - tbRect.width - 8));
+  multiSelToolbar.style.top = t + 'px';
+  multiSelToolbar.style.left = x + 'px';
+}
+
+content.addEventListener('mousedown', (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  if (readingModeState) return;
+  const line = e.target.closest ? e.target.closest('.editor-line') : null;
+  if (!line || !content.contains(line)) return;
+  e.preventDefault(); // keep the caret where it is
+  if (multiSelectedLines.has(line)) {
+    multiSelectedLines.delete(line);
+    line.classList.remove('multi-selected');
+  } else {
+    multiSelectedLines.add(line);
+    line.classList.add('multi-selected');
+  }
+  updateMultiSelToolbar();
+});
+
+// Any plain interaction outside the toolbar drops the selection
+document.addEventListener('mousedown', (e) => {
+  if (!multiSelectedLines.size) return;
+  if (e.ctrlKey || e.metaKey) return;
+  if (e.target.closest && e.target.closest('#multiSelToolbar')) return;
+  clearMultiSelection();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && multiSelectedLines.size) clearMultiSelection();
+});
+editorWrap.addEventListener('scroll', () => {
+  if (multiSelectedLines.size) updateMultiSelToolbar();
+});
+
+function deleteSelectedBlocks() {
+  if (!multiSelectedLines.size) return;
+  saveHistory(state.activeDocId, true);
+  multiSelectedLines.forEach(line => {
+    if (line === activeLineNode) activeLineNode = null;
+    if (content.contains(line)) line.remove();
+  });
+  clearMultiSelection();
+  // Keep at least one line so the editor stays usable
+  if (!content.querySelector('.editor-line')) {
+    const div = document.createElement('div');
+    div.className = 'editor-line';
+    div.dataset.raw = '';
+    div.innerHTML = '<br>';
+    content.appendChild(div);
+  }
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+  debouncedPostProcess();
+}
+
+function mergeSelectedBlocks() {
+  if (multiSelectedLines.size < 2) return;
+  // Document order, not click order
+  const lines = getEditorLines().filter(l => multiSelectedLines.has(l));
+  if (lines.length < 2) return;
+  saveHistory(state.activeDocId, true);
+
+  const rawOf = (l) => {
+    if (l === activeLineNode) return l.textContent;
+    return (l.dataset.raw !== undefined) ? l.dataset.raw : l.textContent;
+  };
+  const merged = lines.map(rawOf).join('\n');
+
+  const first = lines[0];
+  if (multiSelectedLines.has(activeLineNode)) activeLineNode = null;
+  delete first.dataset.gutterCreated;
+  delete first.dataset.rawOnActivate;
+  first.dataset.raw = merged;
+  applyLineKind(first, merged);
+  first.classList.remove('active-line');
+  first.innerHTML = renderMarkdownLine(merged);
+  lines.slice(1).forEach(l => l.remove());
+
+  clearMultiSelection();
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+  debouncedPostProcess();
+}
+
+if (multiSelToolbar) {
+  multiSelToolbar.addEventListener('mousedown', (e) => e.preventDefault());
+  $('multiDeleteBtn')?.addEventListener('click', deleteSelectedBlocks);
+  $('multiMergeBtn')?.addEventListener('click', mergeSelectedBlocks);
+}
 
 function applyBlockChoice(kind) {
   if (!activeLineNode) return;
@@ -4276,6 +5398,957 @@ function makeLineNode(raw) {
   return div;
 }
 
+// ============ PASTE ============
+// The editor's invariant is "one .editor-line div = one markdown line, source
+// in dataset.raw". A native paste breaks it in both directions: multi-line text
+// lands as nested nodes inside a single line (so "a\nb\nc" reads back as "abc"),
+// and rich text injects HTML that dataset.raw never learns about — meaning the
+// paste is silently dropped on the next save. So we do the insertion ourselves.
+
+function insertMarkdownAtCaret(text) {
+  const clean = String(text || '')
+    .replace(/^﻿/, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n');
+  if (!clean) return;
+
+  saveHistory(state.activeDocId, true);
+
+  const sel = window.getSelection();
+  let range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+
+  // Replace the selection first, so pasting over text behaves as expected.
+  if (range && !range.collapsed && content.contains(range.commonAncestorContainer)) {
+    deleteRangeAcrossLines(range);
+    range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+  }
+
+  let line = range ? getLineForNode(range.startContainer) : null;
+  if (!line) line = activeLineNode;
+  if (!line) {
+    line = content.lastElementChild;
+    if (!line) {
+      line = makeLineNode('');
+      content.appendChild(line);
+    }
+    range = null;
+  }
+
+  // Offsets must be read before makeLineRawAndActive() swaps the line's DOM.
+  let rawOffset;
+  if (range && line.contains(range.startContainer)) {
+    rawOffset = renderedToRawOffset(line, rangeOffsetIn(line, range.startContainer, range.startOffset));
+  } else {
+    rawOffset = ((line.dataset.raw !== undefined) ? line.dataset.raw : line.textContent).length;
+  }
+
+  if (line !== activeLineNode) makeLineRawAndActive(line);
+  const raw = line.textContent;
+  const before = raw.slice(0, rawOffset);
+  const after = raw.slice(rawOffset);
+
+  const parts = clean.split('\n');
+
+  if (parts.length === 1) {
+    const newRaw = before + parts[0] + after;
+    line.textContent = newRaw;
+    line.dataset.raw = newRaw;
+    applyLineKind(line, newRaw);
+    setCaretInLine(line, before.length + parts[0].length);
+  } else {
+    // First line keeps what was before the caret, last line inherits what followed.
+    const firstRaw = before + parts[0];
+    const lastRaw = parts[parts.length - 1] + after;
+
+    line.textContent = firstRaw;
+    line.dataset.raw = firstRaw;
+    applyLineKind(line, firstRaw);
+    line.innerHTML = firstRaw.trim() === '' ? '<br>' : renderMarkdownLine(firstRaw);
+    line.classList.remove('active-line');
+
+    let ref = line;
+    for (let i = 1; i < parts.length - 1; i++) {
+      const node = makeLineNode(parts[i]);
+      ref.after(node);
+      ref = node;
+    }
+    const lastNode = makeLineNode(lastRaw);
+    ref.after(lastNode);
+
+    // `line` is already committed to its rendered form above, so clear the
+    // pointer to stop makeLineRawAndActive from committing it a second time.
+    activeLineNode = null;
+    makeLineRawAndActive(lastNode);
+    setCaretInLine(lastNode, parts[parts.length - 1].length);
+  }
+
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+  debouncedPostProcess();
+}
+
+content.addEventListener('paste', (e) => {
+  const cd = e.clipboardData || window.clipboardData;
+  if (!cd) return;
+  e.preventDefault();
+  // Plain text only: pasting from Word or a web page should give the markdown
+  // source you can see and edit, not an HTML blob the line model can't hold.
+  insertMarkdownAtCaret(cd.getData('text/plain'));
+});
+
+// Same reasoning for drag-and-dropped text inside the editor.
+content.addEventListener('drop', (e) => {
+  const dt = e.dataTransfer;
+  if (!dt || !dt.types || dt.types.includes('Files')) return;
+  const text = dt.getData('text/plain');
+  if (!text) return;
+  e.preventDefault();
+  e.stopPropagation();
+  insertMarkdownAtCaret(text);
+});
+
+// ============ FIND / REPLACE ============
+// Operates on each line's raw markdown source (like a plain-text find/replace
+// tool) rather than the rendered HTML, so what you type as a replacement is
+// exactly what ends up on disk — and matches work the same whether a line is
+// currently active (raw) or rendered.
+
+const findReplaceBar = $('findReplaceBar');
+const findInput = $('findInput');
+const replaceInput = $('replaceInput');
+const findCountEl = $('findCount');
+const findMatchCaseEl = $('findMatchCase');
+
+let findMatches = [];
+let findCurrentIndex = -1;
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function findGetLineRaw(line) {
+  return line === activeLineNode ? line.textContent : (line.dataset.raw !== undefined ? line.dataset.raw : line.textContent);
+}
+
+function computeFindMatches() {
+  const term = findInput.value;
+  if (!term) return [];
+  const flags = findMatchCaseEl.checked ? 'g' : 'gi';
+  let re;
+  try {
+    re = new RegExp(escapeRegExp(term), flags);
+  } catch (e) {
+    return [];
+  }
+  const matches = [];
+  getEditorLines().forEach((line) => {
+    const raw = findGetLineRaw(line);
+    let m;
+    re.lastIndex = 0;
+    while ((m = re.exec(raw))) {
+      matches.push({ line, start: m.index, end: m.index + m[0].length });
+      if (m[0].length === 0) re.lastIndex++;
+    }
+  });
+  return matches;
+}
+
+// ---- Visual "highlight every match" ----
+// Separate from the raw-offset match list above (which drives navigation and
+// replace): this searches each line's currently DISPLAYED text — raw for the
+// active line, rendered for the rest — so it always highlights exactly what's
+// on screen (including matches inside **bold**/*italic*/links) without
+// mapping raw <-> rendered offsets.
+//
+// Implemented by physically wrapping matches in a real <mark> element rather
+// than the CSS Custom Highlight API (::highlight()) — that API turned out not
+// to paint reliably here, while <mark> is guaranteed to render since it's
+// just a normal styled element. The current match is left unmarked; it
+// already gets the browser's native text-selection highlight.
+function clearFindMarks() {
+  // Rebuilding from source (rather than unwrapping the <mark> in place) avoids
+  // leftover empty tags — wrapping a match nested inside e.g. <strong> can
+  // split that element, leaving an empty <strong></strong> shell behind that
+  // a simple unwrap wouldn't clean up.
+  const linesToRestore = new Set();
+  document.querySelectorAll('mark.find-match-mark').forEach((mark) => {
+    const line = mark.closest('.editor-line');
+    if (line) linesToRestore.add(line);
+  });
+  linesToRestore.forEach((line) => {
+    const raw = line.dataset.raw !== undefined ? line.dataset.raw : line.textContent;
+    line.innerHTML = raw.trim() === '' ? '<br>' : renderMarkdownLine(raw);
+  });
+}
+
+function computeDisplayMatches() {
+  const term = findInput.value;
+  if (!term) return [];
+  const flags = findMatchCaseEl.checked ? 'g' : 'gi';
+  let re;
+  try {
+    re = new RegExp(escapeRegExp(term), flags);
+  } catch (e) {
+    return [];
+  }
+  const matches = [];
+  getEditorLines().forEach((line) => {
+    const text = line.textContent;
+    let m;
+    re.lastIndex = 0;
+    while ((m = re.exec(text))) {
+      matches.push({ line, start: m.index, end: m.index + m[0].length });
+      if (m[0].length === 0) re.lastIndex++;
+    }
+  });
+  return matches;
+}
+
+function rangeForDisplayOffsets(line, start, end) {
+  const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+  let pos = 0, startNode = null, startOffset = 0, endNode = null, endOffset = 0, n;
+  while ((n = walker.nextNode())) {
+    const len = n.nodeValue.length;
+    if (startNode === null && pos + len >= start) { startNode = n; startOffset = start - pos; }
+    if (pos + len >= end) { endNode = n; endOffset = end - pos; break; }
+    pos += len;
+  }
+  if (!startNode || !endNode) return null;
+  try {
+    const range = document.createRange();
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset);
+    return range;
+  } catch (e) {
+    return null;
+  }
+}
+
+// The official (raw-based) match list and the display-based one above can
+// differ in exact character offsets whenever markdown syntax precedes a match
+// on the same line — but they list matches on each line in the same order, so
+// we pair them by "nth match on this line" instead of by raw offset.
+function applyFindHighlights() {
+  clearFindMarks();
+  if (findMatches.length === 0) return;
+
+  const currentMatch = findCurrentIndex >= 0 ? findMatches[findCurrentIndex] : null;
+  let currentOrdinal = -1;
+  if (currentMatch) {
+    currentOrdinal = 0;
+    for (let i = 0; i < findCurrentIndex; i++) {
+      if (findMatches[i].line === currentMatch.line) currentOrdinal++;
+    }
+  }
+
+  const ordinalByLine = new Map();
+  computeDisplayMatches().forEach((m) => {
+    const ordinal = ordinalByLine.get(m.line) || 0;
+    ordinalByLine.set(m.line, ordinal + 1);
+    // The current match also gets marked (not just left to the native
+    // selection) — the selection dims to a barely-visible grey the instant
+    // focus moves to the find field, which is exactly what selectRangeInLine
+    // does right after selecting it, so relying on it alone made the
+    // highlight look like it "vanished immediately".
+    const isCurrent = !!(currentMatch && m.line === currentMatch.line && ordinal === currentOrdinal);
+
+    const range = rangeForDisplayOffsets(m.line, m.start, m.end);
+    if (!range) return;
+    // Range.surroundContents() throws whenever the match is nested inside an
+    // inline tag (e.g. **bold**) — it's stricter than it looks, rejecting
+    // even a range that fully spans one tag's only text node. extractContents
+    // + insertNode has no such restriction and handles nesting correctly.
+    try {
+      const mark = document.createElement('mark');
+      mark.className = isCurrent ? 'find-match-mark find-match-current' : 'find-match-mark';
+      mark.appendChild(range.extractContents());
+      range.insertNode(mark);
+      if (isCurrent) mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } catch (e) {
+      // Pathological case — still counted/navigable, just not marked.
+    }
+  });
+}
+
+function clearFindHighlights() {
+  clearFindMarks();
+}
+
+// Scrolls to the match without switching its line into raw/active editing
+// mode — a line flipping to show literal markdown syntax (then back to
+// rendered) is exactly what made the highlight look like it "vanished
+// immediately". Visual highlighting is applyFindHighlights()'s job (<mark>,
+// applied right after this runs); this only has to get the line on screen.
+function selectRangeInLine(line) {
+  line.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if (findInput && findReplaceBar && findReplaceBar.classList.contains('visible') && document.activeElement !== replaceInput) {
+    findInput.focus({ preventScroll: true });
+  }
+}
+
+function updateFindCount() {
+  if (!findCountEl) return;
+  if (!findInput.value) {
+    findCountEl.textContent = '0/0';
+    findCountEl.classList.remove('no-match');
+  } else if (findMatches.length === 0) {
+    findCountEl.textContent = '0/0';
+    findCountEl.classList.add('no-match');
+  } else {
+    findCountEl.textContent = `${findCurrentIndex + 1}/${findMatches.length}`;
+    findCountEl.classList.remove('no-match');
+  }
+}
+
+// Re-run the search, trying to keep the same logical match selected (by
+// position) rather than always snapping back to the first result.
+function refreshFindMatches(preferIndex) {
+  const prevMatch = findCurrentIndex >= 0 ? findMatches[findCurrentIndex] : null;
+  findMatches = computeFindMatches();
+
+  if (typeof preferIndex === 'number') {
+    findCurrentIndex = findMatches.length ? Math.min(preferIndex, findMatches.length - 1) : -1;
+  } else if (prevMatch) {
+    const sameLineIdx = findMatches.findIndex(m => m.line === prevMatch.line && m.start >= prevMatch.start);
+    findCurrentIndex = sameLineIdx !== -1 ? sameLineIdx : (findMatches.length ? 0 : -1);
+  } else {
+    findCurrentIndex = findMatches.length ? 0 : -1;
+  }
+
+  updateFindCount();
+  if (findCurrentIndex >= 0) {
+    const m = findMatches[findCurrentIndex];
+    // Activating the target line commits the *previous* active line back to
+    // rendered HTML, rebuilding its text nodes — so highlights must be built
+    // AFTER this, or ranges on either line end up pointing at orphaned nodes.
+    selectRangeInLine(m.line, m.start, m.end);
+  }
+  applyFindHighlights();
+}
+
+function goToFindMatch(delta) {
+  if (findMatches.length === 0) return;
+  findCurrentIndex = (findCurrentIndex + delta + findMatches.length) % findMatches.length;
+  updateFindCount();
+  const m = findMatches[findCurrentIndex];
+  selectRangeInLine(m.line, m.start, m.end);
+  applyFindHighlights();
+}
+
+function commitLineRaw(line, newRaw) {
+  if (line === activeLineNode) {
+    line.textContent = newRaw;
+    line.dataset.raw = newRaw;
+    applyLineKind(line, newRaw);
+  } else {
+    line.dataset.raw = newRaw;
+    applyLineKind(line, newRaw);
+    line.innerHTML = newRaw.trim() === '' ? '<br>' : renderMarkdownLine(newRaw);
+  }
+}
+
+function replaceCurrentFindMatch() {
+  if (findCurrentIndex < 0 || !findMatches[findCurrentIndex]) return;
+  const { line, start, end } = findMatches[findCurrentIndex];
+  const replacement = replaceInput.value;
+  saveHistory(state.activeDocId, true);
+
+  const raw = findGetLineRaw(line);
+  const newRaw = raw.slice(0, start) + replacement + raw.slice(end);
+  commitLineRaw(line, newRaw);
+
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+
+  refreshFindMatches(findCurrentIndex);
+}
+
+function replaceAllFindMatches() {
+  if (findMatches.length === 0) return;
+  const replacement = replaceInput.value;
+  const term = findInput.value;
+  if (!term) return;
+
+  saveHistory(state.activeDocId, true);
+
+  const flags = findMatchCaseEl.checked ? 'g' : 'gi';
+  const re = new RegExp(escapeRegExp(term), flags);
+  let count = 0;
+  getEditorLines().forEach((line) => {
+    const raw = findGetLineRaw(line);
+    let replaced = 0;
+    const newRaw = raw.replace(re, () => { replaced++; return replacement; });
+    if (replaced > 0) {
+      count += replaced;
+      commitLineRaw(line, newRaw);
+    }
+  });
+
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+
+  refreshFindMatches();
+  if (findCountEl) {
+    const prevText = findCountEl.textContent;
+    findCountEl.textContent = `${count} ✓`;
+    setTimeout(() => { if (findCurrentIndex >= 0 || findMatches.length) updateFindCount(); else findCountEl.textContent = prevText; }, 1600);
+  }
+}
+
+function openFindReplaceBar() {
+  if (!findReplaceBar) return;
+  findReplaceBar.classList.add('visible');
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && !sel.getRangeAt(0).collapsed) {
+    findInput.value = sel.toString().split('\n')[0].slice(0, 200);
+  }
+  findInput.focus();
+  findInput.select();
+  refreshFindMatches();
+}
+
+function closeFindReplaceBar() {
+  if (!findReplaceBar) return;
+  findReplaceBar.classList.remove('visible');
+  findMatches = [];
+  findCurrentIndex = -1;
+  clearFindHighlights();
+}
+
+if ($('findReplaceBtn')) {
+  $('findReplaceBtn').addEventListener('click', () => {
+    if (findReplaceBar.classList.contains('visible')) closeFindReplaceBar();
+    else openFindReplaceBar();
+  });
+}
+
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f') {
+    if (!content.contains(document.activeElement) && document.activeElement !== title && document.activeElement !== subtitle) return;
+    e.preventDefault();
+    openFindReplaceBar();
+  }
+});
+
+if (findInput) {
+  findInput.addEventListener('input', () => refreshFindMatches());
+  findInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation(); // don't let the document-wide "Enter splits the line" handler also fire
+      if (e.shiftKey) goToFindMatch(-1); else goToFindMatch(1);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeFindReplaceBar();
+      content.focus();
+    }
+  });
+}
+if (replaceInput) {
+  replaceInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); replaceCurrentFindMatch(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeFindReplaceBar(); content.focus(); }
+  });
+}
+if (findMatchCaseEl) findMatchCaseEl.addEventListener('change', () => refreshFindMatches());
+if ($('findPrevBtn')) $('findPrevBtn').addEventListener('click', () => goToFindMatch(-1));
+if ($('findNextBtn')) $('findNextBtn').addEventListener('click', () => goToFindMatch(1));
+if ($('findCloseBtn')) $('findCloseBtn').addEventListener('click', () => { closeFindReplaceBar(); content.focus(); });
+if ($('replaceOneBtn')) $('replaceOneBtn').addEventListener('click', replaceCurrentFindMatch);
+if ($('replaceAllBtn')) $('replaceAllBtn').addEventListener('click', replaceAllFindMatches);
+
+// ============ PRO WRITER TOOLS: JUSTIFY, SPELLCHECK, TYPEWRITER, LINE FOCUS, EXPORT, SNAPSHOTS ============
+
+let textJustifyState = localStorage.getItem('scriptoriumTextJustify') === 'true';
+let spellcheckState = localStorage.getItem('scriptoriumSpellcheck') !== 'false';
+let typewriterState = localStorage.getItem('scriptoriumTypewriter') === 'true';
+let focusLineState = localStorage.getItem('scriptoriumFocusLine') === 'true';
+let readingModeState = localStorage.getItem('scriptoriumReading') === 'true';
+let activeDiffSnapshot = null;
+
+function applyTextJustify(enable) {
+  textJustifyState = enable;
+  document.documentElement.classList.toggle('text-justified', enable);
+  const btn = $('justifyBtn');
+  if (btn) btn.classList.toggle('active', enable);
+  localStorage.setItem('scriptoriumTextJustify', enable ? 'true' : 'false');
+}
+
+function applySpellcheck(enable) {
+  spellcheckState = enable;
+  const attr = enable ? 'true' : 'false';
+  
+  if (content) {
+    content.setAttribute('spellcheck', attr);
+    content.setAttribute('lang', getLocale() === 'fr' ? 'fr' : 'en');
+  }
+  if (title) {
+    title.setAttribute('spellcheck', attr);
+    title.setAttribute('lang', getLocale() === 'fr' ? 'fr' : 'en');
+  }
+  if (subtitle) {
+    subtitle.setAttribute('spellcheck', attr);
+    subtitle.setAttribute('lang', getLocale() === 'fr' ? 'fr' : 'en');
+  }
+
+  const btn = $('spellcheckBtn');
+  if (btn) btn.classList.toggle('active', enable);
+  localStorage.setItem('scriptoriumSpellcheck', enable ? 'true' : 'false');
+}
+
+function centerActiveLine(smooth = true) {
+  if (!typewriterState || !activeLineNode || !editorWrap) return;
+  const lineRect = activeLineNode.getBoundingClientRect();
+  const wrapRect = editorWrap.getBoundingClientRect();
+  const targetY = wrapRect.top + (wrapRect.height / 2);
+  const lineCenterY = lineRect.top + (lineRect.height / 2);
+  const diff = lineCenterY - targetY;
+  
+  if (Math.abs(diff) > 4) {
+    editorWrap.scrollBy({
+      top: diff,
+      behavior: smooth ? 'smooth' : 'auto'
+    });
+  }
+}
+
+function applyTypewriterMode(enable) {
+  typewriterState = enable;
+  document.documentElement.classList.toggle('typewriter-on', enable);
+  const btn = $('typewriterToggle');
+  if (btn) btn.classList.toggle('active', enable);
+  localStorage.setItem('scriptoriumTypewriter', enable ? 'true' : 'false');
+  if (enable) centerActiveLine(true);
+}
+
+function applyFocusLineMode(enable) {
+  focusLineState = enable;
+  document.documentElement.classList.toggle('focus-line-on', enable);
+  const btn = $('focusLineBtn');
+  if (btn) btn.classList.toggle('active', enable);
+  localStorage.setItem('scriptoriumFocusLine', enable ? 'true' : 'false');
+}
+
+function applyReadingMode(enable) {
+  readingModeState = enable;
+  document.documentElement.classList.toggle('reading-on', enable);
+  const btn = $('readingToggle');
+  if (btn) btn.classList.toggle('active', enable);
+  localStorage.setItem('scriptoriumReading', enable ? 'true' : 'false');
+
+  if (content) content.setAttribute('contenteditable', enable ? 'false' : 'true');
+
+  if (enable) {
+    // Flush the raw active line back to rendered markdown so the text reads clean
+    hideGutterIndicator();
+    setHoveredLine(null);
+    hideSelectionToolbar();
+    if (activeLineNode && !removeAbandonedEmptyLine(activeLineNode) && content.contains(activeLineNode)) {
+      const raw = activeLineNode.textContent;
+      activeLineNode.dataset.raw = raw;
+      applyLineKind(activeLineNode, raw);
+      activeLineNode.innerHTML = raw.trim() === '' ? '<br>' : renderMarkdownLine(raw);
+      activeLineNode.classList.remove('active-line');
+    }
+    activeLineNode = null;
+    const sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+  }
+}
+
+// Bulk-remove every strictly empty line. Lines holding anything — even a lone
+// space (deliberate spacer) — are kept, as are blank lines inside code blocks.
+function removeAllEmptyLines() {
+  if (!content) return;
+  const lines = Array.from(content.children).filter(el => el.classList && el.classList.contains('editor-line'));
+  const toRemove = lines.filter(line => {
+    if (line.classList.contains('in-code') || line.classList.contains('is-code-fence')) return false;
+    const raw = (line === activeLineNode)
+      ? line.textContent
+      : (line.dataset.raw !== undefined ? line.dataset.raw : line.textContent);
+    return raw === '';
+  });
+  if (!toRemove.length) return;
+
+  saveHistory(state.activeDocId, true);
+  toRemove.forEach(line => {
+    if (line === activeLineNode) activeLineNode = null;
+    line.remove();
+  });
+  // Keep at least one line so the editor stays usable
+  if (!content.querySelector('.editor-line')) {
+    const div = document.createElement('div');
+    div.className = 'editor-line';
+    div.dataset.raw = '';
+    div.innerHTML = '<br>';
+    content.appendChild(div);
+  }
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+  debouncedPostProcess();
+}
+
+// Export Dropdown
+const exportMenu = $('exportMenu');
+function closeExportMenu() {
+  if (exportMenu) exportMenu.classList.remove('visible');
+}
+function openExportMenu() {
+  if (!exportMenu || !$('exportBtn')) return;
+  const rect = $('exportBtn').getBoundingClientRect();
+  exportMenu.style.top = (rect.bottom + 6) + 'px';
+  exportMenu.style.left = Math.min(window.innerWidth - 230, rect.left - 180) + 'px';
+  exportMenu.classList.toggle('visible');
+}
+
+function exportPdf() {
+  closeExportMenu();
+  window.print();
+}
+
+function exportHtml() {
+  closeExportMenu();
+  const doc = activeDoc();
+  const docTitle = title ? title.value : (doc ? doc.title : 'Document');
+  const docSubtitle = subtitle ? subtitle.value : '';
+  const htmlContent = content ? content.innerHTML : '';
+  
+  const fullHtml = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>${escapeHtml(docTitle)}</title>
+<style>
+  body { font-family: 'Newsreader', Georgia, serif; max-width: 750px; margin: 40px auto; padding: 0 20px; color: #111; line-height: 1.7; background: #faf8f5; }
+  h1.doc-title { font-size: 32px; font-weight: normal; margin-bottom: 6px; }
+  p.doc-subtitle { font-size: 16px; font-style: italic; color: #666; margin-bottom: 40px; }
+  h1 { font-size: 26px; margin-top: 1.5em; } h2 { font-size: 22px; margin-top: 1.2em; } h3 { font-size: 18px; }
+  blockquote { border-left: 2px solid #c9a96a; padding-left: 16px; margin: 20px 0; color: #555; font-style: italic; }
+  code { font-family: monospace; background: #eee; padding: 2px 4px; border-radius: 3px; }
+  a { color: #2b789e; text-decoration: none; }
+</style>
+</head>
+<body>
+<h1 class="doc-title">${escapeHtml(docTitle)}</h1>
+${docSubtitle ? `<p class="doc-subtitle">${escapeHtml(docSubtitle)}</p>` : ''}
+<div class="content">${htmlContent}</div>
+</body>
+</html>`;
+
+  const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(docTitle || 'document').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportMarkdown() {
+  closeExportMenu();
+  const doc = activeDoc();
+  const docTitle = title ? title.value : (doc ? doc.title : 'Document');
+  const mdText = getContentMarkdown();
+  
+  const blob = new Blob([mdText], { type: 'text/markdown;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(docTitle || 'document').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Snapshots & Diff Management — persisted on disk via the server
+// (<workspace>/.snapshots/), with localStorage as fallback when the running
+// server predates the /api/snapshots route.
+let snapshotsCache = {}; // docId -> list
+
+function getSnapshots(docId) {
+  if (!docId) return [];
+  if (snapshotsCache[docId]) return snapshotsCache[docId];
+  try {
+    const raw = localStorage.getItem(`scriptoriumSnapshots_${docId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return [];
+}
+
+function saveSnapshots(docId, list) {
+  if (!docId) return;
+  snapshotsCache[docId] = list;
+  fetch('/api/snapshots', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ docId, snapshots: list })
+  }).then(res => {
+    if (!res.ok) throw new Error('server refused');
+    // Disk write confirmed: the localStorage copy is now redundant
+    try { localStorage.removeItem(`scriptoriumSnapshots_${docId}`); } catch (e) {}
+  }).catch(() => {
+    try { localStorage.setItem(`scriptoriumSnapshots_${docId}`, JSON.stringify(list)); } catch (e) {}
+  });
+}
+
+// Refresh the cache from disk; merges in (and migrates) any snapshots still
+// sitting in localStorage from before disk persistence existed.
+async function loadSnapshotsForDoc(docId) {
+  if (!docId) return;
+  try {
+    const res = await fetch(`/api/snapshots?docId=${encodeURIComponent(docId)}`);
+    if (!res.ok) throw new Error('server refused');
+    const data = await res.json();
+    let list = Array.isArray(data.snapshots) ? data.snapshots : [];
+
+    let legacy = null;
+    try { legacy = JSON.parse(localStorage.getItem(`scriptoriumSnapshots_${docId}`) || 'null'); } catch (e) {}
+    if (Array.isArray(legacy) && legacy.length) {
+      const known = new Set(list.map(s => s.id));
+      list = list.concat(legacy.filter(s => !known.has(s.id)));
+      list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      saveSnapshots(docId, list); // pushes the merged list to disk
+    } else {
+      snapshotsCache[docId] = list;
+    }
+  } catch (e) {
+    // Old server without the route: getSnapshots falls back to localStorage
+  }
+  renderSnapshotsList();
+}
+
+function createSnapshot() {
+  if (!state.activeDocId) return;
+  // "Révision du 13:54" announced a date and gave a time. The label has to
+  // stand on its own: it survives a swap, which moves the entry's timestamp.
+  const now = new Date();
+  var dateStr = now.toLocaleDateString(getLocale() === 'fr' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'long' });
+  var defaultName = __('prompt.default_snapshot_name', { date: dateStr, time: clockTime(now.getTime()) });
+  var name = prompt(__('prompt.snapshot_name'), defaultName);
+  if (!name) return;
+
+  const docTitle = title ? title.value : '';
+  const docSubtitle = subtitle ? subtitle.value : '';
+  const mdContent = getContentMarkdown();
+
+  const list = getSnapshots(state.activeDocId);
+  list.unshift({
+    id: 'snap_' + Date.now(),
+    name,
+    timestamp: Date.now(),
+    title: docTitle,
+    subtitle: docSubtitle,
+    markdown: mdContent
+  });
+
+  saveSnapshots(state.activeDocId, list);
+  renderSnapshotsList();
+}
+
+function deleteSnapshot(snapId) {
+  if (!state.activeDocId) return;
+  let list = getSnapshots(state.activeDocId);
+  list = list.filter(s => s.id !== snapId);
+  saveSnapshots(state.activeDocId, list);
+  renderSnapshotsList();
+}
+
+function diffStrings(oldStr, newStr) {
+  const oldLines = oldStr.split('\n');
+  const newLines = newStr.split('\n');
+  let result = '';
+
+  let i = 0, j = 0;
+  while (i < oldLines.length || j < newLines.length) {
+    if (i < oldLines.length && j < newLines.length && oldLines[i] === newLines[j]) {
+      result += escapeHtml(newLines[j]) + '\n';
+      i++;
+      j++;
+    } else if (j < newLines.length && (!oldLines.slice(i).includes(newLines[j]))) {
+      result += `<span class="diff-add">+ ${escapeHtml(newLines[j])}</span>\n`;
+      j++;
+    } else if (i < oldLines.length) {
+      result += `<span class="diff-del">- ${escapeHtml(oldLines[i])}</span>\n`;
+      i++;
+    } else {
+      result += `<span class="diff-add">+ ${escapeHtml(newLines[j])}</span>\n`;
+      j++;
+    }
+  }
+  return result;
+}
+
+function openDiffModal(snapId) {
+  const list = getSnapshots(state.activeDocId);
+  const snap = list.find(s => s.id === snapId);
+  if (!snap) return;
+
+  activeDiffSnapshot = snap;
+  const modal = $('diffModal');
+  const meta = $('diffMeta');
+  const contentEl = $('diffContent');
+
+  if (meta) meta.textContent = __('snapshot.diff_meta', { name: snap.name, date: new Date(snap.timestamp).toLocaleString() });
+  
+  const currentMd = getContentMarkdown();
+  if (contentEl) contentEl.innerHTML = diffStrings(snap.markdown, currentMd);
+
+  if (modal) modal.classList.add('active');
+}
+
+// Restoring swaps rather than overwrites: the version leaving the editor takes
+// the snapshot's place, so restoring again brings it straight back. Without the
+// swap, the state you were in when you clicked Restore is simply gone.
+function restoreActiveSnapshot() {
+  if (!activeDiffSnapshot || !state.activeDocId) return;
+  if (!confirm(
+    __('confirm.restore_snapshot', { name: activeDiffSnapshot.name })
+  )) return;
+
+  saveHistory(state.activeDocId, true);
+
+  const incoming = activeDiffSnapshot;
+  const outgoing = {
+    title: title ? title.value : '',
+    subtitle: subtitle ? subtitle.value : '',
+    markdown: getContentMarkdown()
+  };
+
+  if (title) title.value = incoming.title || '';
+  if (subtitle) subtitle.value = incoming.subtitle || '';
+  loadContentMarkdown(incoming.markdown || '');
+
+  // The snapshot keeps its id and position in the list; only its payload is
+  // exchanged, so the entry the user has been aiming at stays where it was.
+  const list = getSnapshots(state.activeDocId);
+  const entry = list.find((s) => s.id === incoming.id);
+  if (entry) {
+    entry.title = outgoing.title;
+    entry.subtitle = outgoing.subtitle;
+    entry.markdown = outgoing.markdown;
+    entry.timestamp = Date.now();
+    entry.name = swappedSnapshotName(entry.name);
+    saveSnapshots(state.activeDocId, list);
+  }
+
+  markDirty();
+  updateStats();
+  debouncedRegenerateTOC();
+  renderSnapshotsList();
+
+  if ($('diffModal')) $('diffModal').classList.remove('active');
+  activeDiffSnapshot = null;
+}
+
+// Marks an entry as holding the version that was just swapped out, and toggles
+// the marker back off when it is swapped in again — so the label tracks the
+// back-and-forth instead of stacking "(remplacé) (remplacé)".
+function swappedSnapshotName(name) {
+  var SUFFIX = __('snapshot.swapped_suffix');
+  return name.endsWith(SUFFIX) ? name.slice(0, -SUFFIX.length) : name + SUFFIX;
+}
+
+// The card used to print the time alone, so a snapshot taken three days ago
+// read as "13:54" — indistinguishable from one taken this afternoon. Snapshots
+// are kept precisely to reach back past today.
+function clockTime(ts) {
+  return new Date(ts).toLocaleTimeString(getLocale() === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function snapshotStamp(ts) {
+  return relDate(ts) + ' ' + clockTime(ts);
+}
+
+function fullDateTime(ts) {
+  return new Date(ts).toLocaleString(getLocale() === 'fr' ? 'fr-FR' : 'en-US', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+}
+
+function renderSnapshotsList() {
+  const listEl = $('snapshotsList');
+  const emptyEl = $('snapshotsEmpty');
+  if (!listEl) return;
+
+  const list = getSnapshots(state.activeDocId);
+  listEl.innerHTML = '';
+
+  if (!list.length) {
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    return;
+  }
+  if (emptyEl) emptyEl.classList.add('hidden');
+
+  list.forEach(snap => {
+    const card = document.createElement('div');
+    card.className = 'snapshot-card';
+    card.innerHTML =
+      '<div class="snapshot-card-header">' +
+        '<span class="snapshot-name">' + escapeHtml(snap.name) + '</span>' +
+        '<span class="snapshot-date" title="' + escapeHtml(fullDateTime(snap.timestamp)) + '">' + escapeHtml(snapshotStamp(snap.timestamp)) + '</span>' +
+      '</div>' +
+      '<div class="snapshot-actions">' +
+        '<button class="snapshot-btn view-diff-btn" type="button">' + __('snapshot.view_diff') + '</button>' +
+        '<button class="snapshot-btn restore-btn" type="button">' + __('snapshot.restore') + '</button>' +
+        '<button class="snapshot-btn delete-btn" type="button" style="color: var(--danger);">' + __('snapshot.delete') + '</button>' +
+      '</div>';
+
+    card.querySelector('.view-diff-btn').addEventListener('click', () => openDiffModal(snap.id));
+    card.querySelector('.restore-btn').addEventListener('click', () => {
+      activeDiffSnapshot = snap;
+      restoreActiveSnapshot();
+    });
+    card.querySelector('.delete-btn').addEventListener('click', () => deleteSnapshot(snap.id));
+
+    listEl.appendChild(card);
+  });
+}
+
+function initProWriterTools() {
+  applyTextJustify(textJustifyState);
+  applySpellcheck(spellcheckState);
+  applyTypewriterMode(typewriterState);
+  applyFocusLineMode(focusLineState);
+  applyReadingMode(readingModeState);
+
+  $('justifyBtn')?.addEventListener('click', () => applyTextJustify(!textJustifyState));
+  $('spellcheckBtn')?.addEventListener('click', () => applySpellcheck(!spellcheckState));
+  $('typewriterToggle')?.addEventListener('click', () => applyTypewriterMode(!typewriterState));
+  $('focusLineBtn')?.addEventListener('click', () => applyFocusLineMode(!focusLineState));
+  $('readingToggle')?.addEventListener('click', () => applyReadingMode(!readingModeState));
+  $('removeEmptyLinesBtn')?.addEventListener('click', removeAllEmptyLines);
+
+  // Export menu
+  $('exportBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openExportMenu();
+  });
+  $('exportPdfBtn')?.addEventListener('click', exportPdf);
+  $('exportHtmlBtn')?.addEventListener('click', exportHtml);
+  $('exportMdBtn')?.addEventListener('click', exportMarkdown);
+
+  document.addEventListener('click', (e) => {
+    if (exportMenu && !e.target.closest('#exportMenu') && !e.target.closest('#exportBtn')) {
+      closeExportMenu();
+    }
+  });
+
+  // Snapshots & Diff
+  $('createSnapshotBtn')?.addEventListener('click', createSnapshot);
+  $('closeDiffBtn')?.addEventListener('click', () => $('diffModal')?.classList.remove('active'));
+  $('closeDiffModalBtn')?.addEventListener('click', () => $('diffModal')?.classList.remove('active'));
+  $('restoreSnapshotBtn')?.addEventListener('click', restoreActiveSnapshot);
+}
+
 // ============ INITIALIZATION ============
 
 function renderAll() {
@@ -4287,21 +6360,236 @@ function renderAll() {
 
 // Start
 fetchWorkspace();
+initColorTheme();
+initFontSizeControls();
+initProWriterTools();
+initLanguageSettings();
 
 document.addEventListener('selectionchange', updateActiveLine);
 
-content.addEventListener('click', (e) => {
-  if (e.target === content) {
-    const lastLine = content.lastChild;
-    if (lastLine && lastLine.classList.contains('editor-line')) {
-      lastLine.focus();
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(lastLine);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
+// ============ GUTTER CLICK-TO-INSERT ============
+// Clicking in the empty space before the first block, between two blocks, or
+// after the last one inserts a new empty block right there instead of just
+// moving the caret to the end of the document. Hovering that space previews
+// the exact insertion point with the same indicator line used by block drag.
+
+function getEditorLines() {
+  return Array.from(content.children).filter(el => el.classList && el.classList.contains('editor-line'));
+}
+
+// An empty trailing line already catches clicks below it (focus, no new block needed).
+function isMootGutterHit(hit) {
+  return !!hit && !!hit.atTail && hit.line.textContent.trim() === '';
+}
+
+// ============ INSERT / EDIT DETENT ============
+// The gap between two blocks is 0.5em (~9px) and the hover outline is drawn
+// 3px into it on each side, so the target for "insert here" was a ~3px band.
+// Aiming one pixel high put the caret in the block above instead.
+//
+// The boundary is now a detent: it reaches a little way *into* the blocks on
+// either side, and once engaged it holds until the pointer travels clearly
+// away (hysteresis). A hand that shakes by two pixels no longer flips modes.
+
+let gutterMode = 'edit';         // 'edit' | 'insert'
+let gutterHit = null;
+
+// Returns the insertion boundary the pointer is on, or null.
+//
+// Hard rule: a point that lies inside a block's own box is NEVER an insertion.
+// An earlier attempt let the boundary bite a few pixels into each block to make
+// it easier to hit; that quietly stole the top and bottom of every block, so
+// clicking the first line of a paragraph inserted an empty block instead of
+// putting the caret in it — the block looked unerodable. The gap is the target,
+// and it is made comfortable by spacing the blocks, not by eating them.
+function findInsertionBoundary(clientY) {
+  const lines = getEditorLines();
+  if (!lines.length) return null;
+
+  // Open space above the first block and below the last is unambiguous.
+  const firstRect = lines[0].getBoundingClientRect();
+  if (clientY < firstRect.top) {
+    return { line: lines[0], insertBefore: true, edgeY: firstRect.top };
+  }
+
+  const lastLine = lines[lines.length - 1];
+  const lastRect = lastLine.getBoundingClientRect();
+  if (clientY > lastRect.bottom) {
+    return { line: lastLine, insertBefore: false, edgeY: lastRect.bottom, atTail: true };
+  }
+
+  // Strictly between two blocks.
+  for (let i = 0; i < lines.length - 1; i++) {
+    const r = lines[i].getBoundingClientRect();
+    const nr = lines[i + 1].getBoundingClientRect();
+    if (clientY < r.bottom || clientY > nr.top) continue;
+    // The indicator sits at the middle of the gap and stays there for the whole
+    // gap: "after block i" and "before block i+1" are the same insertion, and
+    // snapping between the two edges made the line jump for no reason.
+    const mid = (r.bottom + nr.top) / 2;
+    return clientY < mid
+      ? { line: lines[i], insertBefore: false, edgeY: mid }
+      : { line: lines[i + 1], insertBefore: true, edgeY: mid };
+  }
+  return null;
+}
+
+// Drives the two mutually exclusive affordances. Showing the block outline and
+// the insertion line at the same time was half the confusion: the cursor now
+// commits to one reading of what a click will do.
+function setGutterMode(mode, hit) {
+  const changed = mode !== gutterMode;
+  gutterMode = mode;
+  gutterHit = hit || null;
+
+  if (mode === 'insert') {
+    setHoveredLine(null);
+    showGutterIndicator(hit);
+    content.classList.add('gutter-insert');
+    // A short pulse marks the detent on touch, where there is no hover state
+    // to read and the finger hides the indicator anyway.
+    if (changed && navigator.vibrate && window.matchMedia('(pointer: coarse)').matches) {
+      navigator.vibrate(6);
     }
+  } else {
+    hideGutterIndicator();
+    content.classList.remove('gutter-insert');
+  }
+  return changed;
+}
+
+// Resolves a pointer position into a mode. Used by hover on a mouse and by the
+// tap itself on touch, where the mode cannot be previewed.
+function resolveGutterMode(clientY, target) {
+  if (readingModeState || isDraggingBlock) return { mode: 'edit', hit: null };
+
+  const line = target && target.closest ? target.closest('.editor-line') : null;
+  const onBlock = line && content.contains(line);
+
+  // Second guard, belt and braces: whatever the geometry says, a pointer that
+  // is over a block edits that block. Nothing may take a click away from it.
+  if (!onBlock) {
+    const hit = findInsertionBoundary(clientY);
+    if (hit && !isMootGutterHit(hit)) return { mode: 'insert', hit };
+  }
+
+  return { mode: 'edit', hit: null, line: onBlock ? line : null };
+}
+
+function insertBlockAtBoundary(hit) {
+  saveHistory(state.activeDocId, true);
+  const newLine = makeLineNode('');
+  // Flagged so the block is auto-removed if the caret leaves it while still empty
+  newLine.dataset.gutterCreated = '1';
+  content.insertBefore(newLine, hit.insertBefore ? hit.line : hit.line.nextSibling);
+  makeLineRawAndActive(newLine);
+  setCaretInLine(newLine, 0);
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+}
+
+function showGutterIndicator(hit) {
+  if (!blockDropIndicator) return;
+  const wrapRect = editorWrap.getBoundingClientRect();
+  const containerRect = editorContainer.getBoundingClientRect();
+  blockDropIndicator.style.top = (hit.edgeY - wrapRect.top + editorWrap.scrollTop) + 'px';
+  blockDropIndicator.style.left = (containerRect.left - wrapRect.left + editorWrap.scrollLeft) + 'px';
+  blockDropIndicator.style.width = containerRect.width + 'px';
+  blockDropIndicator.style.display = 'block';
+}
+
+function hideGutterIndicator() {
+  if (!blockDropIndicator || isDraggingBlock) return;
+  blockDropIndicator.style.display = 'none';
+}
+
+// Soft outline on the block currently under the cursor, so it's clear where a
+// block starts/ends — and by extension, where clicking above/below it will
+// insert a new one (see the gutter-insertion logic below).
+function setHoveredLine(line) {
+  // An empty block has nothing to frame, and framing it would suggest there is
+  // something there to edit. Blank lines stay silent.
+  if (line && line.textContent.trim() === '') line = null;
+  if (hoveredLineNode === line) return;
+  if (hoveredLineNode) hoveredLineNode.classList.remove('line-hover-outline');
+  hoveredLineNode = line;
+  if (hoveredLineNode) hoveredLineNode.classList.add('line-hover-outline');
+}
+
+// Hover previews the mode on a mouse. The whole editor is watched now, not
+// just its background: the detent reaches into the blocks, so the pointer is
+// often over a block while the answer is still "insert".
+content.addEventListener('mousemove', (e) => {
+  if (isDraggingBlock) return;
+  if (readingModeState) { setGutterMode('edit', null); setHoveredLine(null); return; }
+
+  const resolved = resolveGutterMode(e.clientY, e.target);
+  setGutterMode(resolved.mode, resolved.hit);
+  if (resolved.mode === 'edit') setHoveredLine(resolved.line);
+});
+
+content.addEventListener('mouseleave', () => {
+  setGutterMode('edit', null);
+  setHoveredLine(null);
+});
+
+// What the click does is decided from where the button actually went down, not
+// from the last hover. Moving fast and clicking before the next mousemove fired
+// used to act on a stale boundary — inserting the block, and throwing the caret,
+// wherever the pointer happened to be a moment earlier.
+let pressGutterHit = null;
+
+content.addEventListener('mousedown', (e) => {
+  pressGutterHit = null;
+  if (e.button !== 0 || e.ctrlKey || e.metaKey) return;
+  if (readingModeState || isDraggingBlock) return;
+
+  const resolved = resolveGutterMode(e.clientY, e.target);
+  setGutterMode(resolved.mode, resolved.hit);
+  if (resolved.mode !== 'insert' || !resolved.hit) return;
+
+  pressGutterHit = resolved.hit;
+  // Stops the browser from dropping the caret into the block the detent
+  // overlaps before the click handler gets to insert.
+  e.preventDefault();
+});
+
+// Touch has no hover: the mode is resolved by the tap itself, and the pulse is
+// what tells the finger which one it got.
+content.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' || readingModeState || isDraggingBlock) return;
+  const resolved = resolveGutterMode(e.clientY, e.target);
+  setGutterMode(resolved.mode, resolved.hit);
+  pressGutterHit = resolved.mode === 'insert' ? resolved.hit : null;
+});
+
+content.addEventListener('click', (e) => {
+  const hit = pressGutterHit;
+  pressGutterHit = null;
+
+  if (readingModeState) return;
+  if (e.ctrlKey || e.metaKey) return; // Ctrl+clic = sélection multiple, pas d'insertion
+
+  if (hit) {
+    e.preventDefault();
+    setGutterMode('edit', null);
+    insertBlockAtBoundary(hit);
+    return;
+  }
+
+  if (e.target !== content) return; // a click inside a block edits it, as before
+
+  // No insertion zone (empty doc, or clicked below an already-empty last line): just focus it.
+  const lastLine = content.lastChild;
+  if (lastLine && lastLine.classList && lastLine.classList.contains('editor-line')) {
+    const range = document.createRange();
+    range.selectNodeContents(lastLine);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
   }
 });
 
@@ -4309,5 +6597,243 @@ content.addEventListener('click', (e) => {
 content.addEventListener('dragstart', (e) => {
   e.dataTransfer.effectAllowed = 'copy';
 });
+
+// Registering the worker is what makes the app installable on a phone and
+// lets the shell open without a network. The API is never cached (see sw.js).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn(__('sw.not_registered', { message: err.message }));
+    });
+  });
+}
+
+// ============ MOBILE / TACTILE ============
+// Everything below exists because the desktop affordances are mouse-only:
+// block reordering listens to mousedown/mousemove, moving a document between
+// sections relies on HTML5 drag-and-drop (which touch browsers do not fire),
+// and the layout assumes a viewport that the on-screen keyboard never covers.
+
+const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+
+// --- Keyboard-aware height ---------------------------------------------
+// When the virtual keyboard opens, dvh does not shrink: the layout keeps its
+// full height and the statusbar (plus often the caret) ends up behind the
+// keyboard. visualViewport is the only thing that reports the real area.
+(() => {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  let frame = null;
+  const sync = () => {
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = null;
+      // Below ~1px of difference this is just rounding noise.
+      const covered = window.innerHeight - vv.height - vv.offsetTop;
+      if (covered > 1) {
+        document.documentElement.style.setProperty('--app-h', vv.height + 'px');
+      } else {
+        document.documentElement.style.removeProperty('--app-h');
+      }
+    });
+  };
+  vv.addEventListener('resize', sync);
+  vv.addEventListener('scroll', sync);
+  sync();
+})();
+
+// Keep the caret visible above the keyboard while typing.
+if (isCoarsePointer) {
+  content.addEventListener('input', () => {
+    if (!activeLineNode || !window.visualViewport) return;
+    const rect = activeLineNode.getBoundingClientRect();
+    const limit = window.visualViewport.height - 40;
+    if (rect.bottom > limit) {
+      editorWrap.scrollTop += rect.bottom - limit + 24;
+    }
+  });
+}
+
+// --- Edge swipes to open/close the panels -------------------------------
+// The burger and ideas buttons are small targets in the corners; a swipe from
+// the edge is how every mobile app opens a drawer.
+(() => {
+  if (!isCoarsePointer) return;
+  const EDGE = 28;        // px from the screen edge that arm an opening swipe
+  const THRESHOLD = 55;   // px of travel before it counts as a swipe
+  let startX = 0, startY = 0, tracking = false, fromLeftEdge = false, fromRightEdge = false;
+
+  document.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { tracking = false; return; }
+    // Never hijack a gesture that starts inside a scrollable panel or a modal.
+    if (e.target.closest('.modal, .search-modal-overlay, .block-menu')) { tracking = false; return; }
+    const t = e.touches[0];
+    startX = t.clientX;
+    startY = t.clientY;
+    fromLeftEdge = startX <= EDGE;
+    fromRightEdge = startX >= window.innerWidth - EDGE;
+    tracking = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    // Horizontal intent only, so vertical scrolling is never mistaken for one.
+    if (Math.abs(dx) < THRESHOLD || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+    const sidebarOpen = app.classList.contains('show-sidebar');
+    const ideasOpen = app.classList.contains('show-ideas');
+
+    if (dx > 0) {
+      if (ideasOpen) app.classList.remove('show-ideas');
+      else if (fromLeftEdge && !sidebarOpen) app.classList.add('show-sidebar');
+    } else {
+      if (sidebarOpen) app.classList.remove('show-sidebar');
+      else if (fromRightEdge && !ideasOpen) app.classList.add('show-ideas');
+    }
+  }, { passive: true });
+})();
+
+// --- Touch equivalent of the block drag handle --------------------------
+// startBlockDrag() only reads clientX/clientY off the event, so touch points
+// can be forwarded to the same code path as the mouse.
+(() => {
+  const handle = $('blockDragBtn');
+  if (!handle) return;
+
+  const asPoint = (touch) => ({
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+    preventDefault() {},
+    stopPropagation() {}
+  });
+
+  const onTouchMove = (e) => {
+    if (!e.touches[0]) return;
+    e.preventDefault(); // stop the page from scrolling under the drag
+    onBlockDragMove(asPoint(e.touches[0]));
+  };
+
+  const onTouchEnd = (e) => {
+    window.removeEventListener('touchmove', onTouchMove);
+    window.removeEventListener('touchend', onTouchEnd);
+    window.removeEventListener('touchcancel', onTouchEnd);
+    const t = e.changedTouches[0];
+    onBlockDragEnd(t ? asPoint(t) : { clientX: 0, clientY: 0, preventDefault() {}, stopPropagation() {} });
+  };
+
+  handle.addEventListener('touchstart', (e) => {
+    if (!activeLineNode || e.touches.length !== 1) return;
+    e.preventDefault();
+    startBlockDrag(activeLineNode, asPoint(e.touches[0]));
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    window.addEventListener('touchcancel', onTouchEnd);
+  }, { passive: false });
+})();
+
+// --- Move a document without drag-and-drop ------------------------------
+// Long-press (or right-click) a document in the sidebar to pick a destination
+// section. On touch this is the only way to reorganise the workspace.
+(() => {
+  let menuEl = null;
+
+  const closeMenu = () => {
+    if (menuEl) { menuEl.remove(); menuEl = null; }
+  };
+
+  function openMoveMenu(docId, x, y) {
+    closeMenu();
+    const doc = findDoc(docId);
+    if (!doc) return;
+    const currentSection = state.sections.find(s => s.documents.some(d => d.id === docId));
+
+    menuEl = document.createElement('div');
+    menuEl.className = 'block-menu visible doc-move-menu';
+    menuEl.innerHTML = `<div class="block-menu-title">Déplacer « ${escapeHtml(doc.title || __('new_doc.default_title'))} » vers…</div>`;
+
+    state.sections
+      .filter(s => !currentSection || s.id !== currentSection.id)
+      .forEach(section => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'block-menu-item';
+        item.textContent = section.name;
+        item.addEventListener('click', () => {
+          closeMenu();
+          moveDocument(docId, section.id);
+        });
+        menuEl.appendChild(item);
+      });
+
+    if (menuEl.children.length === 1) {
+      const empty = document.createElement('div');
+      empty.className = 'block-menu-empty';
+      empty.textContent = __('nav.doc_no_other_section');
+      menuEl.appendChild(empty);
+    }
+
+    document.body.appendChild(menuEl);
+    const r = menuEl.getBoundingClientRect();
+    menuEl.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
+    menuEl.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
+  }
+
+  const docIdOf = (item) => {
+    // The nav is rendered from state, so the item's position inside its
+    // section maps back to the document it was built from.
+    const sectionEl = item.closest('.nav-section');
+    if (!sectionEl) return null;
+    const section = state.sections.find(s => s.id === sectionEl.dataset.id);
+    if (!section) return null;
+    const index = Array.from(sectionEl.querySelectorAll('.nav-item')).indexOf(item);
+    if (index < 0) return null;
+    return documentsForNav(section.documents)[index]?.id || null;
+  };
+
+  nav.addEventListener('contextmenu', (e) => {
+    const item = e.target.closest('.nav-item');
+    if (!item) return;
+    e.preventDefault();
+    const id = docIdOf(item);
+    if (id) openMoveMenu(id, e.clientX, e.clientY);
+  });
+
+  // Own long-press detection: contextmenu on long-press is inconsistent across
+  // mobile browsers, and a moving finger must cancel it.
+  let pressTimer = null, pressStart = null;
+  nav.addEventListener('touchstart', (e) => {
+    const item = e.target.closest('.nav-item');
+    if (!item || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    pressStart = { x: t.clientX, y: t.clientY };
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      const id = docIdOf(item);
+      if (id) {
+        if (navigator.vibrate) navigator.vibrate(12);
+        openMoveMenu(id, pressStart.x, pressStart.y);
+      }
+    }, 500);
+  }, { passive: true });
+
+  const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+  nav.addEventListener('touchend', cancelPress, { passive: true });
+  nav.addEventListener('touchcancel', cancelPress, { passive: true });
+  nav.addEventListener('touchmove', (e) => {
+    if (!pressTimer || !pressStart || !e.touches[0]) return;
+    const t = e.touches[0];
+    if (Math.hypot(t.clientX - pressStart.x, t.clientY - pressStart.y) > 10) cancelPress();
+  }, { passive: true });
+
+  document.addEventListener('click', (e) => {
+    if (menuEl && !e.target.closest('.doc-move-menu')) closeMenu();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+})();
 
 setTimeout(() => content.focus(), 100);

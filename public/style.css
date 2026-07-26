@@ -7,13 +7,96 @@
   --border-strong: #2a2a2e;
   --text: #d8d4cc;
   --text-muted: #8b877e;
-  --text-faint: #4e4c48;
+  /* Was #4e4c48 — 2.27:1 against --bg, below the 4.5:1 WCAG AA minimum for
+     body text, and this variable carries the statusbar and the metadata. */
+  --text-faint: #807d74;
   --accent: #c9a96a;
   --accent-soft: rgba(201, 169, 106, 0.15);
   --danger: #c97a6a;
   --serif: 'Newsreader', Georgia, serif;
   --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono: 'JetBrains Mono', monospace;
+
+  /* Editor text sizes — configurable in Settings > Apparence. Absolute px
+     (not em) so each level can be sized independently of the base text. */
+  --fs-doc-title: 34px;
+  --fs-doc-subtitle: 17px;
+  --fs-base: 17.5px;
+  --fs-h1: 35px;
+  --fs-h2: 27px;
+  --fs-h3: 22px;
+  --fs-h4: 19px;
+  --fs-h5: 16.6px;
+  --fs-h6: 14.9px;
+
+  /* Per-element markdown colors, used only when .md-color-on is active */
+  --syn-h1: #e0a458;
+  --syn-h2: #d9b36a;
+  --syn-h3: #c9a96a;
+  --syn-h4: #b89a6e;
+  --syn-h5: #a8927a;
+  --syn-h6: #948875;
+  --syn-bold: #e6c68a;
+  --syn-quote: #8b9a8b;
+  --syn-link: #78c2e6;
+  --syn-code: #8fbf8a;
+  --syn-strike: #c97a6a;
+}
+
+/* Built-in theme: Ivoire — light, warm paper */
+:root[data-theme="ivoire"] {
+  --bg: #f5efe3;
+  --bg-elevated: #ece3d1;
+  --bg-hover: #e4d9c4;
+  --bg-active: #dccfb5;
+  --border: #ddd1ba;
+  --border-strong: #c9b997;
+  --text: #2f2a22;
+  --text-muted: #6b6152;
+  --text-faint: #a89b83;
+  --accent: #a8632f;
+  --accent-soft: rgba(168, 99, 47, 0.15);
+  --danger: #b8493a;
+
+  --syn-h1: #8a3d1f;
+  --syn-h2: #a8632f;
+  --syn-h3: #b8763f;
+  --syn-h4: #94693f;
+  --syn-h5: #6b6152;
+  --syn-h6: #7a7160;
+  --syn-bold: #6b3a1f;
+  --syn-quote: #5f7a5f;
+  --syn-link: #2f6f8a;
+  --syn-code: #3f7a4a;
+  --syn-strike: #b8493a;
+}
+
+/* Built-in theme: Polaire — cool, dark blue/teal */
+:root[data-theme="polaire"] {
+  --bg: #0a0f14;
+  --bg-elevated: #101820;
+  --bg-hover: #16202a;
+  --bg-active: #1c2833;
+  --border: #1c2731;
+  --border-strong: #263441;
+  --text: #d6e4ea;
+  --text-muted: #7f97a3;
+  --text-faint: #47606c;
+  --accent: #5fb3c9;
+  --accent-soft: rgba(95, 179, 201, 0.15);
+  --danger: #d17a6a;
+
+  --syn-h1: #7fc9e0;
+  --syn-h2: #5fb3c9;
+  --syn-h3: #4a9ab0;
+  --syn-h4: #6a8fa0;
+  --syn-h5: #7f97a3;
+  --syn-h6: #6d818c;
+  --syn-bold: #a8dbe8;
+  --syn-quote: #8a9fa8;
+  --syn-link: #d9a668;
+  --syn-code: #7fd9a0;
+  --syn-strike: #d17a6a;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,7 +118,12 @@ button { font: inherit; color: inherit; }
 .app {
   display: grid;
   grid-template-columns: 260px 1fr 340px;
+  /* 100vh on mobile counts the browser chrome as visible, which pushes the
+     statusbar below the fold. dvh tracks the actually usable height; the vh
+     line stays as a fallback for older engines. --app-h is overridden from JS
+     with visualViewport when the on-screen keyboard is open. */
   height: 100vh;
+  height: var(--app-h, 100dvh);
   transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .app.focus-mode { grid-template-columns: 0 1fr 0; }
@@ -186,6 +274,9 @@ button { font: inherit; color: inherit; }
   .sidebar-new-action .secondary-action-btn {
     transition-duration: 0.01ms !important;
     transition-delay: 0s !important;
+  }
+  .editor-line.line-hover-outline:not(.active-line)::after {
+    animation: none !important;
   }
 }
 
@@ -422,7 +513,7 @@ button { font: inherit; color: inherit; }
   transition: border-color 0.25s;
   flex-shrink: 0;
 }
-.topbar.scrolled { border-bottom-color: var(--border); background: rgba(13, 13, 14, 0.85); backdrop-filter: blur(10px); z-index: 10; }
+.topbar.scrolled { border-bottom-color: var(--border); background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 10; }
 
 .mobile-menu, .mobile-ideas {
   display: none;
@@ -437,7 +528,11 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
   flex: 1;
   min-width: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.15s ease;
 }
+.breadcrumb:hover { opacity: 0.85; }
 .breadcrumb .sep { opacity: 0.5; }
 .breadcrumb .current {
   color: var(--text-muted);
@@ -495,12 +590,17 @@ button { font: inherit; color: inherit; }
 
 .editor-line {
   min-height: 1.8em;
-  margin-bottom: 0.5em;
+  /* This gap *is* the insert target, so it is sized to be aimable. It used to
+     be 0.5em with the hover outline drawn 3px into it from each side, leaving
+     about 8px to hit. The outline is a pseudo-element now (no hit area) and the
+     gap is slightly wider, which roughly doubles the target without taking a
+     single pixel away from the blocks themselves. */
+  margin-bottom: 0.62em;
   outline: none;
   /* avoid layout shift on active toggle: don't animate sizing */
   transition: background-color 0.15s ease;
   font-family: var(--serif);
-  font-size: 17.5px;
+  font-size: var(--fs-base);
   line-height: 1.8;
   color: var(--text);
 }
@@ -513,6 +613,56 @@ button { font: inherit; color: inherit; }
   border-radius: 3px;
   outline: 6px solid var(--bg-hover);
 }
+
+/* Soft outline on hover so a block's start/end is visible — makes it clear
+   where clicking above/below it (the gutter-insert gap) will land. Uses
+   outline (not border) so it never shifts layout; skipped on the active line
+   since that already has its own outline treatment above. */
+/* The hover frame is drawn by a pseudo-element rather than `outline`, for two
+   reasons: an outline cannot be animated open, and its 3px offset used to eat
+   into the gap between blocks — the very band the insert detent needs. This
+   frame is painted outside the layout and takes no hit area at all. */
+.editor-line { position: relative; }
+
+.editor-line.line-hover-outline:not(.active-line)::after {
+  content: '';
+  position: absolute;
+  inset: -3px -10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 5%, transparent);
+  pointer-events: none;
+  /* Settles outward from the text it belongs to, so the eye reads "this block"
+     rather than "a rectangle appeared". */
+  animation: blockFrameIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes blockFrameIn {
+  from {
+    opacity: 0;
+    inset: 4px 2px;
+    box-shadow: 0 0 0 0 transparent;
+  }
+  to {
+    opacity: 1;
+    inset: -3px -10px;
+  }
+}
+
+/* ============ ÉDITER vs INSÉRER ============
+   The two readings of a click are now mutually exclusive and each has its own
+   cursor. Previously the block outline and the insertion line could show at
+   once, which left the click ambiguous exactly where it mattered most. */
+.content-area { cursor: text; }
+.content-area.gutter-insert,
+.content-area.gutter-insert .editor-line,
+.content-area.gutter-insert .editor-line * {
+  /* "cell" reads as "place something here" rather than "type here". */
+  cursor: cell;
+}
+/* While the detent holds, no block claims to be the target. */
+.content-area.gutter-insert .editor-line.line-hover-outline::after { display: none; }
 
 /* CRITICAL: kill all inner element sizing/spacing so the line itself owns the layout.
    This makes the rendered (non-active) and raw (active) states pixel-identical in height. */
@@ -548,7 +698,7 @@ button { font: inherit; color: inherit; }
 
 /* Line-kind classes: drive the visual size on the LINE itself, so active/non-active match. */
 .editor-line.is-h1 {
-  font-size: 2em;
+  font-size: var(--fs-h1);
   font-weight: 500;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -558,7 +708,7 @@ button { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--border);
 }
 .editor-line.is-h2 {
-  font-size: 1.55em;
+  font-size: var(--fs-h2);
   font-weight: 500;
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -566,7 +716,7 @@ button { font: inherit; color: inherit; }
   margin-bottom: 0.3em;
 }
 .editor-line.is-h3 {
-  font-size: 1.25em;
+  font-size: var(--fs-h3);
   font-weight: 400;
   font-style: italic;
   line-height: 1.3;
@@ -574,14 +724,14 @@ button { font: inherit; color: inherit; }
   margin-bottom: 0.3em;
 }
 .editor-line.is-h4 {
-  font-size: 1.08em;
+  font-size: var(--fs-h4);
   font-weight: 500;
   line-height: 1.3;
   margin-top: 0.5em;
   margin-bottom: 0.3em;
 }
 .editor-line.is-h5 {
-  font-size: 0.95em;
+  font-size: var(--fs-h5);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -590,7 +740,7 @@ button { font: inherit; color: inherit; }
   margin-bottom: 0.3em;
 }
 .editor-line.is-h6 {
-  font-size: 0.85em;
+  font-size: var(--fs-h6);
   font-weight: 500;
   color: var(--text-muted);
   margin-top: 0.5em;
@@ -622,6 +772,18 @@ button { font: inherit; color: inherit; }
 /* Keep heading bg only on body, not on the bottom-border zone, for clean look */
 .editor-line.is-h1.active-line { border-bottom-color: transparent; }
 
+/* Optional per-element markdown coloring (Settings > Apparence). Colors are set
+   directly on .editor-line.is-* — the block owns its own color, since the
+   "kill inner sizing" rule above forces the nested <h1>/<blockquote>/etc to
+   color:inherit from it (needed so raw/active and rendered states stay identical). */
+.md-color-on .editor-line.is-h1, .md-color-on .editor-line.is-h1 > h1, .md-color-on h1 { color: var(--syn-h1); }
+.md-color-on .editor-line.is-h2, .md-color-on .editor-line.is-h2 > h2, .md-color-on h2 { color: var(--syn-h2); }
+.md-color-on .editor-line.is-h3, .md-color-on .editor-line.is-h3 > h3, .md-color-on h3 { color: var(--syn-h3); }
+.md-color-on .editor-line.is-h4, .md-color-on .editor-line.is-h4 > h4, .md-color-on h4 { color: var(--syn-h4); }
+.md-color-on .editor-line.is-h5, .md-color-on .editor-line.is-h5 > h5, .md-color-on h5 { color: var(--syn-h5); }
+.md-color-on .editor-line.is-h6, .md-color-on .editor-line.is-h6 > h6, .md-color-on h6 { color: var(--syn-h6); }
+.md-color-on .editor-line.is-quote, .md-color-on .editor-line.is-quote > blockquote, .md-color-on blockquote { color: var(--syn-quote); border-left-color: var(--syn-quote); }
+
 .doc-meta {
   margin-bottom: 28px;
   color: var(--text-faint);
@@ -640,7 +802,7 @@ button { font: inherit; color: inherit; }
   outline: none;
   color: var(--text);
   font-family: var(--serif);
-  font-size: 34px;
+  font-size: var(--fs-doc-title);
   font-weight: 400;
   line-height: 1.25;
   margin-bottom: 12px;
@@ -661,7 +823,7 @@ button { font: inherit; color: inherit; }
   outline: none;
   color: var(--text-muted);
   font-family: var(--serif);
-  font-size: 17px;
+  font-size: var(--fs-doc-subtitle);
   font-weight: 300;
   font-style: italic;
   line-height: 1.4;
@@ -699,7 +861,7 @@ button { font: inherit; color: inherit; }
 /* preview mode and inline editor: rendered markdown */
 .preview, .preview-content, .content-area {
   font-family: var(--serif);
-  font-size: 17.5px;
+  font-size: var(--fs-base);
   line-height: 1.8;
   color: var(--text);
   word-wrap: break-word;
@@ -720,19 +882,19 @@ button { font: inherit; color: inherit; }
   white-space: pre-wrap;
   word-break: break-word;
 }
-.preview h1, .preview-content h1, .content-area h1 { font-size: 2em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-.preview h2, .preview-content h2, .content-area h2 { font-size: 1.55em; }
-.preview h3, .preview-content h3, .content-area h3 { font-size: 1.25em; font-style: italic; font-weight: 400; }
-.preview h4, .preview-content h4, .content-area h4 { font-size: 1.08em; }
-.preview h5, .preview-content h5, .content-area h5 { font-size: 0.95em; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
-.preview h6, .preview-content h6, .content-area h6 { font-size: 0.85em; color: var(--text-muted); }
+.preview h1, .preview-content h1, .content-area h1 { font-size: var(--fs-h1); border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
+.preview h2, .preview-content h2, .content-area h2 { font-size: var(--fs-h2); }
+.preview h3, .preview-content h3, .content-area h3 { font-size: var(--fs-h3); font-style: italic; font-weight: 400; }
+.preview h4, .preview-content h4, .content-area h4 { font-size: var(--fs-h4); }
+.preview h5, .preview-content h5, .content-area h5 { font-size: var(--fs-h5); text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+.preview h6, .preview-content h6, .content-area h6 { font-size: var(--fs-h6); color: var(--text-muted); }
 .preview p, .preview-content p, .content-area p { margin: 0 0 0.8em; }
 .preview strong, .preview-content strong, .content-area strong { color: var(--text); font-weight: 600; }
 .preview em, .preview-content em, .content-area em { font-style: italic; }
 .preview u, .preview-content u, .content-area u { text-decoration: underline; text-decoration-color: var(--text-muted); text-underline-offset: 3px; }
 .preview del, .preview-content del, .content-area del { color: var(--text-muted); text-decoration: line-through; }
-.preview a, .preview-content a, .content-area a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
-.preview a:hover, .preview-content a:hover, .content-area a:hover { border-bottom-color: var(--accent); }
+.preview a, .preview-content a, .content-area a, .font-size-preview a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+.preview a:hover, .preview-content a:hover, .content-area a:hover, .font-size-preview a:hover { border-bottom-color: var(--accent); }
 .preview code, .preview-content code, .content-area code {
   font-family: var(--mono);
   font-size: 0.88em;
@@ -763,6 +925,19 @@ button { font: inherit; color: inherit; }
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* Optional per-element markdown coloring for inline marks + the "preview"
+   rendering path (block-level heading/quote colors live further up, on
+   .editor-line.is-* — see the comment there for why). */
+.md-color-on .content-area strong, .md-color-on .preview strong, .md-color-on .preview-content strong, .md-color-on .font-size-preview strong { color: var(--syn-bold); }
+.md-color-on .content-area em, .md-color-on .preview em, .md-color-on .preview-content em, .md-color-on .font-size-preview em { color: var(--syn-h3); font-style: italic; }
+.md-color-on .content-area del, .md-color-on .preview del, .md-color-on .preview-content del, .md-color-on .font-size-preview del { color: var(--syn-strike); text-decoration-color: var(--syn-strike); }
+.md-color-on .content-area a, .md-color-on .preview a, .md-color-on .preview-content a, .md-color-on .font-size-preview a { color: var(--syn-link); border-bottom-color: color-mix(in srgb, var(--syn-link) 35%, transparent); }
+.md-color-on .content-area a:hover, .md-color-on .preview a:hover, .md-color-on .preview-content a:hover, .md-color-on .font-size-preview a:hover { border-bottom-color: var(--syn-link); }
+.md-color-on .content-area code, .md-color-on .preview code, .md-color-on .preview-content code { color: var(--syn-code); }
+.md-color-on .content-area pre code, .md-color-on .preview pre code, .md-color-on .preview-content pre code { color: var(--text); }
+.md-color-on .content-area blockquote, .md-color-on .preview blockquote, .md-color-on .preview-content blockquote { color: var(--syn-quote); border-left-color: var(--syn-quote); }
+
 .preview hr, .preview-content hr, .content-area hr {
   border: none;
   border-top: 1px solid var(--border);
@@ -1202,6 +1377,12 @@ button { font: inherit; color: inherit; }
   justify-content: center;
 }
 .modal-overlay.active { display: flex; }
+.modal-overlay.transparent-overlay,
+.modal-overlay:has(.settings-panel[data-panel="appearance"]:not(.hidden)) {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
 
 .modal {
   background: var(--bg-elevated);
@@ -1337,6 +1518,239 @@ button { font: inherit; color: inherit; }
 }
 .btn-primary:hover { background: var(--accent); color: var(--bg); }
 
+/* ============ SETTINGS: TABS + APPEARANCE ============ */
+.modal-wide { max-width: 560px; }
+
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 4px;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.settings-tab + .settings-tab { margin-left: 14px; }
+.settings-tab:hover { color: var(--text); }
+.settings-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.settings-panel.hidden { display: none; }
+
+.modal-body:has(.settings-panel) {
+  max-height: 65vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.modal-body::-webkit-scrollbar,
+.modal-body:has(.settings-panel)::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-body::-webkit-scrollbar-track,
+.modal-body:has(.settings-panel)::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal-body::-webkit-scrollbar-thumb,
+.modal-body:has(.settings-panel)::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+.modal-body::-webkit-scrollbar-thumb:hover,
+.modal-body:has(.settings-panel)::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  cursor: pointer;
+}
+.checkbox-row input[type="checkbox"] {
+  margin-top: 2px;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.color-theme-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.color-theme-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 6px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.color-theme-swatch:hover { border-color: var(--border-strong); }
+.color-theme-swatch.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.color-theme-swatch-preview {
+  width: 100%;
+  height: 34px;
+  border-radius: 5px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 5px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.color-theme-swatch-preview span {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: block;
+}
+.color-theme-swatch-preview.custom-preview {
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  padding: 0;
+  background: conic-gradient(from 180deg, #c9a96a, #6ea8c9, #8fbf8a, #c97a6a, #c9a96a);
+}
+.color-theme-swatch-label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.color-theme-swatch.active .color-theme-swatch-label { color: var(--text); }
+
+.custom-theme-editor.hidden { display: none; }
+.color-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 16px;
+  margin-top: 10px;
+}
+.color-field-grid.hidden { display: none; }
+.color-field-grid-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+  margin-top: 20px;
+}
+.color-field-grid-title.hidden { display: none; }
+.color-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+.color-field label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.color-field input[type="color"] {
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.font-size-rows { margin-top: 10px; }
+.font-size-row {
+  display: grid;
+  grid-template-columns: 84px 1fr 50px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.font-size-row label { font-size: 12px; color: var(--text-muted); }
+.font-size-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.font-size-value {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: right;
+}
+
+.language-select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b877e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+.language-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.language-select option {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.font-size-preview {
+  margin-top: 14px;
+  padding: 16px 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--serif);
+  color: var(--text);
+  overflow: hidden;
+}
+.fsp-doc-title { font-size: var(--fs-doc-title); font-weight: 400; line-height: 1.25; margin-bottom: 4px; letter-spacing: -0.01em; }
+.fsp-doc-subtitle { font-size: var(--fs-doc-subtitle); font-style: italic; font-weight: 300; color: var(--text-muted); margin-bottom: 12px; }
+.fsp-h1 { font-size: var(--fs-h1); font-weight: 500; line-height: 1.3; margin-bottom: 6px; }
+.fsp-h2 { font-size: var(--fs-h2); font-weight: 500; line-height: 1.3; margin-bottom: 6px; }
+.fsp-h3 { font-size: var(--fs-h3); font-style: italic; line-height: 1.3; margin-bottom: 6px; }
+.fsp-h4 { font-size: var(--fs-h4); font-weight: 500; line-height: 1.3; margin-bottom: 6px; }
+.fsp-h5 { font-size: var(--fs-h5); text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 6px; }
+.fsp-h6 { font-size: var(--fs-h6); color: var(--text-muted); margin-bottom: 8px; }
+.fsp-quote blockquote { border-left: 2px solid var(--accent); padding-left: 12px; margin: 8px 0; color: var(--text-muted); font-style: italic; }
+.fsp-p { font-size: var(--fs-base); line-height: 1.7; }
+
+/* Dynamic syntax coloring inside the settings preview box when md-color-on is active */
+.md-color-on .fsp-h1 { color: var(--syn-h1); }
+.md-color-on .fsp-h2 { color: var(--syn-h2); }
+.md-color-on .fsp-h3 { color: var(--syn-h3); }
+.md-color-on .fsp-h4 { color: var(--syn-h4); }
+.md-color-on .fsp-h5 { color: var(--syn-h5); }
+.md-color-on .fsp-h6 { color: var(--syn-h6); }
+.md-color-on .fsp-quote blockquote { color: var(--syn-quote); border-left-color: var(--syn-quote); }
+
 /* ============ MOBILE / RESPONSIVE ============ */
 @media (max-width: 980px) {
   .app { grid-template-columns: 230px 1fr 0; }
@@ -1346,9 +1760,21 @@ button { font: inherit; color: inherit; }
 }
 
 @media (max-width: 720px) {
+  html, body {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    touch-action: manipulation;
+  }
   .app {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
     grid-template-columns: 1fr;
     grid-template-rows: 1fr;
+  }
+  .app.focus-mode {
+    grid-template-columns: 1fr !important;
   }
   .sidebar, .ideas-panel {
     position: fixed;
@@ -1370,7 +1796,7 @@ button { font: inherit; color: inherit; }
     right: 0;
     transform: translateX(100%);
     border-left: 1px solid var(--border);
-    background: rgba(13, 13, 14, 0.85);
+    background: color-mix(in srgb, var(--bg-elevated) 85%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }
@@ -1392,6 +1818,9 @@ button { font: inherit; color: inherit; }
     gap: 0;
     padding: 20px 16px 30vh;
   }
+  .app.focus-mode .editor-container {
+    padding-top: 15px;
+  }
   .editor-container .preview-pane {
     display: none;
     border-left: none;
@@ -1404,13 +1833,37 @@ button { font: inherit; color: inherit; }
     display: block;
   }
   
-  .title-input { font-size: 27px; }
-  .subtitle-input { font-size: 15.5px; margin-bottom: 30px; }
-  .content-area, .preview, .preview-pane { font-size: 16.5px; line-height: 1.7; }
+  .title-input { font-size: 27px; touch-action: manipulation; }
+  .subtitle-input { font-size: 16px; margin-bottom: 30px; touch-action: manipulation; }
+  .content-area, .preview, .preview-pane { font-size: 16.5px; line-height: 1.7; touch-action: manipulation; }
   .topbar { padding: 10px 14px; }
   .statusbar { padding: 8px 14px; gap: 12px; }
-  .statusbar .right { gap: 12px; }
+  /* The counters and the buttons were running into each other, and the last
+     icon sat flush against the screen edge. */
+  .statusbar .right { gap: 12px; margin-left: auto; padding-left: 14px; }
   .save-indicator { display: none; }
+
+  /* Touch screen focus mode topbar/statusbar accessibility */
+  .app.focus-mode .topbar,
+  .app.focus-mode .statusbar {
+    opacity: 0.4;
+  }
+  .app.focus-mode .topbar:active,
+  .app.focus-mode .topbar:focus-within,
+  .app.focus-mode .statusbar:active,
+  .app.focus-mode .statusbar:focus-within {
+    opacity: 1;
+  }
+
+  /* Prevent iOS / Chrome auto-zoom on mobile form inputs */
+  input[type="text"],
+  input[type="search"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important;
+    touch-action: manipulation;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1420,15 +1873,129 @@ button { font: inherit; color: inherit; }
   .preview h2, .preview-content h2 { font-size: 1.32em; }
 }
 
+/* Below ~560px the three counters plus four 40px buttons cannot both fit and
+   stay tappable. The character count is the one a writer needs least — words
+   and reading time carry the meaning — so it is the one that goes. It is still
+   there on a wider screen, and in the word counter's tooltip. */
+@media (max-width: 560px) {
+  .statusbar .stat.stat-chars { display: none; }
+  .statusbar { gap: 10px; }
+  .statusbar .right { gap: 6px; padding-left: 10px; }
+}
+
+/* ============ SAFE AREAS (encoche + barre d'accueil iOS) ============ */
+/* The viewport meta uses viewport-fit=cover, so the page paints edge to edge;
+   without these insets the topbar sits under the notch and the statusbar under
+   the home indicator. */
+@media (max-width: 720px) {
+  .topbar {
+    padding-top: calc(10px + env(safe-area-inset-top));
+    padding-left: calc(14px + env(safe-area-inset-left));
+    padding-right: calc(14px + env(safe-area-inset-right));
+  }
+  .statusbar {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    padding-left: calc(14px + env(safe-area-inset-left));
+    /* Wider on the right: that edge ends on a tap target, and a button flush
+       against the screen border is both ugly and easy to miss. */
+    padding-right: calc(18px + env(safe-area-inset-right));
+  }
+  .sidebar {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+  .ideas-panel {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-right: env(safe-area-inset-right);
+  }
+  .editor-container {
+    padding-left: calc(16px + env(safe-area-inset-left));
+    padding-right: calc(16px + env(safe-area-inset-right));
+  }
+  /* The statusbar scrolls horizontally when it overflows; without this the
+     only hint that there is more to the right is trial and error. */
+  .statusbar {
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  }
+  .statusbar .stat, .statusbar .icon-btn { scroll-snap-align: start; }
+}
+
+/* ============ CIBLES TACTILES ============ */
+/* A finger needs ~44px. The icon buttons are 18px of drawn surface, so the hit
+   area is grown with padding rather than by scaling the icons themselves. */
+@media (pointer: coarse) {
+  .icon-btn,
+  .close-btn,
+  .panel-tab,
+  .pill-btn,
+  .toc-top-btn,
+  .themes-tabs button,
+  .settings-tab {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn svg { flex: none; }
+  /* The brand is a text label, not an icon: it needs the taller hit area but
+     must keep its natural width and stay left-aligned. */
+  .brand { min-height: 44px; }
+
+  /* Five 44px targets cannot sit next to the wordmark in a 320px drawer. The
+     row moves under the brand and collapses by height instead of width —
+     otherwise it wraps inside the 112px reveal box and stacks three rows deep.*/
+  .sidebar-header {
+    flex-wrap: wrap;
+    /* The taller brand already provides the breathing room the desktop
+       padding was buying; keeping both wastes a sixth of the drawer. */
+    padding: 12px 16px 10px;
+  }
+  .header-actions {
+    flex: 1 0 100%;
+    max-width: none;
+    max-height: 0;
+    margin-left: 0;
+    gap: 2px;
+    justify-content: space-between;
+    transform: none;
+    transition:
+      max-height 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.2s ease,
+      visibility 0s linear 0.34s;
+  }
+  .sidebar-reveal-zone.is-revealed .header-actions {
+    max-width: none;
+    max-height: 52px;
+    margin-left: 0;
+    margin-top: 6px;
+    transform: none;
+  }
+  /* Scaled to 0.88 for the reveal animation, which pulls the hit area back
+     under the minimum. Keep the fade, drop the scale. */
+  .sidebar-reveal-zone.is-revealed .header-actions .icon-btn { transform: none; }
+  .nav-item { min-height: 44px; }
+  .idea-chip { min-height: 40px; }
+  .statusbar .icon-btn { min-width: 40px; min-height: 40px; }
+  /* Tap highlight is distracting on a writing surface, but keep it on links. */
+  .icon-btn, .nav-item, .pill-btn, .panel-tab { -webkit-tap-highlight-color: transparent; }
+}
+
 /* Selection highlight */
 ::selection { background: rgba(201, 169, 106, 0.25); color: var(--text); }
 
 /* Focus mode adjustments */
-.app.focus-mode .editor { padding-top: 12vh; }
+.app.focus-mode .editor-container { padding-top: 6vh; }
 .app.focus-mode .topbar { opacity: 0.15; transition: opacity 0.3s; }
-.app.focus-mode .topbar:hover { opacity: 1; }
+.app.focus-mode .topbar:hover,
+.app.focus-mode .topbar:focus-within { opacity: 1; }
 .app.focus-mode .statusbar { opacity: 0.15; transition: opacity 0.3s; }
-.app.focus-mode .statusbar:hover { opacity: 1; }
+.app.focus-mode .statusbar:hover,
+.app.focus-mode .statusbar:focus-within { opacity: 1; }
 
 .hidden { display: none !important; }
 
@@ -1789,10 +2356,11 @@ mark.search-match.first-match {
 .toc-link {
   display: block;
   padding: 4px 0 4px 8px;
-  color: var(--text-muted);
+  color: var(--text-muted) !important;
   font-size: 12.5px;
   line-height: 1.45;
-  text-decoration: none;
+  text-decoration: none !important;
+  border-bottom: none !important;
   border-left: 2px solid transparent;
   transition: color 0.15s ease;
   overflow: hidden;
@@ -1800,8 +2368,8 @@ mark.search-match.first-match {
   white-space: nowrap;
   cursor: pointer;
 }
-.toc-link:hover { color: var(--text); }
-.toc-link.active { color: var(--accent); }
+.toc-link:hover { color: var(--text) !important; text-decoration: none !important; }
+.toc-link.active { color: var(--accent) !important; font-weight: 500; }
 
 .toc-link.level-2 { margin-left: 12px; opacity: 0.85; font-size: 12px; }
 .toc-link.level-3 { margin-left: 24px; opacity: 0.78; font-size: 11.5px; }
@@ -1855,9 +2423,13 @@ mark.search-match.first-match {
   min-height: 0;
 }
 .ideas-panel .view-toc { display: none; }
+.ideas-panel .view-snapshots { display: none; }
 .ideas-panel.view-toc-mode .view-ideas { display: none; }
 .ideas-panel.view-toc-mode .view-toc { display: flex; }
 .ideas-panel.view-toc-mode .ideas-only { display: none; }
+.ideas-panel.view-snapshots-mode .view-ideas { display: none; }
+.ideas-panel.view-snapshots-mode .view-snapshots { display: flex; }
+.ideas-panel.view-snapshots-mode .ideas-only { display: none; }
 
 /* TOC view inside the right panel — visual padding on the OUTER container,
    not on .toc-wrap, so the SVG's x=0 stays aligned with .toc-list's left edge
@@ -1927,6 +2499,7 @@ mark.search-match.first-match {
   color: var(--text);
 }
 .sel-btn:active { background: var(--bg-active); color: var(--accent); }
+.sel-btn.active { background: var(--bg-active); color: var(--accent); }
 .sel-btn b, .sel-btn i, .sel-btn u, .sel-btn s {
   font-style: normal;
   font-weight: normal;
@@ -1949,6 +2522,128 @@ mark.search-match.first-match {
   flex-shrink: 0;
 }
 
+/* ============ FIND / REPLACE & PRO WRITER TOOLS ============ */
+.statusbar-btn { padding: 5px; transition: all 0.15s ease; }
+.statusbar-btn.active {
+  color: var(--accent) !important;
+  background: var(--bg-hover) !important;
+  border-radius: 4px;
+}
+
+/* Text justification for book/word style published documents */
+.text-justified .content-area,
+.text-justified .preview,
+.text-justified .preview-content,
+.text-justified .editor-line:not(.is-h1):not(.is-h2):not(.is-h3):not(.is-h4):not(.is-h5):not(.is-h6) {
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.find-replace-bar {
+  position: fixed;
+  top: 64px;
+  right: 24px;
+  z-index: 190;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  padding: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  animation: selToolbarIn 0.12s ease-out;
+}
+.find-replace-bar.visible { display: flex; }
+.find-replace-bar svg { color: var(--text-faint); flex-shrink: 0; }
+.fr-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fr-row input[type="text"] {
+  width: 190px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 6px 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12.5px;
+}
+.fr-row input[type="text"]:focus { outline: none; border-color: var(--accent); }
+.fr-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  min-width: 42px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.fr-count.no-match { color: var(--danger); }
+.fr-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.fr-icon-btn:hover { color: var(--text); background: var(--bg-hover); }
+.fr-icon-btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+.fr-close { margin-left: 2px; }
+.fr-case-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-faint);
+  padding: 5px 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+}
+.fr-case-toggle:hover { color: var(--text-muted); background: var(--bg-hover); }
+.fr-case-toggle input { accent-color: var(--accent); cursor: pointer; }
+.fr-text-btn {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.fr-text-btn:hover { color: var(--text); border-color: var(--accent); }
+.fr-text-btn:active { background: var(--bg-active); }
+
+/* Every find match except the current one (classic "find in page" yellow) —
+   a real element, not the CSS Custom Highlight API, so it's guaranteed to
+   paint regardless of ::highlight() support/rendering quirks. The current
+   match isn't marked; it gets the browser's native text-selection instead. */
+mark.find-match-mark {
+  background-color: rgba(255, 205, 0, 0.55);
+  color: #1a1a1a;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 205, 0, 0.55);
+}
+mark.find-match-mark.find-match-current {
+  background-color: rgba(255, 140, 0, 0.95);
+  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.95);
+}
+
 /* ============ GUTTER "+" BLOCK BUTTON ============ */
 .block-add-btn {
   position: fixed;
@@ -1963,7 +2658,10 @@ mark.search-match.first-match {
   align-items: center;
   justify-content: center;
   z-index: 60;
-  transition: all 0.15s ease;
+  /* Deliberately not "all": animating top/left made the button glide across
+     the page whenever the active line changed, which reads as the cursor
+     flying off somewhere. It should simply be at the new line. */
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
   padding: 0;
   font-family: var(--sans);
 }
@@ -1978,9 +2676,17 @@ mark.search-match.first-match {
   background: var(--accent-soft);
   border-color: rgba(201, 169, 106, 0.35);
 }
-/* hide on small screens to avoid clutter */
 @media (max-width: 720px) {
-  .block-add-btn { display: none !important; }
+  .block-add-btn {
+    width: 24px;
+    height: 24px;
+    z-index: 80;
+  }
+  .block-menu {
+    max-height: 55vh;
+    overflow-y: auto;
+    z-index: 99999;
+  }
 }
 
 .block-menu {
@@ -2002,6 +2708,23 @@ mark.search-match.first-match {
 .block-menu.visible { display: block; }
 .block-menu::-webkit-scrollbar { width: 6px; }
 .block-menu::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* "Déplacer vers…" — the touch replacement for dragging a document between
+   sections in the sidebar. Reuses the block menu shell. */
+.doc-move-menu { min-width: 240px; }
+.block-menu-title {
+  padding: 6px 10px 8px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.block-menu-empty {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+}
 
 @keyframes blockMenuIn {
   from { opacity: 0; transform: translateY(-4px); }
@@ -2365,6 +3088,29 @@ mark.search-match.first-match {
   border-color: var(--accent);
 }
 
+/* Floating quick-delete button, revealed after ~1s hovering the drag handle.
+   A separate element next to the handle — it never replaces its icon. */
+.block-trash-btn {
+  position: absolute;
+  z-index: 91;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.12s ease, transform 0.12s ease, background 0.15s ease, color 0.15s ease;
+}
+.block-trash-btn.visible { display: flex; opacity: 1; transform: scale(1); }
+.block-trash-btn:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
+
 /* Dragged line styling in editor */
 .editor-line.dragging-line {
   opacity: 0.35;
@@ -2434,6 +3180,27 @@ mark.search-match.first-match {
   text-decoration: line-through;
 }
 
+/* Delete zones: lit up on the left/right edge of the editor pane while a
+   block is being dragged, so dropping there (not the far edge of the whole
+   window / the right sidebar) reads as "let go here to delete". */
+.editor-delete-zone {
+  position: fixed;
+  z-index: 9999;
+  display: none;
+  pointer-events: none;
+  opacity: 0.35;
+  transition: opacity 0.12s ease;
+}
+.editor-delete-zone.left {
+  background: linear-gradient(to left, transparent, rgba(239, 68, 68, 0.55));
+}
+.editor-delete-zone.right {
+  background: linear-gradient(to right, transparent, rgba(239, 68, 68, 0.55));
+}
+.editor-delete-zone.active {
+  opacity: 1;
+}
+
 /* Drop indicator insertion line */
 .block-drop-indicator {
   position: absolute;
@@ -2494,4 +3261,299 @@ mark.search-match.first-match {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   border: 1px solid var(--border);
   background: var(--bg-elevated);
+}
+
+/* ============ TYPEWRITER & PARAGRAPH FOCUS MODE ============ */
+.typewriter-on .editor-container {
+  padding-bottom: 60vh !important;
+}
+
+.focus-line-on:has(.active-line) .editor-line:not(.active-line),
+.focus-line-on:has(.title-input:focus) .editor-line,
+.focus-line-on:has(.subtitle-input:focus) .editor-line {
+  opacity: 0.25 !important;
+  filter: blur(0.2px);
+  transition: opacity 0.25s ease, filter 0.25s ease;
+}
+.focus-line-on .editor-line.active-line,
+.focus-line-on .title-input:focus,
+.focus-line-on .subtitle-input:focus {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+#typewriterToggle.active,
+#focusLineBtn.active,
+#readingToggle.active {
+  color: var(--accent) !important;
+  background: var(--bg-hover) !important;
+  border-radius: 4px;
+}
+
+/* ============ MULTI-BLOCK SELECTION (Ctrl+clic) ============ */
+.editor-line.multi-selected {
+  background: var(--accent-soft);
+  border-radius: 3px;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.multi-sel-toolbar {
+  position: fixed;
+  display: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  z-index: 185;
+  align-items: center;
+  user-select: none;
+  white-space: nowrap;
+  animation: selToolbarIn 0.12s ease-out;
+}
+.multi-sel-toolbar.visible { display: inline-flex; }
+
+.msel-count {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  padding: 0 8px;
+}
+.msel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.msel-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.msel-btn:disabled { opacity: 0.35; cursor: default; }
+.msel-danger:hover:not(:disabled) { color: var(--danger); }
+
+/* A merged block holds several markdown lines (\n in its raw text). Each
+   sub-line is wrapped in .md-subline and keeps its own block styling. */
+.editor-line .md-subline { display: block; }
+.editor-line .md-subline > h1, .editor-line .md-subline > h2,
+.editor-line .md-subline > h3, .editor-line .md-subline > h4,
+.editor-line .md-subline > h5, .editor-line .md-subline > h6,
+.editor-line .md-subline > p, .editor-line .md-subline > blockquote,
+.editor-line .md-subline > ul, .editor-line .md-subline > ol {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: block;
+}
+.editor-line .md-subline > h1 { font-size: var(--fs-h1); font-weight: 500; line-height: 1.3; letter-spacing: -0.01em; padding-bottom: 0.15em; border-bottom: 1px solid var(--border); }
+.editor-line .md-subline > h2 { font-size: var(--fs-h2); font-weight: 500; line-height: 1.3; letter-spacing: -0.01em; }
+.editor-line .md-subline > h3 { font-size: var(--fs-h3); font-weight: 400; font-style: italic; line-height: 1.3; }
+.editor-line .md-subline > h4 { font-size: var(--fs-h4); font-weight: 500; line-height: 1.3; }
+.editor-line .md-subline > h5 { font-size: var(--fs-h5); font-weight: 500; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+.editor-line .md-subline > h6 { font-size: var(--fs-h6); font-weight: 500; color: var(--text-muted); }
+.editor-line .md-subline > blockquote { border-left: 2px solid var(--accent); padding-left: 16px; font-style: italic; color: var(--text-muted); }
+.editor-line .md-subline > ul, .editor-line .md-subline > ol { padding-left: 1.6em; }
+
+/* While editing a merged block, its raw text contains \n — show them as breaks */
+.editor-line.active-line { white-space: pre-wrap; }
+
+/* No multi-selection affordances in reading mode */
+.reading-on .multi-sel-toolbar { display: none !important; }
+.reading-on .editor-line.multi-selected { background: transparent; outline: none; }
+
+/* ============ OBSIDIAN FRONTMATTER ============ */
+/* Lines of a leading YAML frontmatter block (--- ... ---) are tagged
+   .is-frontmatter by markFrontmatterLines(); this setting hides them in the
+   editor while keeping them in the saved markdown. */
+.hide-frontmatter .editor-line.is-frontmatter { display: none; }
+
+/* ============ READING MODE ============ */
+/* Continuous text, no block affordances: no insertion indicator/gutter buttons,
+   no hover or active-line effects, empty blocks collapsed (line breaks INSIDE a
+   block — <br> among other content — are kept, since only whole empty lines hide). */
+.reading-on .content-area { caret-color: transparent; cursor: default; }
+.reading-on .editor-line { margin-bottom: 0; }
+.reading-on .editor-line.active-line {
+  background: transparent;
+  outline: none;
+}
+.reading-on .editor-line.line-hover-outline:not(.active-line)::after { display: none; }
+.reading-on .block-add-btn,
+.reading-on .block-drag-btn,
+.reading-on .block-trash-btn,
+.reading-on .block-drop-indicator,
+.reading-on .block-menu,
+.reading-on .sel-toolbar { display: none !important; }
+/* A rendered empty line is a lone <br>; an active empty line has no child at all. */
+.reading-on .editor-line:has(> br:only-child) { display: none; }
+.reading-on .editor-line:empty { display: none; }
+
+/* ============ EXPORT MENU DROPDOWN ============ */
+.export-menu {
+  position: fixed;
+  top: 56px;
+  right: 64px;
+  z-index: 250;
+  display: none;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 6px;
+  min-width: 220px;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+  animation: selToolbarIn 0.12s ease-out;
+}
+.export-menu.visible { display: flex; }
+.export-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+.export-menu-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.export-menu-item svg { color: var(--accent); flex-shrink: 0; }
+
+/* ============ SNAPSHOTS & REVISION DIFF ============ */
+.snapshot-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.snapshot-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+.snapshot-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.snapshot-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.snapshot-date {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.snapshot-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.snapshot-btn {
+  font-size: 11.5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.snapshot-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.diff-add {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.diff-del {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  text-decoration: line-through;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+/* ============ PRINT / PDF BOOK LAYOUT ============ */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    font-family: 'Newsreader', 'Georgia', serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .sidebar, .topbar, .statusbar, .ideas-panel, .backdrop, .modal-overlay,
+  .block-add-btn, .block-trash-btn, .find-replace-bar, .toc-aside, .export-menu {
+    display: none !important;
+  }
+  .app {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .editor-wrap {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+  }
+  .editor-container {
+    max-width: 100% !important;
+    padding: 0 1.5cm !important;
+    margin: 0 !important;
+  }
+  .title-input {
+    font-size: 26pt !important;
+    color: #000 !important;
+    font-family: 'Newsreader', serif !important;
+    border: none !important;
+    margin-bottom: 8pt !important;
+  }
+  .subtitle-input {
+    font-size: 14pt !important;
+    color: #444 !important;
+    font-style: italic !important;
+    border: none !important;
+    margin-bottom: 2cm !important;
+  }
+  .content-area {
+    font-size: 11.5pt !important;
+    line-height: 1.65 !important;
+    text-align: justify !important;
+    hyphens: auto !important;
+  }
+  .editor-line h1, .editor-line.is-h1 {
+    font-size: 18pt !important;
+    page-break-before: always;
+    margin-top: 1.5cm !important;
+  }
+  .editor-line h2, .editor-line.is-h2 { font-size: 15pt !important; margin-top: 1cm !important; }
+  .editor-line h3, .editor-line.is-h3 { font-size: 13pt !important; }
+  @page {
+    size: A4;
+    margin: 2.2cm 2cm 2.2cm 2cm;
+  }
 }

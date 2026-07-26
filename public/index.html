@@ -2,25 +2,70 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
+<!-- No maximum-scale/user-scalable: pinch-zoom must stay available in a reading
+     and writing app. iOS-style input auto-zoom is prevented with 16px fonts. -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="color-scheme" content="dark light" />
+<meta name="theme-color" content="#0d0d0f" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Scriptorium" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon-180.png" />
 <title>Scriptorium</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Newsreader:ital,wght@0,300;0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Everything below is served from node_modules by server.js: the app edits
+     files on your own disk, so it has to work with no network at all. -->
+<link rel="stylesheet" href="vendor-fonts.css">
+
 <!-- Syntax highlighting (code blocks) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/styles/github-dark.min.css">
-<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/highlight.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/rust.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/go.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/yaml.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/dockerfile.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/languages/latex.min.js"></script>
+<link rel="stylesheet" href="/vendor/highlight/styles/github-dark.min.css">
+<script defer src="/vendor/highlight/highlight.min.js"></script>
+<script defer src="/vendor/highlight/languages/rust.min.js"></script>
+<script defer src="/vendor/highlight/languages/go.min.js"></script>
+<script defer src="/vendor/highlight/languages/yaml.min.js"></script>
+<script defer src="/vendor/highlight/languages/dockerfile.min.js"></script>
+<script defer src="/vendor/highlight/languages/latex.min.js"></script>
 
 <!-- Math rendering (LaTeX) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<link rel="stylesheet" href="/vendor/katex/katex.min.css">
+<script defer src="/vendor/katex/katex.min.js"></script>
 
 <link rel="stylesheet" href="style.css">
+<script defer src="i18n.js"></script>
+<script>
+// Apply the saved color theme before first paint, so switching themes never
+// flashes the default theme for a frame on reload.
+(function () {
+  try {
+    var id = localStorage.getItem('scriptoriumColorTheme') || 'default';
+    document.documentElement.setAttribute('data-theme', id);
+    if (localStorage.getItem('scriptoriumMdColor') === '1') {
+      document.documentElement.classList.add('md-color-on');
+    }
+    if (localStorage.getItem('scriptoriumHideFrontmatter') === '1') {
+      document.documentElement.classList.add('hide-frontmatter');
+    }
+    if (id === 'custom') {
+      var raw = localStorage.getItem('scriptoriumCustomThemeVars');
+      if (raw) {
+        var vars = JSON.parse(raw);
+        Object.keys(vars).forEach(function (k) {
+          document.documentElement.style.setProperty(k, vars[k]);
+        });
+      }
+    }
+    var fsRaw = localStorage.getItem('scriptoriumFontSizes');
+    if (fsRaw) {
+      var sizes = JSON.parse(fsRaw);
+      Object.keys(sizes).forEach(function (k) {
+        document.documentElement.style.setProperty(k, sizes[k] + 'px');
+      });
+    }
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <div class="app" id="app">
@@ -113,8 +158,24 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
 
+        <button class="icon-btn" id="typewriterToggle" title="Mode Machine à écrire (Ligne centrée)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+        </button>
+
+        <button class="icon-btn" id="focusLineBtn" title="Focus Paragraphe (atténuer le reste du texte)" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M7 6h10M7 18h10"/></svg>
+        </button>
+
+        <button class="icon-btn" id="readingToggle" title="Mode lecture (texte continu, sans blocs)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </button>
+
         <button class="icon-btn" id="focusToggle" title="Mode focus (F)">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+
+        <button class="icon-btn" id="exportBtn" title="Exporter / Imprimer (PDF Livre, HTML, Markdown)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
         </button>
 
         <button class="icon-btn mobile-ideas" id="mobileIdeasBtn">
@@ -128,9 +189,9 @@
       <div class="editor-container" id="editorContainer">
         <div class="editor-pane" id="editorPane">
           <div class="doc-meta" id="docMeta"></div>
-          <textarea class="title-input" id="title" placeholder="Sans titre" rows="1" autocomplete="off"></textarea>
-          <textarea class="subtitle-input" id="subtitle" placeholder="Sous-titre, ou une ligne pour situer le texte" rows="1" autocomplete="off"></textarea>
-          <div class="content-area" id="content" contenteditable="true" placeholder="Commence à écrire…" spellcheck="false"></div>
+          <textarea class="title-input" id="title" placeholder="Sans titre" rows="1" autocomplete="off" spellcheck="true" lang="fr"></textarea>
+          <textarea class="subtitle-input" id="subtitle" placeholder="Sous-titre, ou une ligne pour situer le texte" rows="1" autocomplete="off" spellcheck="true" lang="fr"></textarea>
+          <div class="content-area" id="content" contenteditable="true" placeholder="Commence à écrire…" spellcheck="true" lang="fr"></div>
         </div>
       </div>
     </div>
@@ -150,22 +211,33 @@
 
     <div class="statusbar">
       <div class="stat"><strong id="wc">0</strong> mots</div>
-      <div class="stat"><strong id="cc">0</strong> signes</div>
+      <div class="stat stat-chars"><strong id="cc">0</strong> signes</div>
       <div class="stat"><strong id="rt">0 min</strong></div>
       <div class="chord-indicator" id="chordIndicator">Ctrl+K…</div>
       <div class="right">
-        <div class="stat">md</div>
-        <div class="stat" id="cursor">ln 1 · col 1</div>
+        <button class="icon-btn statusbar-btn" id="removeEmptyLinesBtn" title="Supprimer toutes les lignes vides du document" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 3v5M9.5 5.5 12 8l2.5-2.5"/><path d="M12 21v-5M9.5 18.5 12 16l2.5 2.5"/></svg>
+        </button>
+        <button class="icon-btn statusbar-btn" id="justifyBtn" title="Justifier le texte (aligner à gauche et à droite)" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+        </button>
+        <button class="icon-btn statusbar-btn" id="spellcheckBtn" title="Vérification orthographique (Correcteur)" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 3-8 3 8"/><path d="M7 13h4"/><path d="m16 8 2 3-2 3"/><path d="M14 16.5 16 18.5 22 12.5"/></svg>
+        </button>
+        <button class="icon-btn statusbar-btn" id="findReplaceBtn" title="Rechercher / remplacer (Ctrl+F)" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
       </div>
     </div>
   </main>
 
-  <!-- RIGHT PANEL: IDEAS or TOC (switchable) -->
+  <!-- RIGHT PANEL: IDEAS, TOC or SNAPSHOTS (switchable) -->
   <aside class="ideas-panel" id="ideasPanel">
     <div class="ideas-header">
       <div class="panel-tabs">
         <button class="panel-tab active" id="panelTabIdeas">Idées</button>
         <button class="panel-tab" id="panelTabToc">Sommaire</button>
+        <button class="panel-tab" id="panelTabSnapshots">Instantanés</button>
       </div>
       <button class="icon-btn ideas-only" id="importIdeasBtn" title="Importer thème .md">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
@@ -205,44 +277,166 @@
       </div>
       <div class="toc-side-empty hidden" id="tocSideEmpty">Aucun titre dans ce document.</div>
     </div>
+
+    <!-- SNAPSHOTS VIEW -->
+    <div class="ideas-view view-snapshots">
+      <div class="snapshots-header" style="padding: 10px 14px; border-bottom: 1px solid var(--border);">
+        <button class="btn btn-primary btn-sm" id="createSnapshotBtn" type="button" style="width: 100%;">+ Créer un instantané</button>
+      </div>
+      <div class="snapshots-list" id="snapshotsList" style="padding: 12px; overflow-y: auto;"></div>
+      <div class="snapshots-empty hidden" id="snapshotsEmpty" style="padding: 20px; text-align: center; color: var(--text-faint); font-size: 13px;">Aucun instantané enregistré pour ce document.</div>
+    </div>
   </aside>
 </div>
 
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settingsModal">
-  <div class="modal">
+  <div class="modal modal-wide">
     <div class="modal-header">
-      <h3>Dossiers de travail</h3>
+      <h3>Paramètres</h3>
       <button class="close-btn" id="closeSettingsBtn">&times;</button>
     </div>
+    <div class="settings-tabs" role="tablist">
+      <button class="settings-tab active" id="settingsTabFolders" data-panel="folders" role="tab" type="button">Dossiers</button>
+      <button class="settings-tab" id="settingsTabAppearance" data-panel="appearance" role="tab" type="button">Apparence</button>
+      <button class="settings-tab" id="settingsTabLanguage" data-panel="language" role="tab" type="button">Langue</button>
+    </div>
     <div class="modal-body">
-      <p class="modal-desc">Définissez les dossiers locaux sur votre ordinateur pour vos documents et vos thèmes d'idées.</p>
-      <div class="form-group">
-        <label for="workspacePathInput">Dossier des documents (Workspace) :</label>
-        <div class="input-with-btn">
-          <input type="text" id="workspacePathInput" placeholder="C:\chemin\vers\votre\workspace" />
-          <button class="picker-btn" id="pickWorkspaceFolderBtn" type="button" title="Parcourir / Choisir un dossier">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            </svg>
-          </button>
+      <div class="settings-panel" data-panel="folders">
+        <p class="modal-desc">Définissez les dossiers locaux sur votre ordinateur pour vos documents et vos thèmes d'idées.</p>
+        <div class="form-group">
+          <label for="workspacePathInput">Dossier des documents (Workspace) :</label>
+          <div class="input-with-btn">
+            <input type="text" id="workspacePathInput" placeholder="C:\chemin\vers\votre\workspace" />
+            <button class="picker-btn" id="pickWorkspaceFolderBtn" type="button" title="Parcourir / Choisir un dossier">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 14px;">
+          <label for="ideasPathInput">Dossier des idées (optionnel) :</label>
+          <div class="input-with-btn">
+            <input type="text" id="ideasPathInput" placeholder="Par défaut : sous-dossier 'ideas' du workspace" />
+            <button class="picker-btn" id="pickIdeasFolderBtn" type="button" title="Parcourir / Choisir un dossier">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+            </button>
+          </div>
+          <span class="field-hint" style="display: block; font-size: 11px; color: var(--text-tertiary, #888); margin-top: 4px;">Laissez vide pour utiliser le dossier "ideas" à l'intérieur du workspace.</span>
+        </div>
+        <div class="modal-actions" style="margin-top: 20px;">
+          <button class="btn btn-secondary" id="cancelSettingsBtn">Annuler</button>
+          <button class="btn btn-primary" id="saveSettingsBtn">Enregistrer</button>
         </div>
       </div>
-      <div class="form-group" style="margin-top: 14px;">
-        <label for="ideasPathInput">Dossier des idées (optionnel) :</label>
-        <div class="input-with-btn">
-          <input type="text" id="ideasPathInput" placeholder="Par défaut : sous-dossier 'ideas' du workspace" />
-          <button class="picker-btn" id="pickIdeasFolderBtn" type="button" title="Parcourir / Choisir un dossier">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-            </svg>
-          </button>
+
+      <div class="settings-panel hidden" data-panel="appearance">
+        <p class="modal-desc">Choisissez un thème visuel. Le changement s'applique immédiatement.</p>
+        <div class="color-theme-swatches" id="colorThemeSwatches"></div>
+
+        <label class="checkbox-row" style="margin-top: 18px;">
+          <input type="checkbox" id="mdColorToggle" />
+          <span>Colorer différemment les titres (H1-H6), le gras, les citations, les liens, le code, le texte barré, etc.</span>
+        </label>
+
+        <label class="checkbox-row" style="margin-top: 10px;">
+          <input type="checkbox" id="frontmatterToggle" />
+          <span>Masquer le frontmatter YAML (bloc «&nbsp;---&nbsp;» en tête de document, ex.&nbsp;notes Obsidian). Il reste conservé dans le fichier.</span>
+        </label>
+
+        <div class="custom-theme-editor hidden" id="customThemeEditor">
+          <p class="modal-desc" style="margin-top: 18px;">
+            Thème personnalisé — enregistré dans <code>theme.custom.json</code> à la racine du projet Scriptorium.
+          </p>
+          <div class="color-field-grid" id="customThemeBaseFields"></div>
+          <div class="color-field-grid-title hidden" id="customThemeSyntaxTitle">Couleurs des éléments markdown</div>
+          <div class="color-field-grid hidden" id="customThemeSyntaxFields"></div>
+          <div class="modal-actions" style="margin-top: 16px; justify-content: flex-start;">
+            <button class="btn btn-secondary" id="resetCustomThemeBtn" type="button">Repartir du thème "Par défaut"</button>
+            <button class="btn btn-primary" id="saveCustomThemeBtn" type="button">Enregistrer le thème personnalisé</button>
+            <span class="field-hint" id="customThemeSaveStatus"></span>
+          </div>
         </div>
-        <span class="field-hint" style="display: block; font-size: 11px; color: var(--text-tertiary, #888); margin-top: 4px;">Laissez vide pour utiliser le dossier "ideas" à l'intérieur du workspace.</span>
+
+        <p class="modal-desc" style="margin-top: 22px;">Taille du texte — chaque niveau est réglable indépendamment.</p>
+        <div class="font-size-rows">
+          <div class="font-size-row">
+            <label for="fsSliderDocTitle">Titre document</label>
+            <input type="range" id="fsSliderDocTitle" data-fs-key="--fs-doc-title" min="20" max="60" step="1" />
+            <span class="font-size-value" id="fsValueDocTitle"></span>
+          </div>
+          <div class="font-size-row">
+            <label for="fsSliderDocSubtitle">Sous-titre doc</label>
+            <input type="range" id="fsSliderDocSubtitle" data-fs-key="--fs-doc-subtitle" min="12" max="30" step="0.5" />
+            <span class="font-size-value" id="fsValueDocSubtitle"></span>
+          </div>
+          <div class="font-size-row">
+            <label for="fsSliderBase">Texte normal</label>
+            <input type="range" id="fsSliderBase" data-fs-key="--fs-base" min="13" max="24" step="0.5" />
+            <span class="font-size-value" id="fsValueBase"></span>
+          </div>
+          <div class="font-size-row">
+            <label for="fsSliderH1">Titre H1</label>
+            <input type="range" id="fsSliderH1" data-fs-key="--fs-h1" min="24" max="56" step="1" />
+            <span class="font-size-value" id="fsValueH1"></span>
+          </div>
+          <div class="font-size-row">
+            <label for="fsSliderH2">Titre H2</label>
+            <input type="range" id="fsSliderH2" data-fs-key="--fs-h2" min="20" max="46" step="1" />
+            <span class="font-size-value" id="fsValueH2"></span>
+          </div>
+          <div class="font-size-row">
+            <label for="fsSliderH3">Titre H3</label>
+            <input type="range" id="fsSliderH3" data-fs-key="--fs-h3" min="17" max="38" step="1" />
+            <span class="font-size-value" id="fsValueH3"></span>
+          </div>
+          <div class="font-size-row">
+            <label for="fsSliderH4">Titre H4</label>
+            <input type="range" id="fsSliderH4" data-fs-key="--fs-h4" min="15" max="32" step="1" />
+            <span class="font-size-value" id="fsValueH4"></span>
+          </div>
+          <div class="font-size-row">
+            <label for="fsSliderH5">Titre H5</label>
+            <input type="range" id="fsSliderH5" data-fs-key="--fs-h5" min="13" max="26" step="0.5" />
+            <span class="font-size-value" id="fsValueH5"></span>
+          </div>
+          <div class="font-size-row">
+            <label for="fsSliderH6">Titre H6</label>
+            <input type="range" id="fsSliderH6" data-fs-key="--fs-h6" min="12" max="24" step="0.5" />
+            <span class="font-size-value" id="fsValueH6"></span>
+          </div>
+        </div>
+
+        <div class="font-size-preview" id="fontSizePreview">
+          <div class="fsp-doc-title">Titre du document</div>
+          <div class="fsp-doc-subtitle">Sous-titre ou description du document</div>
+          <div class="fsp-h1">Titre principal (H1)</div>
+          <div class="fsp-h2">Titre de section (H2)</div>
+          <div class="fsp-h3">Sous-titre (H3)</div>
+          <div class="fsp-h4">Titre H4</div>
+          <div class="fsp-h5">Titre H5</div>
+          <div class="fsp-h6">Titre H6</div>
+          <div class="fsp-quote"><blockquote>Une citation d'exemple pour l'aperçu du style</blockquote></div>
+          <div class="fsp-p">Texte normal avec du <strong>gras</strong>, de l'<em>italique</em>, du <code>code</code>, un <a href="#">lien</a> et du <del>barré</del>.</div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 12px; justify-content: flex-start;">
+          <button class="btn btn-secondary" id="resetFontSizesBtn" type="button">Réinitialiser les tailles</button>
+        </div>
       </div>
-      <div class="modal-actions" style="margin-top: 20px;">
-        <button class="btn btn-secondary" id="cancelSettingsBtn">Annuler</button>
-        <button class="btn btn-primary" id="saveSettingsBtn">Enregistrer</button>
+
+      <div class="settings-panel hidden" data-panel="language">
+        <p class="modal-desc">Choose the application language. Changes apply immediately.</p>
+        <div class="form-group">
+          <label for="languageSelect">Language / Langue :</label>
+          <select id="languageSelect" class="language-select">
+            <option value="en">English</option>
+            <option value="fr">Français</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>
@@ -289,6 +483,19 @@
   </button>
 </div>
 
+<!-- MULTI-BLOCK SELECTION TOOLBAR (Ctrl+clic) -->
+<div class="multi-sel-toolbar" id="multiSelToolbar" role="toolbar" aria-label="Blocs sélectionnés">
+  <span class="msel-count" id="multiSelCount"></span>
+  <button class="msel-btn" id="multiMergeBtn" type="button" title="Fusionner les blocs sélectionnés en un seul bloc (contenu et mise en forme conservés)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M9 7.5 12 10l3-2.5"/><path d="M12 21v-7M9 16.5 12 14l3 2.5"/></svg>
+    Fusionner
+  </button>
+  <button class="msel-btn msel-danger" id="multiDeleteBtn" type="button" title="Supprimer les blocs sélectionnés">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/></svg>
+    Supprimer
+  </button>
+</div>
+
 <!-- GUTTER "+" BUTTON + BLOCK DRAG HANDLE + MENU -->
 <button class="block-add-btn" id="blockAddBtn" title="Ajouter un bloc" aria-label="Ajouter un bloc">
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -300,6 +507,10 @@
     <circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/>
     <circle cx="8" cy="20" r="1.5"/><circle cx="16" cy="20" r="1.5"/>
   </svg>
+</button>
+
+<button class="block-trash-btn" id="blockTrashBtn" title="Supprimer le bloc" aria-label="Supprimer le bloc">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"/><path d="M10 11v6M14 11v6"/></svg>
 </button>
 
 <div class="block-menu" id="blockMenu" role="menu" aria-label="Type de bloc">
@@ -319,6 +530,67 @@
   <button class="block-menu-item" data-block="code" role="menuitem"><span class="ico">{}</span>Bloc de code<span class="hint">```</span></button>
   <button class="block-menu-item" data-block="image" role="menuitem"><span class="ico">🖼️</span>Image<span class="hint">![]()</span></button>
   <button class="block-menu-item" data-block="hr" role="menuitem"><span class="ico">―</span>Séparateur<span class="hint">---</span></button>
+</div>
+
+<!-- FIND / REPLACE -->
+<div class="find-replace-bar" id="findReplaceBar">
+  <div class="fr-row">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="text" id="findInput" placeholder="Rechercher…" autocomplete="off" spellcheck="false" />
+    <span class="fr-count" id="findCount">0/0</span>
+    <button class="fr-icon-btn" id="findPrevBtn" title="Précédent (Maj+Entrée)" type="button">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+    </button>
+    <button class="fr-icon-btn" id="findNextBtn" title="Suivant (Entrée)" type="button">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <label class="fr-case-toggle" title="Respecter la casse">
+      <input type="checkbox" id="findMatchCase" />Aa
+    </label>
+    <button class="fr-icon-btn fr-close" id="findCloseBtn" title="Fermer (Échap)" type="button">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="fr-row">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v6h6M14 4l6 6M10 20v-6H4M10 20l-6-6"/></svg>
+    <input type="text" id="replaceInput" placeholder="Remplacer par…" autocomplete="off" spellcheck="false" />
+    <button class="fr-text-btn" id="replaceOneBtn" type="button">Remplacer</button>
+    <button class="fr-text-btn" id="replaceAllBtn" type="button">Tout remplacer</button>
+  </div>
+</div>
+
+<!-- EXPORT MENU DROPDOWN -->
+<div class="export-menu" id="exportMenu">
+  <button class="export-menu-item" id="exportPdfBtn" type="button">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+    <span>Imprimer / PDF Livre</span>
+  </button>
+  <button class="export-menu-item" id="exportHtmlBtn" type="button">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    <span>Exporter en HTML Autonome</span>
+  </button>
+  <button class="export-menu-item" id="exportMdBtn" type="button">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <span>Exporter en Markdown (.md)</span>
+  </button>
+</div>
+
+<!-- DIFF MODAL -->
+<div class="modal-overlay" id="diffModal">
+  <div class="modal modal-wide diff-modal">
+    <div class="modal-header">
+      <h3 id="diffModalTitle">Comparatif de révision (Diff)</h3>
+      <button class="close-btn" id="closeDiffBtn">&times;</button>
+    </div>
+    <div class="modal-body" style="max-height: 65vh; overflow-y: auto;">
+      <div class="diff-meta" id="diffMeta" style="margin-bottom: 12px; font-size: 12.5px; color: var(--text-muted);"></div>
+      <div class="diff-content" id="diffContent" style="font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; background: var(--bg); padding: 14px; border: 1px solid var(--border); border-radius: 6px;"></div>
+    </div>
+    <div class="modal-actions" style="padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between;">
+      <button class="btn btn-secondary" id="closeDiffModalBtn" type="button">Fermer</button>
+      <button class="btn btn-primary" id="restoreSnapshotBtn" type="button">Restaurer cet instantané</button>
+    </div>
+  </div>
 </div>
 
 <!-- GLOBAL DROP OVERLAY -->
