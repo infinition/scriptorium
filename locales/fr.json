@@ -419,4 +419,6 @@
   "settings.language_select_label": "Langue / Language :"
 ,
   "toast.no_empty_lines": "Aucune ligne vide à supprimer"
+,
+  "panel.cycle_tooltip": "Changer de panneau (clic pour cycle)"
 }

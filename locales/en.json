@@ -419,4 +419,6 @@
   "toast.state_off": "off",
   "search.title": "Search",
   "editor.block_menu_aria": "Block type"
+,
+  "panel.cycle_tooltip": "Switch panel (click to cycle)"
 }

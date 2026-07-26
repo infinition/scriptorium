@@ -2431,12 +2431,6 @@ mark.search-match.first-match {
   font-weight: 600;
   letter-spacing: 0.5px;
 }
-.panel-cycle-btn::after {
-  content: '\25BC';
-  font-size: 7px;
-  opacity: 0.5;
-  margin-left: 2px;
-}
 
 .ideas-view {
   display: flex;
