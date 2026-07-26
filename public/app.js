@@ -193,7 +193,9 @@ async function saveDocumentOnDisk() {
       saveIndicator.classList.add('saved');
       saveText.textContent = __('save.saved');
       dirty = false;
-      
+
+      showToast('toast.doc_saved');
+
       renderNav();
       updateBreadcrumbAndMeta();
     }
@@ -281,7 +283,7 @@ async function deleteDocument(docId) {
     return;
   }
   if (!confirm(__('confirm.doc_delete'))) return;
-  
+
   try {
     const res = await fetch('/api/documents', {
       method: 'DELETE',
@@ -294,6 +296,7 @@ async function deleteDocument(docId) {
         state.activeDocId = null;
       }
       await fetchWorkspace();
+      showToast('toast.doc_deleted');
     }
   } catch (err) {
     console.error(err);
@@ -310,6 +313,7 @@ async function createSection(name) {
     const data = await res.json();
     if (data.success) {
       await fetchWorkspace();
+      showToast('toast.section_created');
     } else {
       alert(data.error || __('alert.section_create_error'));
     }
@@ -327,11 +331,11 @@ async function renameSection(oldId, newName) {
     });
     const data = await res.json();
     if (data.success) {
-      // If active doc was inside this renamed section, update its ID prefix
       if (state.activeDocId && state.activeDocId.startsWith(oldId + '/')) {
         state.activeDocId = state.activeDocId.replace(oldId + '/', data.id + '/');
       }
       await fetchWorkspace();
+      showToast('toast.section_renamed');
     } else {
       alert(data.error || __('alert.section_rename_error'));
     }
@@ -347,14 +351,14 @@ async function deleteSection(sectionId) {
   }
   const section = state.sections.find(s => s.id === sectionId);
   if (!section) return;
-  
+
   const count = section.documents.length;
   if (count > 0 && !confirm(__('confirm.section_delete_docs', { name: section.name, count: count }))) {
     return;
   } else if (count === 0 && !confirm(__('confirm.section_delete_empty', { name: section.name }))) {
     return;
   }
-  
+
   try {
     const res = await fetch('/api/sections', {
       method: 'DELETE',
@@ -363,11 +367,11 @@ async function deleteSection(sectionId) {
     });
     const data = await res.json();
     if (data.success) {
-      // Clear active doc if deleted
       if (state.activeDocId && state.activeDocId.startsWith(sectionId + '/')) {
         state.activeDocId = null;
       }
       await fetchWorkspace();
+      showToast('toast.section_deleted');
     }
   } catch (err) {
     console.error(err);
@@ -461,6 +465,7 @@ async function createTheme(name) {
     if (data.success) {
       state.activeThemeId = data.theme.id;
       await fetchWorkspace();
+      showToast('toast.theme_created');
     } else {
       alert(data.error || __('alert.theme_create_error'));
     }
@@ -476,9 +481,9 @@ async function deleteTheme(id) {
   }
   const theme = state.ideaThemes.find(t => t.id === id);
   if (!theme) return;
-  
+
   if (!confirm(__('confirm.theme_delete', { name: theme.name }))) return;
-  
+
   try {
     const res = await fetch('/api/themes', {
       method: 'DELETE',
@@ -491,6 +496,7 @@ async function deleteTheme(id) {
         state.activeThemeId = state.ideaThemes.find(t => t.id !== id)?.id || null;
       }
       await fetchWorkspace();
+      showToast('toast.theme_deleted');
     }
   } catch (err) {
     console.error(err);
@@ -584,6 +590,58 @@ function relDate(ts) {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+
+// ============ TOAST NOTIFICATIONS ============
+var toastContainer = null;
+var toastTimer = null;
+
+function showToast(key, vars) {
+  if (!toastContainer) toastContainer = document.getElementById('toastContainer');
+  if (!toastContainer) return;
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    var old = toastContainer.querySelector('.toast');
+    if (old) old.remove();
+  }
+
+  var el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = __(key, vars);
+  toastContainer.appendChild(el);
+
+  toastTimer = setTimeout(function () {
+    el.classList.add('toast-out');
+    setTimeout(function () { if (el.parentNode) el.remove(); }, 220);
+    toastTimer = null;
+  }, 2200);
+}
+
+// On touch devices, show button titles as brief toasts (hover tooltips don't work)
+(function () {
+  if (!window.matchMedia('(pointer: coarse)').matches) return;
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button, [role="button"], a');
+    if (!btn) return;
+    if (btn.classList.contains('sel-btn') || btn.classList.contains('block-menu-item')) return;
+    var title = btn.title || btn.getAttribute('aria-label');
+    if (title && title.length > 3 && title.length < 80) {
+      if (!toastContainer) toastContainer = document.getElementById('toastContainer');
+      if (!toastContainer) return;
+      if (toastContainer.querySelector('.toast:not(.mobile-tooltip)')) return;
+      var prev = toastContainer.querySelector('.mobile-tooltip');
+      if (prev) prev.remove();
+      var el = document.createElement('div');
+      el.className = 'toast mobile-tooltip';
+      el.textContent = title;
+      toastContainer.appendChild(el);
+      setTimeout(function () {
+        el.classList.add('toast-out');
+        setTimeout(function () { if (el.parentNode) el.remove(); }, 220);
+      }, 1200);
+    }
+  });
+})();
 
 function documentsForNav(documents) {
   return [...documents].sort((a, b) => {
@@ -881,6 +939,7 @@ function updateBreadcrumbAndMeta() {
       e.target.classList.add('copied');
       const prev = e.target.textContent;
       e.target.textContent = __('meta.copied');
+      showToast('toast.filename_copied');
       setTimeout(() => {
         e.target.classList.remove('copied');
         e.target.textContent = prev;
@@ -3306,6 +3365,7 @@ function initLanguageSettings() {
       updateDocSortButton();
       if (typeof updateBreadcrumbAndMeta === 'function') updateBreadcrumbAndMeta();
       if (typeof updateStats === 'function') updateStats();
+      showToast('toast.lang_changed', { lang: locale });
     });
   });
 }
@@ -3359,6 +3419,7 @@ if (sortDocsBtn) {
     localStorage.setItem('scriptorium_doc_sort', state.docSortMode);
     updateDocSortButton();
     renderNav();
+    showToast('toast.sort_changed');
   });
 }
 
@@ -3396,6 +3457,7 @@ function toggleWorkspaceLock() {
   state.isLocked = !state.isLocked;
   localStorage.setItem('scriptorium_is_locked', state.isLocked);
   updateLockStateUI();
+  showToast(state.isLocked ? 'toast.workspace_locked' : 'toast.workspace_unlocked');
   // The server enforces the padlock on destructive routes, so it has to know.
   fetch('/api/lock', {
     method: 'POST',
@@ -4409,7 +4471,9 @@ function debouncedRegenerateTOC() {
 }
 
 function toggleFocusMode() {
+  var isFocus = !app.classList.contains('focus-mode');
   app.classList.toggle('focus-mode');
+  showToast(isFocus ? 'toast.focus_on' : 'toast.focus_off');
 }
 
 function onEditorScrollForTOC() {
@@ -5879,10 +5943,12 @@ function applyTextJustify(enable) {
   const btn = $('justifyBtn');
   if (btn) btn.classList.toggle('active', enable);
   localStorage.setItem('scriptoriumTextJustify', enable ? 'true' : 'false');
+  showToast('toast.text_justified');
 }
 
 function applySpellcheck(enable) {
   spellcheckState = enable;
+  showToast('toast.spellcheck_toggled', { state: enable ? 'on' : 'off' });
   const attr = enable ? 'true' : 'false';
   
   if (content) {
@@ -5926,6 +5992,7 @@ function applyTypewriterMode(enable) {
   if (btn) btn.classList.toggle('active', enable);
   localStorage.setItem('scriptoriumTypewriter', enable ? 'true' : 'false');
   if (enable) centerActiveLine(true);
+  showToast(enable ? 'toast.typewriter_on' : 'toast.typewriter_off');
 }
 
 function applyFocusLineMode(enable) {
@@ -5934,6 +6001,7 @@ function applyFocusLineMode(enable) {
   const btn = $('focusLineBtn');
   if (btn) btn.classList.toggle('active', enable);
   localStorage.setItem('scriptoriumFocusLine', enable ? 'true' : 'false');
+  showToast(enable ? 'toast.focus_line_on' : 'toast.focus_line_off');
 }
 
 function applyReadingMode(enable) {
@@ -5942,6 +6010,7 @@ function applyReadingMode(enable) {
   const btn = $('readingToggle');
   if (btn) btn.classList.toggle('active', enable);
   localStorage.setItem('scriptoriumReading', enable ? 'true' : 'false');
+  showToast(enable ? 'toast.reading_on' : 'toast.reading_off');
 
   if (content) content.setAttribute('contenteditable', enable ? 'false' : 'true');
 
@@ -5995,6 +6064,7 @@ function removeAllEmptyLines() {
   saveHistory(state.activeDocId, true);
   debouncedRegenerateTOC();
   debouncedPostProcess();
+  showToast('toast.empty_lines_removed');
 }
 
 // Export Dropdown
@@ -6159,6 +6229,7 @@ function deleteSnapshot(snapId) {
   list = list.filter(s => s.id !== snapId);
   saveSnapshots(state.activeDocId, list);
   renderSnapshotsList();
+  showToast('toast.snapshot_deleted');
 }
 
 function diffStrings(oldStr, newStr) {
