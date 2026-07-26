@@ -3577,7 +3577,7 @@ mark.find-match-mark.find-match-current {
 /* ============ TOAST NOTIFICATIONS ============ */
 .toast-container {
   position: fixed;
-  bottom: 24px;
+  bottom: 64px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 99999;
@@ -3623,7 +3623,7 @@ mark.find-match-mark.find-match-current {
 /* Mobile: wider toast, multi-line safe */
 @media (max-width: 720px) {
   .toast-container {
-    bottom: 16px;
+    bottom: 56px;
     left: 16px;
     right: 16px;
     transform: none;
