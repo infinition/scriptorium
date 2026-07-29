@@ -816,8 +816,9 @@ function renderNav() {
       const item = document.createElement('div');
       item.className = 'nav-item' + (doc.id === state.activeDocId ? ' active' : '');
       item.draggable = true;
+      var docLabel = doc.title || __('new_doc.default_title');
       item.innerHTML = `
-        <span class="label">${escapeHtml(doc.title || __('new_doc.default_title'))}</span>
+        <span class="label" title="${escapeHtml(docLabel)}">${escapeHtml(docLabel)}</span>
         <span class="meta">${relDate(doc.updatedAt)}</span>
         <button class="delete-doc" title="Supprimer">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -3376,6 +3377,40 @@ function initLanguageSettings() {
       showToast('toast.lang_changed', { lang: locale });
     });
   });
+}
+
+// ============ READING FADE SLIDER (Settings > Appearance) ============
+var READING_FADE_DEFAULT = 18; // %
+
+function initReadingFadeSlider() {
+  var slider = $('readingFadeSlider');
+  var valueEl = $('readingFadeValue');
+  if (!slider || !valueEl) return;
+
+  // Load saved value
+  var saved = localStorage.getItem('scriptoriumReadingFade');
+  var fadePct = saved !== null ? parseInt(saved, 10) : READING_FADE_DEFAULT;
+
+  // Apply
+  applyReadingFade(fadePct);
+
+  // Sync UI
+  slider.value = fadePct;
+  valueEl.textContent = fadePct + '%';
+
+  // Live input
+  slider.addEventListener('input', function () {
+    var v = parseInt(this.value, 10);
+    applyReadingFade(v);
+    valueEl.textContent = v + '%';
+    localStorage.setItem('scriptoriumReadingFade', String(v));
+  });
+}
+
+function applyReadingFade(pct) {
+  if (editorWrap) {
+    editorWrap.style.setProperty('--fade-pct', pct + '%');
+  }
 }
 
 async function handlePickFolder(inputEl, btnEl) {
@@ -5957,7 +5992,13 @@ let textJustifyState = localStorage.getItem('scriptoriumTextJustify') === 'true'
 let spellcheckState = localStorage.getItem('scriptoriumSpellcheck') !== 'false';
 let typewriterState = localStorage.getItem('scriptoriumTypewriter') === 'true';
 let focusLineState = localStorage.getItem('scriptoriumFocusLine') === 'true';
-let readingModeState = localStorage.getItem('scriptoriumReading') === 'true';
+let readingModeState = parseInt(localStorage.getItem('scriptoriumReading')) || 0;
+// 0 = off, 1 = reading, 2 = reading-typewriter
+let autoScrollState = 0; // 0=off, 1=slow, 2=medium, 3=normal
+let autoScrollTimerId = null;
+let autoScrollPaused = false;
+var AUTO_SCROLL_TICK_MS = 40;    // ~25 fps, smooth enough
+var AUTO_SCROLL_RATES = [0, 0.6, 1.2, 2.4]; // px per tick (0.6*25≈15px/s, 1.2*25=30px/s, 2.4*25=60px/s)
 let activeDiffSnapshot = null;
 
 function applyTextJustify(enable) {
@@ -6027,31 +6068,129 @@ function applyFocusLineMode(enable) {
   showToast(enable ? 'toast.focus_line_on' : 'toast.focus_line_off');
 }
 
-function applyReadingMode(enable) {
-  readingModeState = enable;
-  document.documentElement.classList.toggle('reading-on', enable);
-  const btn = $('readingToggle');
-  if (btn) btn.classList.toggle('active', enable);
-  localStorage.setItem('scriptoriumReading', enable ? 'true' : 'false');
-  showToast(enable ? 'toast.reading_on' : 'toast.reading_off');
+function applyReadingMode(mode) {
+  readingModeState = mode;
+  var isReading = mode >= 1;
+  var isTypewriter = mode === 2;
 
-  if (content) content.setAttribute('contenteditable', enable ? 'false' : 'true');
+  document.documentElement.classList.toggle('reading-on', isReading);
+  document.documentElement.classList.toggle('reading-typewriter-on', isTypewriter);
 
-  if (enable) {
+  var btn = $('readingToggle');
+  if (btn) {
+    btn.classList.toggle('active', isReading);
+    btn.classList.toggle('reading-typewriter', isTypewriter);
+  }
+
+  localStorage.setItem('scriptoriumReading', String(mode));
+
+  if (mode === 0) showToast('toast.reading_off');
+  else if (mode === 1) showToast('toast.reading_on');
+  else showToast('toast.reading_typewriter_on');
+
+  // Update tooltip to reflect current mode
+  if (btn) {
+    var tooltipKey = mode === 2 ? 'topbar.reading_typewriter_title' : 'topbar.reading_title';
+    btn.setAttribute('data-i18n-title', tooltipKey);
+    btn.title = __(tooltipKey);
+  }
+
+  if (content) content.setAttribute('contenteditable', isReading ? 'false' : 'true');
+
+  if (isReading) {
     // Flush the raw active line back to rendered markdown so the text reads clean
     hideGutterIndicator();
     setHoveredLine(null);
     hideSelectionToolbar();
     if (activeLineNode && !removeAbandonedEmptyLine(activeLineNode) && content.contains(activeLineNode)) {
-      const raw = activeLineNode.textContent;
+      var raw = activeLineNode.textContent;
       activeLineNode.dataset.raw = raw;
       applyLineKind(activeLineNode, raw);
       activeLineNode.innerHTML = raw.trim() === '' ? '<br>' : renderMarkdownLine(raw);
       activeLineNode.classList.remove('active-line');
     }
     activeLineNode = null;
-    const sel = window.getSelection();
+    var sel = window.getSelection();
     if (sel) sel.removeAllRanges();
+  }
+
+  // Stop auto-scroll when leaving reading mode entirely
+  if (mode === 0) {
+    stopAutoScroll();
+    autoScrollState = 0;
+    autoScrollPaused = false;
+    var asBtn = $('autoScrollBtn');
+    if (asBtn) {
+      asBtn.classList.remove('active', 'speed-1', 'speed-2', 'speed-3');
+      asBtn.setAttribute('data-i18n-title', 'statusbar.autoscroll_title');
+      asBtn.title = __('statusbar.autoscroll_title');
+    }
+  }
+}
+
+// ============ AUTO-SCROLL (reading mode only) ============
+
+function applyAutoScroll(speed) {
+  autoScrollState = speed;
+  var btn = $('autoScrollBtn');
+  if (btn) {
+    btn.classList.toggle('active', speed > 0);
+    btn.classList.remove('speed-1', 'speed-2', 'speed-3');
+    if (speed > 0) btn.classList.add('speed-' + speed);
+    // Update tooltip
+    var key = speed === 0 ? 'statusbar.autoscroll_title'
+      : 'statusbar.autoscroll_speed' + speed + '_title';
+    btn.setAttribute('data-i18n-title', key);
+    btn.title = __(key);
+  }
+
+  if (speed === 0) {
+    stopAutoScroll();
+    showToast('toast.autoscroll_off');
+  } else {
+    startAutoScroll(speed);
+    var toastKey = 'toast.autoscroll_speed' + speed;
+    showToast(toastKey);
+  }
+}
+
+function startAutoScroll(speed) {
+  stopAutoScroll();
+  if (!editorWrap || speed === 0) return;
+  autoScrollState = speed;
+  autoScrollPaused = false;
+  autoScrollTimerId = setInterval(autoScrollTick, AUTO_SCROLL_TICK_MS);
+}
+
+function autoScrollTick() {
+  if (autoScrollPaused || autoScrollState === 0 || !readingModeState) {
+    stopAutoScroll();
+    return;
+  }
+
+  var maxScroll = editorWrap.scrollHeight - editorWrap.clientHeight;
+  if (maxScroll <= 0) return; // content fits viewport, nothing to scroll
+  if (editorWrap.scrollTop >= maxScroll - 1) {
+    // Reached bottom, stop and reset state
+    stopAutoScroll();
+    applyAutoScroll(0);
+    return;
+  }
+
+  editorWrap.scrollTop += AUTO_SCROLL_RATES[autoScrollState];
+}
+
+function stopAutoScroll() {
+  if (autoScrollTimerId) {
+    clearInterval(autoScrollTimerId);
+    autoScrollTimerId = null;
+  }
+}
+
+function onUserScroll() {
+  if (autoScrollState > 0 && !autoScrollPaused) {
+    autoScrollPaused = true;
+    showToast('toast.autoscroll_paused');
   }
 }
 
@@ -6247,6 +6386,7 @@ function createSnapshot() {
 
   saveSnapshots(state.activeDocId, list);
   renderSnapshotsList();
+  showToast('toast.snapshot_created');
 }
 
 function deleteSnapshot(snapId) {
@@ -6269,7 +6409,6 @@ function diffStrings(oldStr, newStr) {
       result += escapeHtml(newLines[j]) + '\n';
       i++;
       j++;
-      showToast('toast.snapshot_created');
     } else if (j < newLines.length && (!oldLines.slice(i).includes(newLines[j]))) {
       result += `<span class="diff-add">+ ${escapeHtml(newLines[j])}</span>\n`;
       j++;
@@ -6306,10 +6445,10 @@ function openDiffModal(snapId) {
 // the snapshot's place, so restoring again brings it straight back. Without the
 // swap, the state you were in when you clicked Restore is simply gone.
 function restoreActiveSnapshot() {
-  if (!activeDiffSnapshot || !state.activeDocId) return;
+  if (!activeDiffSnapshot || !state.activeDocId) return false;
   if (!confirm(
     __('confirm.restore_snapshot', { name: activeDiffSnapshot.name })
-  )) return;
+  )) return false;
 
   saveHistory(state.activeDocId, true);
 
@@ -6344,6 +6483,7 @@ function restoreActiveSnapshot() {
 
   if ($('diffModal')) $('diffModal').classList.remove('active');
   activeDiffSnapshot = null;
+  return true;
 }
 
 // Marks an entry as holding the version that was just swapped out, and toggles
@@ -6403,8 +6543,9 @@ function renderSnapshotsList() {
     card.querySelector('.view-diff-btn').addEventListener('click', () => openDiffModal(snap.id));
     card.querySelector('.restore-btn').addEventListener('click', () => {
       activeDiffSnapshot = snap;
-      restoreActiveSnapshot();
-      showToast('toast.snapshot_restored');
+      if (restoreActiveSnapshot()) {
+        showToast('toast.snapshot_restored');
+      }
     });
     card.querySelector('.delete-btn').addEventListener('click', () => deleteSnapshot(snap.id));
 
@@ -6423,8 +6564,37 @@ function initProWriterTools() {
   $('spellcheckBtn')?.addEventListener('click', () => applySpellcheck(!spellcheckState));
   $('typewriterToggle')?.addEventListener('click', () => applyTypewriterMode(!typewriterState));
   $('focusLineBtn')?.addEventListener('click', () => applyFocusLineMode(!focusLineState));
-  $('readingToggle')?.addEventListener('click', () => applyReadingMode(!readingModeState));
+  $('readingToggle')?.addEventListener('click', () => {
+    var next = (readingModeState + 1) % 3;
+    applyReadingMode(next);
+  });
   $('removeEmptyLinesBtn')?.addEventListener('click', removeAllEmptyLines);
+  $('autoScrollBtn')?.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (autoScrollPaused && autoScrollState > 0) {
+      // Resume at current speed
+      startAutoScroll(autoScrollState);
+      showToast('toast.autoscroll_speed' + autoScrollState);
+    } else {
+      var next = (autoScrollState + 1) % 4;
+      applyAutoScroll(next);
+    }
+  });
+
+  // Detect manual scroll (wheel/touch/keyboard) to pause auto-scroll
+  if (editorWrap) {
+    editorWrap.addEventListener('wheel', onUserScroll, { passive: true });
+    editorWrap.addEventListener('touchmove', onUserScroll, { passive: true });
+  }
+  document.addEventListener('keydown', function(e) {
+    if (autoScrollState === 0 || autoScrollPaused) return;
+    var key = e.key;
+    if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight' ||
+        key === 'PageUp' || key === 'PageDown' || key === 'Home' || key === 'End' || key === ' ') {
+      onUserScroll();
+    }
+  });
 
   // Export menu
   $('exportBtn')?.addEventListener('click', (e) => {
@@ -6445,7 +6615,9 @@ function initProWriterTools() {
   $('createSnapshotBtn')?.addEventListener('click', createSnapshot);
   $('closeDiffBtn')?.addEventListener('click', () => $('diffModal')?.classList.remove('active'));
   $('closeDiffModalBtn')?.addEventListener('click', () => $('diffModal')?.classList.remove('active'));
-  $('restoreSnapshotBtn')?.addEventListener('click', restoreActiveSnapshot);
+  $('restoreSnapshotBtn')?.addEventListener('click', () => {
+    if (restoreActiveSnapshot()) showToast('toast.snapshot_restored');
+  });
 }
 
 // ============ INITIALIZATION ============
@@ -6463,6 +6635,7 @@ initColorTheme();
 initFontSizeControls();
 initProWriterTools();
 initLanguageSettings();
+initReadingFadeSlider();
 
 document.addEventListener('selectionchange', updateActiveLine);
 

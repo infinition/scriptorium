@@ -224,6 +224,9 @@
         <button class="icon-btn statusbar-btn" id="spellcheckBtn" data-i18n-title="statusbar.spellcheck_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 3-8 3 8"/><path d="M7 13h4"/><path d="m16 8 2 3-2 3"/><path d="M14 16.5 16 18.5 22 12.5"/></svg>
         </button>
+        <button class="icon-btn statusbar-btn reading-only" id="autoScrollBtn" data-i18n-title="statusbar.autoscroll_title" type="button">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
         <button class="icon-btn statusbar-btn" id="findReplaceBtn" data-i18n-title="statusbar.find_replace_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </button>
@@ -236,6 +239,7 @@
     <div class="ideas-header">
       <div class="header-row">
       <button class="panel-cycle-btn" id="panelCycleBtn" data-i18n-title="panel.cycle_tooltip" title="Switch panel">
+        <svg class="cycle-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
         <span class="panel-cycle-label" id="panelCycleLabel">Ideas</span>
       </button>
       <button class="icon-btn ideas-only" id="importIdeasBtn" data-i18n-title="ideas.import_theme_title">
@@ -318,7 +322,7 @@
         <div class="form-group" style="margin-top: 14px;">
           <label for="ideasPathInput" data-i18n="settings.ideas_label">Dossier des idées (optionnel) :</label>
           <div class="input-with-btn">
-            <input type="text" id="ideasPathInput" placeholder="Par défaut : sous-dossier 'ideas' du workspace" />
+            <input type="text" id="ideasPathInput" data-i18n-placeholder="settings.ideas_placeholder" placeholder="Par défaut : sous-dossier 'ideas' du workspace" />
             <button class="picker-btn" id="pickIdeasFolderBtn" type="button" data-i18n-title="settings.folder_browse_title">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -328,8 +332,8 @@
           
         </div>
         <div class="modal-actions" style="margin-top: 20px;">
-          <button class="btn btn-secondary" id="cancelSettingsBtn"></button>
-          <button class="btn btn-primary" id="saveSettingsBtn"></button>
+          <button class="btn btn-secondary" id="cancelSettingsBtn" data-i18n="settings.cancel_btn">Annuler</button>
+          <button class="btn btn-primary" id="saveSettingsBtn" data-i18n="settings.save_btn">Enregistrer</button>
         </div>
       </div>
 
@@ -423,7 +427,14 @@
         </div>
 
         <div class="modal-actions" style="margin-top: 12px; justify-content: flex-start;">
-          <button class="btn btn-secondary" id="resetFontSizesBtn" type="button"></button>
+          <button class="btn btn-secondary" id="resetFontSizesBtn" type="button" data-i18n="settings.reset_font_btn">Réinitialiser les tailles</button>
+        </div>
+
+        <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.reading_fade_desc">Fondu du mode lecture machine à écrire : réglez l'intensité du dégradé en haut et en bas.</span></p>
+        <div class="font-size-row">
+          <label for="readingFadeSlider"><span data-i18n="settings.reading_fade_label">Taille du fondu</span></label>
+          <input type="range" id="readingFadeSlider" min="5" max="35" step="1" value="18" />
+          <span class="font-size-value" id="readingFadeValue">18%</span>
         </div>
       </div>
 
@@ -496,7 +507,7 @@
 </div>
 
 <!-- GUTTER "+" BUTTON + BLOCK DRAG HANDLE + MENU -->
-<button class="block-add-btn" id="blockAddBtn" title="Ajouter un bloc" aria-label="Ajouter un bloc">
+<button class="block-add-btn" id="blockAddBtn" data-i18n-title="editor.block_add_title" data-i18n-aria-label="editor.block_add_aria" aria-label="Ajouter un bloc">
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
 </button>
 
@@ -513,18 +524,18 @@
 </button>
 
 <div class="block-menu" id="blockMenu" role="menu" data-i18n-aria-label="editor.block_menu_aria" aria-label="Block type">
-  <div class="block-menu-section" data-i18n="editor.block_menu_text">Texte</div></div>
+  <div class="block-menu-section" data-i18n="editor.block_menu_text">Texte</div>
   <button class="block-menu-item" data-block="p" role="menuitem"><span class="ico">¶</span><span data-i18n="editor.block_paragraph">Paragraphe</span></button>
   <button class="block-menu-item" data-block="h1" role="menuitem"><span class="ico">H1</span><span data-i18n="editor.block_heading1">Titre 1</span><span class="hint">#</span></button>
   <button class="block-menu-item" data-block="h2" role="menuitem"><span class="ico">H2</span><span data-i18n="editor.block_heading2">Titre 2</span><span class="hint">##</span></button>
   <button class="block-menu-item" data-block="h3" role="menuitem"><span class="ico">H3</span><span data-i18n="editor.block_heading3">Titre 3</span><span class="hint">###</span></button>
   <div class="block-menu-sep"></div>
-  <div class="block-menu-section" data-i18n="editor.block_menu_lists">Listes</div></div>
+  <div class="block-menu-section" data-i18n="editor.block_menu_lists">Listes</div>
   <button class="block-menu-item" data-block="ul" role="menuitem"><span class="ico">•</span><span data-i18n="editor.block_bullet_list">Liste à puces</span><span class="hint">-</span></button>
   <button class="block-menu-item" data-block="ol" role="menuitem"><span class="ico">1.</span><span data-i18n="editor.block_numbered_list">Liste numérotée</span><span class="hint">1.</span></button>
   <button class="block-menu-item" data-block="task" role="menuitem"><span class="ico">☐</span><span data-i18n="editor.block_task">Case à cocher</span><span class="hint">- [ ]</span></button>
   <div class="block-menu-sep"></div>
-  <div class="block-menu-section" data-i18n="editor.block_menu_blocks">Blocs</div></div>
+  <div class="block-menu-section" data-i18n="editor.block_menu_blocks">Blocs</div>
   <button class="block-menu-item" data-block="quote" role="menuitem"><span class="ico">"</span><span data-i18n="editor.block_quote">Citation</span><span class="hint">&gt;</span></button>
   <button class="block-menu-item" data-block="code" role="menuitem"><span class="ico">{}</span>Bloc de code<span class="hint">```</span></button>
   <button class="block-menu-item" data-block="image" role="menuitem"><span class="ico">🖼️</span><span data-i18n="editor.block_image">Image</span><span class="hint">![]()</span></button>
@@ -586,8 +597,8 @@
       <div class="diff-content" id="diffContent" style="font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; background: var(--bg); padding: 14px; border: 1px solid var(--border); border-radius: 6px;"></div>
     </div>
     <div class="modal-actions" style="padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between;">
-      <button class="btn btn-secondary" id="closeDiffModalBtn" type="button"></button>
-      <button class="btn btn-primary" id="restoreSnapshotBtn" type="button"></button>
+      <button class="btn btn-secondary" id="closeDiffModalBtn" type="button" data-i18n="snapshot.close">Fermer</button>
+      <button class="btn btn-primary" id="restoreSnapshotBtn" type="button" data-i18n="snapshot.restore">Restaurer</button>
     </div>
   </div>
 </div>

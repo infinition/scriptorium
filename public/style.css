@@ -295,6 +295,11 @@ button { font: inherit; color: inherit; }
 .icon-btn:hover { color: var(--text); background: var(--bg-hover); }
 .icon-btn:active { background: var(--bg-active); }
 .icon-btn.active { color: var(--accent); background: var(--accent-soft); }
+/* 3rd state indicator for the reading-toggle cycle (off -> reading -> typewriter-reading) */
+.icon-btn.active.reading-typewriter {
+  background: linear-gradient(135deg, var(--accent-soft) 0%, var(--bg-hover) 100%);
+  box-shadow: inset 0 0 0 1.2px var(--accent);
+}
 
 .new-btn {
   margin: 0 16px 14px;
@@ -2431,6 +2436,13 @@ mark.search-match.first-match {
   font-weight: 600;
   letter-spacing: 0.5px;
 }
+.panel-cycle-btn .cycle-icon {
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+.panel-cycle-btn:hover .cycle-icon {
+  transform: rotate(180deg);
+}
 
 .ideas-view {
   display: flex;
@@ -2545,6 +2557,15 @@ mark.search-match.first-match {
   background: var(--bg-hover) !important;
   border-radius: 4px;
 }
+
+/* Buttons only visible in reading mode */
+.reading-only { display: none; }
+.reading-on .reading-only { display: inline-flex; }
+
+/* Auto-scroll speed levels: increasingly saturated accent */
+#autoScrollBtn.speed-1.active { opacity: 0.7; }
+#autoScrollBtn.speed-2.active { opacity: 0.85; }
+#autoScrollBtn.speed-3.active { opacity: 1; }
 
 /* Text justification for book/word style published documents */
 .text-justified .content-area,
@@ -3411,6 +3432,52 @@ mark.find-match-mark.find-match-current {
 /* A rendered empty line is a lone <br>; an active empty line has no child at all. */
 .reading-on .editor-line:has(> br:only-child) { display: none; }
 .reading-on .editor-line:empty { display: none; }
+
+/* Preserve heading spacing in reading mode (overridden by margin-bottom:0 above) */
+.reading-on .editor-line.is-h1,
+.reading-on .editor-line.is-h2,
+.reading-on .editor-line.is-h3,
+.reading-on .editor-line.is-h4,
+.reading-on .editor-line.is-h5,
+.reading-on .editor-line.is-h6 {
+  margin-bottom: 0.3em;
+}
+
+/* ============ TYPEWRITER READING MODE ============ */
+/* Gradient mask: text fades to transparent at viewport edges,
+   fully visible in the center band. Smooth scrolling for reading. */
+.reading-typewriter-on .editor-wrap {
+  --fade-pct: 18%;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 1) var(--fade-pct),
+    rgba(0, 0, 0, 1) calc(100% - var(--fade-pct)),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 1) var(--fade-pct),
+    rgba(0, 0, 0, 1) calc(100% - var(--fade-pct)),
+    transparent 100%
+  );
+  scroll-behavior: smooth;
+}
+
+/* Extra top/bottom padding so first/last paragraphs can reach the center zone */
+.reading-typewriter-on .editor-container {
+  padding-top: 40vh;
+  padding-bottom: 55vh;
+}
+
+/* Print: remove the gradient mask so the full text is printed */
+@media print {
+  .reading-typewriter-on .editor-wrap {
+    mask-image: none !important;
+    -webkit-mask-image: none !important;
+  }
+}
 
 /* ============ EXPORT MENU DROPDOWN ============ */
 .export-menu {
