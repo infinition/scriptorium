@@ -292,6 +292,8 @@
   "statusbar.remove_empty_title": "Remove all empty lines from the document",
   "statusbar.justify_title": "Justify text (align left and right)",
   "statusbar.spellcheck_title": "Spell check",
+  "statusbar.undo_title": "Undo (Ctrl+Z)",
+  "statusbar.redo_title": "Redo (Ctrl+Shift+Z)",
   "statusbar.find_replace_title": "Find / Replace (Ctrl+F)",
   "statusbar.autoscroll_title": "Auto-scroll (click to start)",
   "statusbar.autoscroll_speed1_title": "Auto-scroll: very slow (click for faster)",

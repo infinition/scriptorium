@@ -1451,12 +1451,19 @@ function saveHistory(docId = state.activeDocId, force = false) {
   
   const histObj = docHistory[docId];
   
+  // Remember where the caret was so an undo/redo can put it back instead of
+  // dropping it at the start of the document.
+  let caretLine = -1, caretOffset = 0;
+  if (activeLineNode && content.contains(activeLineNode)) {
+    caretLine = Array.prototype.indexOf.call(content.children, activeLineNode);
+    caretOffset = getCaretCharacterOffsetWithin(activeLineNode);
+  }
   const currentState = {
     title: title.value,
     subtitle: subtitle.value,
     content: getContentMarkdown(),
-    selectionStart: 0,
-    selectionEnd: 0
+    caretLine,
+    caretOffset
   };
   
   // Skip if state is identical to current index
@@ -1512,18 +1519,25 @@ function performRedo() {
 
 function restoreHistoryState(stateObj) {
   if (!stateObj) return;
-  
+
   title.value = stateObj.title;
   subtitle.value = stateObj.subtitle;
   loadContentMarkdown(stateObj.content);
-  
+
   autoGrow(title);
   autoGrow(subtitle);
   updateStats();
   markDirty();
-  
+
   content.focus();
-  
+
+  // Put the caret back where it was, if the state recorded it.
+  if (stateObj.caretLine >= 0) {
+    const lines = content.children;
+    const line = lines[Math.min(stateObj.caretLine, lines.length - 1)];
+    if (line) setCaretPosition(line, stateObj.caretOffset || 0);
+  }
+
   if (state.activeDocId && docHistory[state.activeDocId]) {
     docHistory[state.activeDocId].lastWasTyping = false;
   }
@@ -3964,6 +3978,14 @@ content.addEventListener('input', () => {
   debouncedRegenerateTOC();
   // Re-group code blocks / re-highlight / refresh callouts after typing settles
   debouncedPostProcess();
+});
+
+// Block the WebView's native undo/redo so Ctrl+Z always runs our custom
+// history stack instead of the contenteditable's built-in one.
+content.addEventListener('beforeinput', (e) => {
+  if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
+    e.preventDefault();
+  }
 });
 
 title.addEventListener('input', () => {
@@ -6872,6 +6894,8 @@ function initProWriterTools() {
   applyFocusLineMode(focusLineState);
   applyReadingMode(readingModeState);
 
+  $('undoBtn')?.addEventListener('click', () => performUndo());
+  $('redoBtn')?.addEventListener('click', () => performRedo());
   $('justifyBtn')?.addEventListener('click', () => applyTextJustify(!textJustifyState));
   $('spellcheckBtn')?.addEventListener('click', () => applySpellcheck(!spellcheckState));
   $('typewriterToggle')?.addEventListener('click', () => applyTypewriterMode(!typewriterState));

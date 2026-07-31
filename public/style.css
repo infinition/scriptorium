@@ -972,6 +972,7 @@ button { font: inherit; color: inherit; }
 
 /* ============ STATUS BAR ============ */
 .statusbar {
+  position: relative;
   display: flex;
   align-items: center;
   padding: 10px 24px;
@@ -989,6 +990,15 @@ button { font: inherit; color: inherit; }
 .statusbar .stat { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
 .statusbar .stat strong { color: var(--text-muted); font-weight: 400; }
 .statusbar .right { margin-left: auto; display: flex; gap: 16px; }
+/* Undo / redo arrows, centred in the bottom bar. */
+.statusbar-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .chord-indicator {
   color: var(--accent);
   background: var(--accent-soft);

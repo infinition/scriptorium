@@ -289,6 +289,8 @@
   "statusbar.remove_empty_title": "Supprimer toutes les lignes vides du document",
   "statusbar.justify_title": "Justifier le texte (aligner \u00e0 gauche et \u00e0 droite)",
   "statusbar.spellcheck_title": "V\u00e9rification orthographique (Correcteur)",
+  "statusbar.undo_title": "Annuler (Ctrl+Z)",
+  "statusbar.redo_title": "Répéter (Ctrl+Shift+Z)",
   "statusbar.find_replace_title": "Rechercher / remplacer (Ctrl+F)",
   "statusbar.autoscroll_title": "Défilement auto. (clic pour lancer)",
   "statusbar.autoscroll_speed1_title": "Défilement: très lent (clic pour accélérer)",
