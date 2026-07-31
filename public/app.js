@@ -216,7 +216,19 @@ async function saveDocumentOnDisk() {
           docHistory[data.document.id] = docHistory[doc.id];
           delete docHistory[doc.id];
         }
+        // Snapshots are keyed by document id: carry them over to the new id
+        // when a title change renamed the file, or they would be orphaned and
+        // the panel would read as empty.
+        const oldId = doc.id;
+        const snapshots = getSnapshots(oldId);
+        if (snapshots.length) {
+          saveSnapshots(data.document.id, snapshots);
+          saveSnapshots(oldId, []);
+        } else {
+          delete snapshotsCache[oldId];
+        }
         state.activeDocId = data.document.id;
+        renderSnapshotsList();
       }
       
       // Update local state without full reload
