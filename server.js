@@ -392,9 +392,9 @@ The breadcrumb at the top shows the section, the title and the filename. Click i
 
 ## Top bar
 
-- **Typewriter**: centres the active line vertically.
-- **Paragraph focus**: keeps only the current paragraph visible.
-- **Reading mode**: cycles between block text, continuous text, and typewriter reading with a fade.
+- **Typewriter** (\`T\`): centres the active line vertically.
+- **Paragraph focus** (\`P\`): keeps only the current paragraph visible.
+- **Reading mode** (\`R\` or \`Tab\`): cycles between block text, continuous text, and typewriter reading with a fade.
 - **Focus mode** (\`F\`): keeps only the text, everything else fades away.
 - **Export**: print or PDF, standalone HTML, Markdown.
 - **Search** (\`Ctrl+P\`): searches across all documents and ideas.
@@ -406,7 +406,7 @@ The breadcrumb at the top shows the section, the title and the filename. Click i
 - **Remove empty lines**.
 - **Justify**: aligns the text left and right.
 - **Spell check**: toggles spell checking.
-- **Auto-scroll**: scrolls the text, click to set the speed.
+- **Auto-scroll** (\`A\`): scrolls the text, click to set the speed.
 - **Find / Replace** (\`Ctrl+F\`).
 
 ## Markdown editing
@@ -441,6 +441,11 @@ The gear at the top left opens the settings.
 | \`Ctrl+G\` or \`Ctrl+B\` | Bold |
 | \`Ctrl+I\` | Italic |
 | \`Ctrl+Z\` / \`Ctrl+Shift+Z\` | Undo / Redo |
+| \`T\` | Typewriter |
+| \`P\` | Paragraph focus |
+| \`R\` | Reading mode |
+| \`A\` | Auto-scroll |
+| \`Tab\` | Cycle display modes |
 | \`F\` | Focus mode |
 
 ## Supported Markdown
@@ -535,9 +540,9 @@ Le fil d'ariane en haut affiche la section, le titre et le nom du fichier. Cliqu
 
 ## La barre du haut
 
-- **Machine à écrire** : centre la ligne active verticalement.
-- **Focus ligne** : ne laisse visible que le paragraphe courant.
-- **Mode lecture** : alterne entre texte en blocs, texte continu, et lecture machine à écrire avec fondu.
+- **Machine à écrire** (\`T\`) : centre la ligne active verticalement.
+- **Focus ligne** (\`P\`) : ne laisse visible que le paragraphe courant.
+- **Mode lecture** (\`R\` ou \`Tab\`) : alterne entre texte en blocs, texte continu, et lecture machine à écrire avec fondu.
 - **Mode focus** (\`F\`) : ne garde que le texte, tout le reste s'efface.
 - **Exporter** : imprimer ou PDF, HTML autonome, Markdown.
 - **Recherche** (\`Ctrl+P\`) : cherche dans tous les documents et les idées.
@@ -549,7 +554,7 @@ Le fil d'ariane en haut affiche la section, le titre et le nom du fichier. Cliqu
 - **Supprimer les lignes vides**.
 - **Justifier** : aligne le texte à gauche et à droite.
 - **Correcteur** : active ou coupe la vérification orthographique.
-- **Défilement auto** : fait défiler le texte, clic pour régler la vitesse.
+- **Défilement auto** (\`A\`) : fait défiler le texte, clic pour régler la vitesse.
 - **Rechercher / remplacer** (\`Ctrl+F\`).
 
 ## Édition Markdown
@@ -584,6 +589,11 @@ L'engrenage en haut à gauche ouvre les paramètres.
 | \`Ctrl+G\` ou \`Ctrl+B\` | Gras |
 | \`Ctrl+I\` | Italique |
 | \`Ctrl+Z\` / \`Ctrl+Shift+Z\` | Annuler / Répéter |
+| \`T\` | Machine à écrire |
+| \`P\` | Focus paragraphe |
+| \`R\` | Mode lecture |
+| \`A\` | Défilement auto |
+| \`Tab\` | Alterner les modes d'affichage |
 | \`F\` | Mode focus |
 
 ## Markdown supporté

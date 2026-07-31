@@ -3055,6 +3055,19 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  // Simple-letter toggles for the writing modes: T typewriter, P paragraph
+  // focus, R reading, A auto-scroll, Tab cycles the three display modes.
+  // Like F, they fire only when not typing in a field, so they never insert a
+  // letter into the text (Tab keeps indenting while the editor has focus).
+  if (!ctrl && !e.altKey && !e.metaKey && !inField) {
+    const k = e.key.toLowerCase();
+    if (k === 'tab') { e.preventDefault(); applyReadingMode((readingModeState + 1) % 3); return; }
+    if (k === 't') { e.preventDefault(); applyTypewriterMode(!typewriterState); return; }
+    if (k === 'p') { e.preventDefault(); applyFocusLineMode(!focusLineState); return; }
+    if (k === 'r') { e.preventDefault(); applyReadingMode((readingModeState + 1) % 3); return; }
+    if (k === 'a') { e.preventDefault(); cycleAutoScroll(); return; }
+  }
+
   // Editor specific shortcuts
   if (!content.contains(target)) return;
 
@@ -6474,6 +6487,16 @@ function applyReadingMode(mode) {
 }
 
 // ============ AUTO-SCROLL (reading mode only) ============
+
+// Cycles the auto-scroll speed, matching the button: 0, slow, faster, normal, stop.
+function cycleAutoScroll() {
+  if (autoScrollPaused && autoScrollState > 0) {
+    startAutoScroll(autoScrollState);
+    showToast('toast.autoscroll_speed' + autoScrollState);
+  } else {
+    applyAutoScroll((autoScrollState + 1) % 4);
+  }
+}
 
 function applyAutoScroll(speed) {
   autoScrollState = speed;
