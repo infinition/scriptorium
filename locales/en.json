@@ -433,6 +433,8 @@
   "toast.workspace_unlocked": "Workspace unlocked",
   "toast.doc_imported": "Document imported",
   "toast.theme_imported": "Theme imported",
+  "toast.image_added": "Image inserted",
+  "toast.image_save_error": "Failed to save the image",
   "toast.sort_changed": "Sort order changed",
   "toast.lang_changed": "Language changed to {lang}",
   "toast.blocks_merged": "Blocks merged",

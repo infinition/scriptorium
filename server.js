@@ -291,6 +291,16 @@ for (const [route, pkg] of Object.entries(VENDOR_MOUNTS)) {
 app.use('/locales', express.static(path.join(__dirname, 'locales')));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Images pasted or dropped into a document are saved in <workspace>/assets and
+// served here so they render in the editor. The workspace can change at
+// runtime, so the static middleware is built per request against the current
+// workspaceDir.
+app.use('/assets', (req, res, next) => {
+  const assetsDir = path.join(workspaceDir, 'assets');
+  if (!fs.existsSync(assetsDir)) return res.status(404).end();
+  express.static(assetsDir)(req, res, next);
+});
+
 // SSE (Server-Sent Events) for real-time workspace updates
 const sseClients = new Set();
 
@@ -831,6 +841,35 @@ app.get('/api/config', (req, res) => {
     configured: workspaceConfigured
   });
 });
+
+// Save an image pasted or dropped into a document. Stored in <workspace>/assets
+// and returned as a workspace-relative path ("assets/name.png") for the markdown.
+app.post('/api/assets', guarded((req, res) => {
+  const { filename, dataBase64 } = req.body || {};
+  if (!filename || typeof dataBase64 !== 'string' || !dataBase64) {
+    return res.status(400).json({ error: 'filename and data are required' });
+  }
+  const extMatch = String(filename).match(/\.([a-z0-9]+)$/i);
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
+  if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) {
+    return res.status(400).json({ error: 'Unsupported image type' });
+  }
+  const stem = extMatch ? filename.slice(0, -extMatch[0].length) : filename;
+  const safeStem = assertSegment(stem, 'Image');
+  const assetsDir = path.join(workspaceDir, 'assets');
+  fs.mkdirSync(assetsDir, { recursive: true });
+
+  let safeName = `${safeStem}.${ext}`;
+  let counter = 1;
+  while (fs.existsSync(path.join(assetsDir, safeName))) {
+    safeName = `${safeStem}-${counter}.${ext}`;
+    counter++;
+  }
+
+  const buf = Buffer.from(dataBase64, 'base64');
+  fs.writeFileSync(path.join(assetsDir, safeName), buf);
+  res.json({ success: true, path: `assets/${safeName}` });
+}));
 
 // The padlock is enforced server-side, so it has to be persisted here rather
 // than in localStorage only.

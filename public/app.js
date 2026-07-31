@@ -5976,22 +5976,80 @@ function insertMarkdownAtCaret(text) {
 content.addEventListener('paste', (e) => {
   const cd = e.clipboardData || window.clipboardData;
   if (!cd) return;
+  // If the clipboard holds an image (screenshot, copied picture), save it into
+  // the workspace assets folder and insert its markdown reference.
+  const imgItem = Array.from(cd.items || []).find(it => it.type && it.type.indexOf('image/') === 0);
+  if (imgItem) {
+    e.preventDefault();
+    const file = imgItem.getAsFile();
+    if (file) handlePastedImage(file, 'image');
+    return;
+  }
   e.preventDefault();
   // Plain text only: pasting from Word or a web page should give the markdown
   // source you can see and edit, not an HTML blob the line model can't hold.
   insertMarkdownAtCaret(cd.getData('text/plain'));
 });
 
-// Same reasoning for drag-and-dropped text inside the editor.
+// Same reasoning for drag-and-dropped text inside the editor. Image files
+// dropped here are saved and inserted as markdown instead.
 content.addEventListener('drop', (e) => {
   const dt = e.dataTransfer;
-  if (!dt || !dt.types || dt.types.includes('Files')) return;
+  if (!dt) return;
+  const imageFiles = Array.from(dt.files || []).filter(f => f.type && f.type.indexOf('image/') === 0);
+  if (imageFiles.length) {
+    e.preventDefault();
+    e.stopPropagation();
+    imageFiles.forEach(f => handlePastedImage(f, f.name));
+    return;
+  }
+  if (!dt.types || dt.types.includes('Files')) return;
   const text = dt.getData('text/plain');
   if (!text) return;
   e.preventDefault();
   e.stopPropagation();
   insertMarkdownAtCaret(text);
 });
+
+// Reads an image (clipboard or dropped file), uploads it to <workspace>/assets
+// and inserts its markdown reference at the caret.
+async function handlePastedImage(file, suggestedName) {
+  const dataBase64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      resolve(result.indexOf(',') !== -1 ? result.slice(result.indexOf(',') + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  const extMap = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg' };
+  const ext = extMap[file.type] || 'png';
+  const base = String(suggestedName || 'image')
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'image';
+  try {
+    const res = await fetch('/api/assets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: `${base}.${ext}`, dataBase64 })
+    });
+    const data = await res.json();
+    if (data.path) {
+      insertMarkdownAtCaret(`![${base}](${data.path})`);
+      markDirty();
+      updateStats();
+      showToast('toast.image_added');
+    } else {
+      showToast('toast.image_save_error');
+    }
+  } catch (err) {
+    console.error('Image save error:', err);
+    showToast('toast.image_save_error');
+  }
+}
 
 // ============ FIND / REPLACE ============
 // Operates on each line's raw markdown source (like a plain-text find/replace

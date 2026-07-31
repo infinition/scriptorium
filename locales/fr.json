@@ -430,6 +430,8 @@
   "toast.workspace_unlocked": "Workspace d\u00e9verrouill\u00e9",
   "toast.doc_imported": "Document import\u00e9",
   "toast.theme_imported": "Th\u00e8me import\u00e9",
+  "toast.image_added": "Image ins\u00e9r\u00e9e",
+  "toast.image_save_error": "\u00c9chec de l'enregistrement de l'image",
   "toast.sort_changed": "Ordre de tri modifi\u00e9",
   "toast.lang_changed": "Langue chang\u00e9e en {lang}",
   "toast.blocks_merged": "Blocs fusionn\u00e9s",
