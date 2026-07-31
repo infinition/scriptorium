@@ -147,6 +147,13 @@ async function fetchWorkspace() {
       localStorage.setItem('scriptorium_is_locked', state.isLocked);
       updateLockStateUI();
     }
+
+    // First launch: no workspace has ever been chosen, ask the user.
+    if (configData.configured === false) {
+      showWorkspaceSetupModal();
+      return;
+    }
+
     workspaceLabel.textContent = pathBasename(state.workspaceDir);
     workspaceLabel.title = state.workspaceDir;
 
@@ -6744,6 +6751,69 @@ initFontSizeControls();
 initProWriterTools();
 initLanguageSettings();
 initReadingFadeSlider();
+
+// ============ FIRST-LAUNCH WORKSPACE SETUP ============
+// Shown only when no workspace has ever been configured (config.json without
+// a workspaceDir). The user picks an existing folder or types a new path,
+// which the server creates on the spot.
+
+function showWorkspaceSetupModal() {
+  const modal = $('workspaceModal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeWorkspaceSetupModal() {
+  const modal = $('workspaceModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function initWorkspaceSetupModal() {
+  const pathInput = $('workspaceSetupPathInput');
+  const browseBtn = $('workspaceSetupBrowseBtn');
+  const confirmBtn = $('workspaceSetupConfirmBtn');
+
+  if (browseBtn) {
+    browseBtn.addEventListener('click', () => {
+      handlePickFolder(pathInput, browseBtn);
+    });
+  }
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', async () => {
+      const newPath = pathInput ? pathInput.value.trim() : '';
+      if (!newPath) {
+        showToast('workspace.path_required');
+        return;
+      }
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newPath })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeWorkspaceSetupModal();
+          state.activeDocId = null;
+          state.activeThemeId = null;
+          await fetchWorkspace();
+          showToast('toast.workspace_set');
+        }
+      } catch (err) {
+        console.error('Workspace setup error:', err);
+        showToast('alert.config_save_error');
+      }
+    });
+  }
+
+  if (pathInput) {
+    pathInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && confirmBtn) confirmBtn.click();
+    });
+  }
+}
+
+initWorkspaceSetupModal();
 
 document.addEventListener('selectionchange', updateActiveLine);
 

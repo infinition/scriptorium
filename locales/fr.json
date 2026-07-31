@@ -133,6 +133,14 @@
   "snapshot.diff_meta": "Comparaison entre la version actuelle et \"{name}\" (cr\u00e9\u00e9 le {date})",
   "snapshot.swapped_suffix": " \u2014 version remplac\u00e9e",
 
+  "workspace.title": "Choisissez votre dossier de travail",
+  "workspace.desc": "Aucun dossier de travail n\u2019a encore \u00e9t\u00e9 configur\u00e9. Choisissez un dossier existant, ou saisissez un nouveau chemin pour le cr\u00e9er.",
+  "workspace.path_label": "Dossier de travail :",
+  "workspace.path_placeholder": "C:\\chemin\\vers\\workspace",
+  "workspace.hint": "Le dossier est cr\u00e9\u00e9 s\u2019il n\u2019existe pas encore.",
+  "workspace.confirm": "Utiliser ce dossier",
+  "workspace.path_required": "Saisissez d\u2019abord un chemin de dossier.",
+
   "settings.title": "Param\u00e8tres",
   "settings.tab_folders": "Dossiers",
   "settings.tab_appearance": "Apparence",
@@ -405,6 +413,7 @@
   "toast.snapshot_deleted": "Instantan\u00e9 supprim\u00e9",
   "toast.snapshot_restored": "Instantan\u00e9 restaur\u00e9",
   "toast.settings_saved": "Param\u00e8tres enregistr\u00e9s",
+  "toast.workspace_set": "Dossier de travail d\u00e9fini",
   "toast.workspace_locked": "Workspace verrouill\u00e9",
   "toast.workspace_unlocked": "Workspace d\u00e9verrouill\u00e9",
   "toast.doc_imported": "Document import\u00e9",

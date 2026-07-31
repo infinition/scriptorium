@@ -293,6 +293,33 @@
   </aside>
 </div>
 
+<!-- WORKSPACE SETUP MODAL (first launch) -->
+<div class="modal-overlay" id="workspaceModal">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3 data-i18n="workspace.title">Choose your workspace</h3>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc" data-i18n="workspace.desc">No working folder has been configured yet. Pick an existing folder, or type a new path to create it.</p>
+      <div class="form-group">
+        <label for="workspaceSetupPathInput" data-i18n="workspace.path_label">Workspace folder:</label>
+        <div class="input-with-btn">
+          <input type="text" id="workspaceSetupPathInput" data-i18n-placeholder="workspace.path_placeholder" placeholder="C:\path\to\workspace" autocomplete="off" spellcheck="false" />
+          <button class="picker-btn" id="workspaceSetupBrowseBtn" type="button" data-i18n-title="settings.folder_browse_title" aria-label="Browse">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <p class="field-hint" data-i18n="workspace.hint">The folder is created if it does not exist yet.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="workspaceSetupConfirmBtn" type="button" data-i18n="workspace.confirm">Use this folder</button>
+    </div>
+  </div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settingsModal">
   <div class="modal modal-wide">

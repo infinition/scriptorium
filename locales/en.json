@@ -133,6 +133,14 @@
   "snapshot.diff_meta": "Comparison between the current version and \"{name}\" (created {date})",
   "snapshot.swapped_suffix": " \u2014 replaced version",
 
+  "workspace.title": "Choose your workspace",
+  "workspace.desc": "No working folder has been configured yet. Pick an existing folder, or type a new path to create it.",
+  "workspace.path_label": "Workspace folder:",
+  "workspace.path_placeholder": "C:\\path\\to\\workspace",
+  "workspace.hint": "The folder is created if it does not exist yet.",
+  "workspace.confirm": "Use this folder",
+  "workspace.path_required": "Enter a folder path first.",
+
   "settings.title": "Settings",
   "settings.tab_folders": "Folders",
   "settings.tab_appearance": "Appearance",
@@ -408,6 +416,7 @@
   "toast.snapshot_deleted": "Snapshot deleted",
   "toast.snapshot_restored": "Snapshot restored",
   "toast.settings_saved": "Settings saved",
+  "toast.workspace_set": "Workspace set",
   "toast.workspace_locked": "Workspace locked",
   "toast.workspace_unlocked": "Workspace unlocked",
   "toast.doc_imported": "Document imported",

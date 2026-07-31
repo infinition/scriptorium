@@ -16,11 +16,16 @@ npm start
 
 Then open `http://localhost:3000`.
 
-On first launch the server reads `config.json` (created next to `server.js`)
-to find your workspace folder. The default is `~/Scriptorium`; change it from
-the gear icon in the sidebar, or edit `config.json` directly. To run against a
-different folder for one session without touching the saved config, set
-`SCRIPTORIUM_WORKSPACE`.
+On first launch, when no workspace has ever been configured, the app asks you
+to choose a working folder (native folder dialog, or a typed path; the folder
+is created if it does not exist). The choice is saved in `config.json` (next to
+`server.js`). Change it later from the gear icon in the sidebar, or edit
+`config.json` directly. To run against a different folder for one session
+without touching the saved config, set `SCRIPTORIUM_WORKSPACE`.
+
+A fresh workspace is seeded with a bilingual demo (French and English) that
+tours every markdown feature, plus two general ideas themes, one per language.
+The seed runs once: files you keep or edit are never overwritten.
 
 ### Version bureau (Tauri)
 

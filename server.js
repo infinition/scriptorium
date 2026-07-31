@@ -53,6 +53,9 @@ let workspaceDir = path.join(require('os').homedir(), 'Scriptorium');
 let ideasDirSetting = '';
 let accessToken = '';
 let workspaceLocked = false;
+// False until config.json records a workspace: the client then shows the
+// first-launch chooser instead of silently using the ~/Scriptorium default.
+let workspaceConfigured = false;
 
 function loadCustomTheme() {
   try {
@@ -78,6 +81,7 @@ function loadConfig() {
       const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
       if (data.workspaceDir) {
         workspaceDir = data.workspaceDir;
+        workspaceConfigured = true;
       }
       if (data.ideasDir !== undefined) {
         ideasDirSetting = data.ideasDir;
@@ -115,6 +119,8 @@ loadConfig();
 let configuredWorkspaceDir = workspaceDir;
 if (process.env.SCRIPTORIUM_WORKSPACE) {
   workspaceDir = path.resolve(process.env.SCRIPTORIUM_WORKSPACE);
+  // An explicit override counts as configured for this run.
+  workspaceConfigured = true;
   console.log(`Workspace overridden by SCRIPTORIUM_WORKSPACE: ${workspaceDir}`);
 }
 
@@ -330,8 +336,198 @@ function setupWorkspaceWatcher() {
   } catch (err) {}
 }
 
+// Bilingual welcome demo written into an empty workspace: a tour of every
+// markdown feature the editor supports. One file per language.
+const WELCOME_DEMO_EN = `# Welcome to Scriptorium
+
+This document shows everything the editor can do. Keep it as an example, or delete it and start writing. Your files are saved directly on your disk.
+
+## Text formatting
+
+**Bold**, *italic*, ~~strikethrough~~, <u>underline</u>, \`inline code\`, ==highlight==.
+
+## Headings
+
+From the largest to the smallest. The H1 heading is the document title, the others structure the text.
+
+### Subsection (H3)
+
+#### Level 4 (H4)
+
+##### Level 5 (H5)
+
+###### Level 6 (H6)
+
+## Lists
+
+- Bullet list
+  - Nested item
+    - Deeper item
+
+1. First numbered item
+2. Second item
+3. Third item
+
+- [x] Completed task
+- [ ] Open task
+
+## Quotes
+
+> A quote to set a remark apart.
+
+> [!info] Note
+> An Obsidian-style callout, handy to draw attention.
+
+## Tables
+
+| Project | Status | Priority |
+|---------|--------|----------|
+| Design | Done | High |
+| Writing | In progress | Medium |
+
+## Code
+
+\`\`\`python
+def greet(name):
+    print("Hello, " + name + "!")
+\`\`\`
+
+\`\`\`js
+function greet(name) {
+    return "Hello, " + name + "!";
+}
+\`\`\`
+
+## Math
+
+Inline formula: $E = mc^2$.
+
+Display formula:
+
+$$ \\int_{-\\infty}^{+\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi} $$
+
+## Links and wikilinks
+
+[Markdown Guide](https://www.markdownguide.org)
+
+An Obsidian-style internal link: [[another-document]]
+
+## Image
+
+A test image loaded from the network:
+
+![Test image](https://picsum.photos/600/300)
+
+## Footnotes
+
+A sentence with a footnote[^1].
+
+[^1]: The footnote text appears at the bottom of the document.
+
+## Divider
+
+---
+
+The rest is yours. Happy writing.
+`;
+
+const WELCOME_DEMO_FR = `# Bienvenue sur Scriptorium
+
+Ce document présente tout ce que l'éditeur sait faire. Gardez-le en exemple ou supprimez-le pour commencer. Le texte est enregistré directement sur votre disque.
+
+## Mise en forme
+
+**Gras**, *italique*, ~~barré~~, <u>souligné</u>, \`code en ligne\`, ==surligné==.
+
+## Titres
+
+Du plus grand au plus petit. Le titre H1 est le titre du document, les suivants structurent le texte.
+
+### Sous-section (H3)
+
+#### Niveau 4 (H4)
+
+##### Niveau 5 (H5)
+
+###### Niveau 6 (H6)
+
+## Listes
+
+- Liste à puces
+  - Sous-point
+    - Sous-sous-point
+
+1. Premier point numéroté
+2. Second point
+3. Troisième point
+
+- [x] Tâche terminée
+- [ ] Tâche à faire
+
+## Citations
+
+> Une citation pour isoler une remarque.
+
+> [!tip] Astuce
+> Un callout de style Obsidian, utile pour attirer l'attention.
+
+## Tableaux
+
+| Projet | Statut | Priorité |
+|--------|--------|----------|
+| Design | Terminé | Haute |
+| Rédaction | En cours | Moyenne |
+
+## Code
+
+\`\`\`python
+def salutation(nom):
+    print("Bonjour, " + nom + " !")
+\`\`\`
+
+\`\`\`js
+function salutation(nom) {
+    return "Bonjour, " + nom + " !";
+}
+\`\`\`
+
+## Mathématiques
+
+Formule en ligne : $E = mc^2$.
+
+Formule centrée :
+
+$$ \\int_{-\\infty}^{+\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi} $$
+
+## Liens et wikilinks
+
+[Guide Markdown](https://www.markdownguide.org)
+
+Un lien interne de style Obsidian : [[autre-document]]
+
+## Image
+
+Une image de test chargée depuis le réseau :
+
+![Image de test](https://picsum.photos/600/300)
+
+## Notes de bas de page
+
+Une phrase avec une note de bas de page[^1].
+
+[^1]: Le texte de la note s'affiche en bas du document.
+
+## Séparateur
+
+---
+
+Le reste vous appartient. Bonne écriture.
+`;
+
 // Ensure default workspace structure exists
 function ensureWorkspaceDirs() {
+  // Nothing to seed until the user has chosen a workspace.
+  if (!workspaceConfigured) return;
   try {
     if (!fs.existsSync(workspaceDir)) {
       fs.mkdirSync(workspaceDir, { recursive: true });
@@ -341,36 +537,36 @@ function ensureWorkspaceDirs() {
     if (!fs.existsSync(ideasDir)) {
       fs.mkdirSync(ideasDir, { recursive: true });
       
-      // Write some default themes
+      // Two general themes, one per language, so a fresh install starts
+      // with examples that fit any audience.
       const defaultThemes = {
-        'quantum': [
-          "La structure causale est plus fondamentale que la structure métrique — l'espace-temps émerge des relations de causalité.",
-          "Un photon n'a pas de lieu (Newton-Wigner) — il n'y a pas d'opérateur de position bien défini pour lui.",
-          "Les constantes que nous observons sont les survivantes d'une dynamique de sélection.",
-          "c n'est pas la vitesse de la lumière — c'est la vitesse de causalité, le photon ne fait que la saturer.",
-          "Deux photons dans le même mode sont littéralement le même état occupé deux fois.",
-          "MQ et RG : ce n'est pas mathématiquement contradictoire, c'est ontologiquement incompatible."
-        ],
-        'conscience': [
-          "La conscience comme boucle vivante entre perception, mémoire, prédiction, action, correction.",
-          "Voir une banane = activer une mémoire de formes, textures, odeurs, gestes, goûts, mots, émotions.",
-          "Le cadre intérieur devient le prisme à travers lequel chaque nouvelle perception est interprétée.",
-          "La conscience se densifie avec le temps — elle ne surgit pas d'un bloc."
-        ],
-        'IA & éthique': [
-          "Le risque n'est pas l'IA méchante — c'est l'IA optimisée sans paradigme d'auto-correction.",
-          "Une IA psychopathe n'est pas une IA consciente mauvaise — c'est une IA qui n'a jamais eu de boucle de rétroaction avec un autrui.",
-          "L'AGI sans corps, sans douleur, sans miroir — qu'est-ce qui la retient ?"
-        ],
-        'général': [
-          "Une proposition cohérente à falsifier — pas une vérité, pas une modestie performative.",
-          "Refuser les esquives, nommer les positions existantes, assumer les désaccords."
-        ]
+        'general': {
+          name: 'General ideas',
+          ideas: [
+            'Each line starting with a dash is an idea',
+            'Click an idea to archive it',
+            'Right-click to insert an idea into your text',
+            'Hover an idea to read it in full',
+            'Add your own ideas, one per line',
+            'An ideas theme is just a markdown file'
+          ]
+        },
+        'général': {
+          name: 'Idées générales',
+          ideas: [
+            'Chaque ligne commençant par un tiret est une idée',
+            'Cliquez sur une idée pour l\'archiver',
+            'Clic droit pour insérer une idée dans votre texte',
+            'Survolez une idée pour la lire en entier',
+            'Ajoutez vos propres idées, une par ligne',
+            'Un thème d\'idées est simplement un fichier markdown'
+          ]
+        }
       };
 
-      for (const [theme, ideas] of Object.entries(defaultThemes)) {
-        const fileContent = `# ${theme}\n\n` + ideas.map(idea => `- [ ] ${idea}`).join('\n') + '\n';
-        fs.writeFileSync(path.join(ideasDir, `${theme}.md`), fileContent, 'utf8');
+      for (const [id, theme] of Object.entries(defaultThemes)) {
+        const fileContent = `# ${theme.name}\n\n` + theme.ideas.map(idea => `- [ ] ${idea}`).join('\n') + '\n';
+        fs.writeFileSync(path.join(ideasDir, `${id}.md`), fileContent, 'utf8');
       }
     }
 
@@ -383,22 +579,12 @@ function ensureWorkspaceDirs() {
     });
 
     if (subdirs.length === 0) {
-      // Create some default folders to populate
-      fs.mkdirSync(path.join(workspaceDir, 'Manifestes'), { recursive: true });
-      fs.mkdirSync(path.join(workspaceDir, 'Essais'), { recursive: true });
-      fs.mkdirSync(path.join(workspaceDir, 'Nouvelles'), { recursive: true });
-      fs.mkdirSync(path.join(workspaceDir, 'Expériences'), { recursive: true });
-      
-      // If C:\DEV\coding\nexearch\solutions\manifest\MANIFESTE.md exists, copy it to Manifestes/MANIFESTE.md
-      const sourceManifest = 'C:\\\\DEV\\\\coding\\\\nexearch\\\\solutions\\\\manifest\\\\MANIFESTE.md';
-      const targetManifest = path.join(workspaceDir, 'Manifestes', 'MANIFESTE.md');
-      if (fs.existsSync(sourceManifest) && !fs.existsSync(targetManifest)) {
-        fs.copyFileSync(sourceManifest, targetManifest);
-      } else {
-        // Create a default welcome document
-        const welcomeContent = `# Bienvenue sur Scriptorium\n\n*Votre espace d'écriture minimaliste et moderne.*\n\nCommencez à rédiger ici. Utilisez le markdown comme d'habitude. Vos fichiers sont enregistrés directement sur votre disque.\n`;
-        fs.writeFileSync(path.join(workspaceDir, 'Manifestes', 'Bienvenue.md'), welcomeContent, 'utf8');
-      }
+      // Write the demo only once: never overwrite a file the user kept or
+      // edited after the first launch.
+      const welcomeEn = path.join(workspaceDir, 'Welcome.md');
+      const welcomeFr = path.join(workspaceDir, 'Bienvenue.md');
+      if (!fs.existsSync(welcomeEn)) fs.writeFileSync(welcomeEn, WELCOME_DEMO_EN, 'utf8');
+      if (!fs.existsSync(welcomeFr)) fs.writeFileSync(welcomeFr, WELCOME_DEMO_FR, 'utf8');
     }
     setupWorkspaceWatcher();
   } catch (err) {
@@ -531,7 +717,8 @@ app.get('/api/config', (req, res) => {
     workspaceDir,
     ideasDir: ideasDirSetting,
     effectiveIdeasDir: getIdeasDir(),
-    locked: workspaceLocked
+    locked: workspaceLocked,
+    configured: workspaceConfigured
   });
 });
 
@@ -558,14 +745,16 @@ app.post('/api/config', (req, res) => {
   if (ideasPath !== undefined) {
     ideasDirSetting = ideasPath ? ideasPath.trim() : '';
   }
+  workspaceConfigured = true;
   saveConfig();
   ensureWorkspaceDirs();
-  
+
   res.json({
     success: true,
     workspaceDir,
     ideasDir: ideasDirSetting,
-    effectiveIdeasDir: getIdeasDir()
+    effectiveIdeasDir: getIdeasDir(),
+    configured: workspaceConfigured
   });
 });
 
@@ -741,7 +930,12 @@ app.post('/api/pick-folder', (req, res) => {
 // Get Workspace layout (sections, documents, ideas themes)
 app.get('/api/workspace', (req, res) => {
   ensureWorkspaceDirs();
-  
+  // No workspace configured yet: return an empty layout, the client shows the
+  // first-launch chooser instead.
+  if (!workspaceConfigured) {
+    return res.json({ configured: false, sections: [], ideaThemes: [] });
+  }
+
   try {
     const sections = [];
     const generalDocs = [];
