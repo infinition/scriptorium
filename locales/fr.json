@@ -135,7 +135,7 @@
 
   "workspace.title": "Bienvenue dans Scriptorium",
   "workspace.tagline": "Votre compagnon d'\u00e9criture.",
-  "workspace.desc": "Veuillez s\u00e9lectionner votre dossier de travail pour commencer.",
+  "workspace.desc": "Choisissez un dossier existant, ou saisissez un nouveau chemin pour le cr\u00e9er.",
   "workspace.path_label": "Dossier de travail :",
   "workspace.path_placeholder": "C:\\chemin\\vers\\workspace",
   "workspace.hint": "Le dossier est cr\u00e9\u00e9 s\u2019il n\u2019existe pas encore.",

@@ -135,7 +135,7 @@
 
   "workspace.title": "Welcome to Scriptorium",
   "workspace.tagline": "Your writing companion.",
-  "workspace.desc": "Please select your working folder to get started.",
+  "workspace.desc": "Pick an existing folder, or type a new path to create it.",
   "workspace.path_label": "Workspace folder:",
   "workspace.path_placeholder": "C:\\path\\to\\workspace",
   "workspace.hint": "The folder is created if it does not exist yet.",
