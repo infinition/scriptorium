@@ -48,3 +48,13 @@ jobs:
           releaseBody: Release build of Scriptorium.
           releaseDraft: false
           prerelease: false
+
+      # The raw binary, no installer: a portable Windows exe.
+      - name: Upload standalone Windows exe
+        if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp src-tauri/target/release/scriptorium.exe "Scriptorium_${VERSION}_x64_portable.exe"
+          gh release upload "$GITHUB_REF_NAME" "Scriptorium_${VERSION}_x64_portable.exe" --clobber

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -63,21 +63,23 @@
   .downloads { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
   .dl { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-radius: 8px;
         background: var(--accent-soft); border: 1px solid var(--accent); color: var(--accent);
-        text-decoration: none; font-weight: 500; font-size: 15px; transition: all 0.15s; }
+        text-decoration: none; font-weight: 500; font-size: 15px; transition: all 0.15s; text-align: left; }
   .dl:hover { background: var(--accent); color: var(--bg); }
   .dl small { display: block; font-weight: 400; opacity: 0.75; font-size: 12px; }
   .dl svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .alt-links { margin-top: 18px; font-size: 13px; color: var(--text-muted); display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+  .alt-links a { color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; }
+  .alt-links a:hover { color: var(--text); }
   .releases-note { margin-top: 22px; font-size: 13px; color: var(--text-faint); }
   .releases-note a { color: var(--accent); }
 
   section { padding: 64px 0; border-top: 1px solid var(--border); }
   section h2 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 30px; margin: 0 0 32px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
   .card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
   .card h3 { font-size: 15px; margin: 0 0 8px; color: var(--accent); font-weight: 600; }
   .card p { font-size: 14px; color: var(--text-muted); margin: 0; }
 
-  .features .grid { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
   .foot { border-top: 1px solid var(--border); padding: 40px 0 56px; text-align: center; color: var(--text-faint); font-size: 13px; }
   .foot a { color: var(--accent); text-decoration: none; }
 
@@ -95,72 +97,77 @@
   <div class="wrap">
     <a class="brand" href="#">Scriptorium<span class="dot">.</span></a>
     <nav>
-      <a href="#fonctions">Fonctions</a>
-      <a href="#telechargement">Télécharger</a>
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
       <a href="https://github.com/infinition/scriptorium">GitHub</a>
     </nav>
   </div>
 </header>
 
 <main>
-  <div class="hero">
-    <img class="logo" src="https://raw.githubusercontent.com/infinition/scriptorium/main/public/app-icon.png" alt="Logo Scriptorium" width="88" height="88" />
+  <div class="hero" id="download">
+    <img class="logo" src="https://raw.githubusercontent.com/infinition/scriptorium/main/public/app-icon.png" alt="Scriptorium logo" width="88" height="88" />
     <h1>Scriptorium<span class="dot">.</span></h1>
-    <p class="tagline">Votre compagnon d'écriture.</p>
-    <p class="lead">Un éditeur Markdown sans distraction qui lit et écrit des fichiers `.md` ordinaires sur votre propre disque. Titres, listes, code et formules s'affichent en direct, rien ne quitte votre machine.</p>
+    <p class="tagline">Your writing companion.</p>
+    <p class="lead">A distraction-free Markdown editor that reads and writes plain `.md` files on your own disk. Headings, lists, code and math render live; nothing leaves your machine.</p>
 
     <div class="downloads">
       <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_x64-setup.exe">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        <span>Windows<small>scriptorium_1.1.0_x64-setup.exe</small></span>
+        <span>Windows<small>Scriptorium_1.1.0_x64-setup.exe</small></span>
       </a>
       <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_aarch64.dmg">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="4"/><circle cx="7" cy="8" r="1"/></svg>
-        <span>macOS<small>scriptorium_1.1.0_aarch64.dmg</small></span>
+        <span>macOS<small>Scriptorium_1.1.0_aarch64.dmg</small></span>
       </a>
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/scriptorium_1.1.0_amd64.AppImage">
+      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_amd64.AppImage">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        <span>Linux<small>scriptorium_1.1.0_amd64.AppImage</small></span>
+        <span>Linux<small>Scriptorium_1.1.0_amd64.AppImage</small></span>
       </a>
     </div>
-    <p class="releases-note">Les installateurs sont générés à chaque tag de version. <a href="https://github.com/infinition/scriptorium/releases">Voir toutes les versions</a></p>
+    <div class="alt-links">
+      <a href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_x64_portable.exe">Windows portable exe</a>
+      <a href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_aarch64.app.tar.gz">macOS tar.gz</a>
+      <a href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_amd64.deb">Linux deb</a>
+    </div>
+    <p class="releases-note">Installers are built for every version tag. <a href="https://github.com/infinition/scriptorium/releases">See all versions</a></p>
   </div>
 
-  <section id="fonctions" class="features">
+  <section id="features">
     <div class="wrap">
-      <h2>Ce que Scriptorium sait faire</h2>
+      <h2>What Scriptorium does</h2>
       <div class="grid">
         <div class="card">
-          <h3>Vos fichiers, votre disque</h3>
-          <p>Chaque document est un fichier `.md` ordinaire. Une section est un dossier. Scriptorium reflète votre espace de travail, il ne le verrouille pas.</p>
+          <h3>Your files, your disk</h3>
+          <p>Every document is a plain `.md` file. A section is a folder. Scriptorium mirrors your workspace, it does not lock it.</p>
         </div>
         <div class="card">
-          <h3>Rendu en direct</h3>
-          <p>Markdown, LaTeX, code coloré, tableaux et callouts s'affichent en direct. La ligne que vous éditez repasse en source brut.</p>
+          <h3>Live rendering</h3>
+          <p>Markdown, LaTeX, highlighted code, tables and callouts render live. The line you are editing switches back to raw source.</p>
         </div>
         <div class="card">
-          <h3>Idées</h3>
-          <p>Un nuage de phrases classé par thème. Cliquez pour archiver, clic droit pour insérer dans le texte.</p>
+          <h3>Ideas</h3>
+          <p>A sentence cloud grouped by theme. Click to archive, right-click to insert into your text.</p>
         </div>
         <div class="card">
-          <h3>Instantanés</h3>
-          <p>Un historique de révision par document. Comparez, restaurez, revenez en arrière avant une coupe.</p>
+          <h3>Snapshots</h3>
+          <p>A per-document revision history. Compare, restore, come back before a big cut.</p>
         </div>
         <div class="card">
-          <h3>Sans distraction</h3>
-          <p>Mode focus, machine à écrire, focus paragraphe, lecture continue. L'interface s'efface devant le texte.</p>
+          <h3>Distraction free</h3>
+          <p>Focus mode, typewriter, paragraph focus, continuous reading. The interface steps aside.</p>
         </div>
         <div class="card">
-          <h3>Hors ligne</h3>
-          <p>Aucun CDN, aucune dépendance réseau pour l'édition. Tout est servi depuis votre machine.</p>
+          <h3>Offline</h3>
+          <p>No CDN, no network dependency for editing. Everything is served from your machine.</p>
         </div>
         <div class="card">
-          <h3>Recherche plein texte</h3>
-          <p>Recherchez dans les titres, le contenu des documents et les idées, en une frappe (`Ctrl+P`).</p>
+          <h3>Full-text search</h3>
+          <p>Search across titles, document bodies and ideas in one keystroke (`Ctrl+P`).</p>
         </div>
         <div class="card">
-          <h3>Bilingue</h3>
-          <p>Français et anglais, avec un guide complet intégré aux documents de démo.</p>
+          <h3>Two ways to run</h3>
+          <p>As a web server in any browser, or as a native desktop window. Same codebase, same behaviour.</p>
         </div>
       </div>
     </div>
@@ -169,7 +176,7 @@
 
 <footer class="foot">
   <div class="wrap">
-    <p>Scriptorium, un éditeur Markdown local et sans distraction.</p>
+    <p>Scriptorium, a local, distraction-free Markdown editor.</p>
     <p><a href="https://github.com/infinition/scriptorium">github.com/infinition/scriptorium</a></p>
   </div>
 </footer>
