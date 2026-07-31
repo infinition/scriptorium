@@ -34,3 +34,6 @@ build/
 # Tauri (Rust) build output
 src-tauri/target/
 src-tauri/gen/
+
+# Local editor tooling
+.claude/
