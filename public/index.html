@@ -296,11 +296,13 @@
 <!-- WORKSPACE SETUP MODAL (first launch) -->
 <div class="modal-overlay" id="workspaceModal">
   <div class="modal modal-wide">
-    <div class="modal-header">
-      <h3 data-i18n="workspace.title">Choose your workspace</h3>
+    <div class="modal-header workspace-header">
+      <img src="icon-512.png" alt="" class="workspace-logo" width="80" height="80" />
+      <h3 data-i18n="workspace.title">Welcome to Scriptorium</h3>
     </div>
     <div class="modal-body">
-      <p class="modal-desc" data-i18n="workspace.desc">No working folder has been configured yet. Pick an existing folder, or type a new path to create it.</p>
+      <p class="workspace-tagline" data-i18n="workspace.tagline">Your writing companion.</p>
+      <p class="modal-desc" data-i18n="workspace.desc">Please select your working folder to get started.</p>
       <div class="form-group">
         <label for="workspaceSetupPathInput" data-i18n="workspace.path_label">Workspace folder:</label>
         <div class="input-with-btn">

@@ -133,8 +133,9 @@
   "snapshot.diff_meta": "Comparaison entre la version actuelle et \"{name}\" (cr\u00e9\u00e9 le {date})",
   "snapshot.swapped_suffix": " \u2014 version remplac\u00e9e",
 
-  "workspace.title": "Choisissez votre dossier de travail",
-  "workspace.desc": "Aucun dossier de travail n\u2019a encore \u00e9t\u00e9 configur\u00e9. Choisissez un dossier existant, ou saisissez un nouveau chemin pour le cr\u00e9er.",
+  "workspace.title": "Bienvenue dans Scriptorium",
+  "workspace.tagline": "Votre compagnon d'\u00e9criture.",
+  "workspace.desc": "Veuillez s\u00e9lectionner votre dossier de travail pour commencer.",
   "workspace.path_label": "Dossier de travail :",
   "workspace.path_placeholder": "C:\\chemin\\vers\\workspace",
   "workspace.hint": "Le dossier est cr\u00e9\u00e9 s\u2019il n\u2019existe pas encore.",
