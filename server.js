@@ -426,7 +426,7 @@ Markdown renders live. The line you are editing switches to raw text, the others
 - The toolbar that appears on selection: bold, italic, underline, strikethrough, code, link, headings, quote.
 - The \`+\` button in the margin inserts a block: paragraph, headings H1 to H6, lists, checkbox, quote, code block, image, divider.
 - The block handle moves it, the trash deletes it.
-- Click an image to edit its URL.
+- Click an image to switch back to its Markdown source and edit the URL directly.
 - A click between two blocks inserts a new block there.
 - Pasting inserts plain text, never foreign formatting.
 
@@ -574,7 +574,7 @@ Le Markdown s'affiche en direct. La ligne que vous éditez passe en texte brut, 
 - La barre d'outils qui apparaît à la sélection : gras, italique, souligné, barré, code, lien, titres, citation.
 - Le bouton \`+\` dans la marge insère un bloc : paragraphe, titres H1 à H6, listes, case à cocher, citation, bloc de code, image, séparateur.
 - La poignée de bloc le déplace, la corbeille le supprime.
-- Cliquez sur une image pour modifier son URL.
+- Cliquez sur une image pour revenir à son code Markdown et modifier l'URL directement.
 - Un clic entre deux blocs insère un nouveau bloc à cet endroit.
 - Coller insère du texte brut, jamais de mise en forme étrangère.
 
