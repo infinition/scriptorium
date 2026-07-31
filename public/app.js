@@ -5022,9 +5022,34 @@ function currentBlockKind(text) {
 }
 
 function setLineBlockType(kind) {
-  if (!activeLineNode) return;
+  // Format the line that actually holds the selection, not only the remembered
+  // active line (they can drift apart after toolbar clicks).
+  const sel = window.getSelection();
+  let line = activeLineNode;
+  if (sel && sel.rangeCount) {
+    line = getLineForNode(sel.getRangeAt(0).startContainer) || activeLineNode;
+  }
+  if (!line || !content.contains(line)) return;
+
+  // Capture selection offsets before any DOM mutation. If the line is not raw
+  // yet (inactive rendered line), map the rendered offsets to raw ones.
+  let selStart = null, selEnd = null;
+  if (sel && sel.rangeCount) {
+    const r = sel.getRangeAt(0);
+    if (line.contains(r.startContainer) && line.contains(r.endContainer)) {
+      selStart = rangeOffsetIn(line, r.startContainer, r.startOffset);
+      selEnd = rangeOffsetIn(line, r.endContainer, r.endOffset);
+      if (line !== activeLineNode) {
+        selStart = renderedToRawOffset(line, selStart);
+        selEnd = renderedToRawOffset(line, selEnd);
+      }
+    }
+  }
+
+  if (line !== activeLineNode) makeLineRawAndActive(line);
+
   saveHistory(state.activeDocId, true);
-  const text = activeLineNode.textContent;
+  const text = line.textContent;
   const inner = stripBlockPrefix(text);
   // Clicking the format that's already applied toggles it back to a plain paragraph.
   const targetKind = currentBlockKind(text) === kind ? 'p' : kind;
@@ -5035,28 +5060,29 @@ function setLineBlockType(kind) {
 
   // Keep the caret or selection where it was instead of jumping to the end, so
   // H1 then H2 can be pressed in a row and the result is visible live.
-  const sel = window.getSelection();
-  let selStart = null, selEnd = null;
-  if (sel && sel.rangeCount) {
-    const r = sel.getRangeAt(0);
-    if (activeLineNode.contains(r.startContainer) && activeLineNode.contains(r.endContainer)) {
-      selStart = rangeOffsetIn(activeLineNode, r.startContainer, r.startOffset);
-      selEnd = rangeOffsetIn(activeLineNode, r.endContainer, r.endOffset);
-    }
-  }
-
-  activeLineNode.textContent = newText;
-  activeLineNode.dataset.raw = newText;
-  applyLineKind(activeLineNode, newText);
+  line.textContent = newText;
+  line.dataset.raw = newText;
+  applyLineKind(line, newText);
 
   if (selStart !== null) {
     const shift = (pos) => {
       if (pos <= oldPrefixLen) return Math.min(pos + newPrefixLen - oldPrefixLen, newPrefixLen);
       return Math.min(pos + newPrefixLen - oldPrefixLen, newText.length);
     };
-    setSelectionInLine(activeLineNode, shift(selStart), shift(selEnd));
+    const ns = shift(selStart);
+    const ne = shift(selEnd);
+    setSelectionInLine(line, ns, ne);
+    // Deferred post-processing (TOC, code grouping) may rebuild the line and
+    // drop the selection: re-apply it once the dust settles.
+    const target = line;
+    setTimeout(() => {
+      if (target === activeLineNode && content.contains(target)) {
+        target.textContent = target.dataset.raw !== undefined ? target.dataset.raw : target.textContent;
+        setSelectionInLine(target, ns, ne);
+      }
+    }, 280);
   } else {
-    setCaretInLine(activeLineNode, newText.length);
+    setCaretInLine(line, newText.length);
   }
   markDirty();
   updateStats();
