@@ -336,192 +336,292 @@ function setupWorkspaceWatcher() {
   } catch (err) {}
 }
 
-// Bilingual welcome demo written into an empty workspace: a tour of every
-// markdown feature the editor supports. One file per language.
+// Bilingual welcome demo written into an empty workspace: a complete guide
+// to every feature, one file per language.
 const WELCOME_DEMO_EN = `# Welcome to Scriptorium
 
-This document shows everything the editor can do. Keep it as an example, or delete it and start writing. Your files are saved directly on your disk.
+A distraction-free Markdown editor. Your texts are plain \`.md\` files on your disk, in the folder you chose on first launch.
 
-## Text formatting
+## First steps
+
+- **New document**: "New text" button in the sidebar, or \`Ctrl+N\`.
+- **New section**: "New section" button. A section is a folder; a document is a \`.md\` file inside it.
+- **Open a document**: click it in the sidebar.
+- **Rename**: change the title in the editor. The file is renamed on save.
+- **Move**: right-click a document (long-press on mobile), then pick the section.
+- **Import**: drag a \`.md\` file onto a section. Drag it onto the ideas panel to import a theme.
+- **Sort**: the sort button in the sidebar toggles alphabetical order and order by date.
+
+## Lock the document
+
+Click **Scriptorium.** at the top left to lock edits and deletions. Click again to unlock.
+
+## The right panel
+
+The button at the top right of the panel cycles between three views:
+
+- **Ideas**: your sentence cloud. A theme is a file in the \`ideas\` folder. Click an idea to archive it, right-click to insert it into your text, hover to read it in full. The \`+\` button adds an idea. The "Active" and "Archive" tabs filter the list.
+- **Contents**: the headings of the current document. Click a link to jump to that heading.
+- **Snapshots**: the document's revision history.
+
+## Snapshots
+
+A snapshot captures the state of a document at a given moment. Take one before a big cut, you can always come back.
+
+- **Create**: "+ Create a snapshot" button, then give it a name.
+- **Compare**: the "Compare" button shows the differences with the current version.
+- **Restore**: the snapshot's version replaces the current content, and the current version takes its place in the list. Restore again to go back.
+- **Delete**: removes the snapshot.
+
+## Ideas
+
+The ideas panel gathers short sentences, grouped by theme. It is a notebook of fragments to reuse.
+
+- Click an idea to archive it (it stays in the "Archive" tab).
+- Right-click to insert it into your text at the cursor.
+- Hover to read the idea in full.
+- The \`+\` button adds an idea to the active theme. Esc cancels.
+
+## Contents
+
+The contents list the headings of the document. Click a heading to jump straight to the section.
+
+## Breadcrumb
+
+The breadcrumb at the top shows the section, the title and the filename. Click it to go back to the top of the document. Click the filename to copy it.
+
+## Top bar
+
+- **Typewriter**: centres the active line vertically.
+- **Paragraph focus**: keeps only the current paragraph visible.
+- **Reading mode**: cycles between block text, continuous text, and typewriter reading with a fade.
+- **Focus mode** (\`F\`): keeps only the text, everything else fades away.
+- **Export**: print or PDF, standalone HTML, Markdown.
+- **Search** (\`Ctrl+P\`): searches across all documents and ideas.
+
+## Bottom bar
+
+- Counters: words, characters, reading time.
+- **Undo / Redo** (\`Ctrl+Z\` / \`Ctrl+Shift+Z\`).
+- **Remove empty lines**.
+- **Justify**: aligns the text left and right.
+- **Spell check**: toggles spell checking.
+- **Auto-scroll**: scrolls the text, click to set the speed.
+- **Find / Replace** (\`Ctrl+F\`).
+
+## Markdown editing
+
+Markdown renders live. The line you are editing switches to raw text, the others stay rendered.
+
+- The toolbar that appears on selection: bold, italic, underline, strikethrough, code, link, headings, quote.
+- The \`+\` button in the margin inserts a block: paragraph, headings H1 to H6, lists, checkbox, quote, code block, image, divider.
+- The block handle moves it, the trash deletes it.
+- Click an image to edit its URL.
+- A click between two blocks inserts a new block there.
+- Pasting inserts plain text, never foreign formatting.
+
+Shortcuts: \`Ctrl+G\` or \`Ctrl+B\` bold, \`Ctrl+I\` italic, \`Ctrl+K\` then \`C\` to change the heading level, \`Q\` quote, \`L\` list, \`U\` underline, \`D\` inline code.
+
+## Settings
+
+The gear at the top left opens the settings.
+
+- **Folders**: workspace path and ideas folder, with a browse button.
+- **Appearance**: colour themes (Default, Ivory, Polaire, Custom), text sizes per heading level, reading fade, hide YAML frontmatter, colour headings and formatting differently.
+- **Language**: Français or English.
+
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| \`Ctrl+N\` | New document |
+| \`Ctrl+S\` | Save |
+| \`Ctrl+P\` | Search |
+| \`Ctrl+F\` | Find / Replace |
+| \`Ctrl+G\` or \`Ctrl+B\` | Bold |
+| \`Ctrl+I\` | Italic |
+| \`Ctrl+Z\` / \`Ctrl+Shift+Z\` | Undo / Redo |
+| \`F\` | Focus mode |
+
+## Supported Markdown
+
+This document is itself an example. Headings, lists, tables, code blocks, LaTeX, quotes, links and images.
 
 **Bold**, *italic*, ~~strikethrough~~, <u>underline</u>, \`inline code\`, ==highlight==.
 
-## Headings
+An inline formula: $E = mc^2$.
 
-From the largest to the smallest. The H1 heading is the document title, the others structure the text.
+A display formula:
 
-### Subsection (H3)
+$$ \\int_{-\\infty}^{+\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi} $$
 
-#### Level 4 (H4)
-
-##### Level 5 (H5)
-
-###### Level 6 (H6)
-
-## Lists
-
-- Bullet list
-  - Nested item
-    - Deeper item
-
-1. First numbered item
-2. Second item
-3. Third item
-
-- [x] Completed task
-- [ ] Open task
-
-## Quotes
-
-> A quote to set a remark apart.
-
-> [!info] Note
-> An Obsidian-style callout, handy to draw attention.
-
-## Tables
-
-| Project | Status | Priority |
-|---------|--------|----------|
-| Design | Done | High |
-| Writing | In progress | Medium |
-
-## Code
+A code block:
 
 \`\`\`python
 def greet(name):
     print("Hello, " + name + "!")
 \`\`\`
 
-\`\`\`js
-function greet(name) {
-    return "Hello, " + name + "!";
-}
-\`\`\`
+A quote:
 
-## Math
+> Writing is thinking slowly.
 
-Inline formula: $E = mc^2$.
+A table:
 
-Display formula:
+| Style | Example |
+|---|---|
+| Bold | **text** |
+| Italic | *text* |
+| Strikethrough | ~~text~~ |
 
-$$ \\int_{-\\infty}^{+\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi} $$
-
-## Links and wikilinks
-
-[Markdown Guide](https://www.markdownguide.org)
-
-An Obsidian-style internal link: [[another-document]]
-
-## Image
-
-A test image loaded from the network:
+An image:
 
 ![Test image](https://picsum.photos/600/300)
 
-## Footnotes
-
-A sentence with a footnote[^1].
-
-[^1]: The footnote text appears at the bottom of the document.
-
-## Divider
-
----
-
-The rest is yours. Happy writing.
+Happy writing.
 `;
 
-const WELCOME_DEMO_FR = `# Bienvenue sur Scriptorium
+const WELCOME_DEMO_FR = `# Bienvenue dans Scriptorium
 
-Ce document présente tout ce que l'éditeur sait faire. Gardez-le en exemple ou supprimez-le pour commencer. Le texte est enregistré directement sur votre disque.
+Un éditeur Markdown sans distraction. Vos textes sont de simples fichiers \`.md\` sur votre disque, dans le dossier que vous avez choisi au premier lancement.
 
-## Mise en forme
+## Premiers gestes
+
+- **Nouveau texte** : bouton « Nouveau texte » dans la barre latérale, ou \`Ctrl+N\`.
+- **Nouvelle section** : bouton « Nouvelle section ». Une section est un dossier ; un document est un fichier \`.md\` dans ce dossier.
+- **Ouvrir un document** : cliquez dessus dans la barre latérale.
+- **Renommer** : changez le titre dans l'éditeur. Le fichier est renommé à la sauvegarde.
+- **Déplacer** : clic droit sur un document (appui long sur mobile), puis choisissez la section.
+- **Importer** : glissez un fichier \`.md\` sur une section. Glissez-le sur le panneau d'idées pour importer un thème.
+- **Trier** : le bouton de tri dans la barre latérale alterne l'ordre alphabétique et l'ordre par date.
+
+## Verrouiller le document
+
+Cliquez sur **Scriptorium.** en haut à gauche pour verrouiller les modifications et suppressions. Re-cliquez pour déverrouiller.
+
+## Le panneau de droite
+
+Le bouton en haut à droite du panneau alterne entre trois vues :
+
+- **Idées** : votre nuage de phrases. Un thème est un fichier dans le dossier \`ideas\`. Cliquez sur une idée pour l'archiver, clic droit pour l'insérer dans le texte, survol pour la lire en entier. Le bouton \`+\` ajoute une idée. Les onglets « Actives » et « Archive » filtrent la liste.
+- **Sommaire** : les titres du document courant. Cliquez un lien pour sauter au titre.
+- **Instantanés** : l'historique de révision du document.
+
+## Les instantanés
+
+Un instantané capture l'état d'un document à un moment précis. Prenez-en un avant une coupe importante, vous pourrez toujours revenir en arrière.
+
+- **Créer** : bouton « + Créer un instantané », puis donnez-lui un nom.
+- **Comparer** : le bouton « Comparer » affiche les différences avec la version actuelle.
+- **Restaurer** : la version de l'instantané remplace le contenu actuel, et la version actuelle prend sa place dans la liste. Restaurer à nouveau revient en arrière.
+- **Supprimer** : retire l'instantané.
+
+## Les idées
+
+Le panneau d'idées rassemble des phrases courtes, classées par thème. C'est un carnet de fragments à réutiliser.
+
+- Cliquez sur une idée pour l'archiver (elle reste dans l'onglet « Archive »).
+- Clic droit pour l'insérer dans votre texte au curseur.
+- Survol pour lire l'idée en entier.
+- Le bouton \`+\` ajoute une idée au thème actif. Échap annule.
+
+## Le sommaire
+
+Le sommaire liste les titres du document. Cliquez un titre pour sauter directement à la section.
+
+## Le fil d'ariane
+
+Le fil d'ariane en haut affiche la section, le titre et le nom du fichier. Cliquez dessus pour remonter tout en haut du document. Cliquez sur le nom de fichier pour le copier.
+
+## La barre du haut
+
+- **Machine à écrire** : centre la ligne active verticalement.
+- **Focus ligne** : ne laisse visible que le paragraphe courant.
+- **Mode lecture** : alterne entre texte en blocs, texte continu, et lecture machine à écrire avec fondu.
+- **Mode focus** (\`F\`) : ne garde que le texte, tout le reste s'efface.
+- **Exporter** : imprimer ou PDF, HTML autonome, Markdown.
+- **Recherche** (\`Ctrl+P\`) : cherche dans tous les documents et les idées.
+
+## La barre du bas
+
+- Compteurs : mots, caractères, temps de lecture.
+- **Annuler / Répéter** (\`Ctrl+Z\` / \`Ctrl+Shift+Z\`).
+- **Supprimer les lignes vides**.
+- **Justifier** : aligne le texte à gauche et à droite.
+- **Correcteur** : active ou coupe la vérification orthographique.
+- **Défilement auto** : fait défiler le texte, clic pour régler la vitesse.
+- **Rechercher / remplacer** (\`Ctrl+F\`).
+
+## Édition Markdown
+
+Le Markdown s'affiche en direct. La ligne que vous éditez passe en texte brut, les autres s'affichent rendues.
+
+- La barre d'outils qui apparaît à la sélection : gras, italique, souligné, barré, code, lien, titres, citation.
+- Le bouton \`+\` dans la marge insère un bloc : paragraphe, titres H1 à H6, listes, case à cocher, citation, bloc de code, image, séparateur.
+- La poignée de bloc le déplace, la corbeille le supprime.
+- Cliquez sur une image pour modifier son URL.
+- Un clic entre deux blocs insère un nouveau bloc à cet endroit.
+- Coller insère du texte brut, jamais de mise en forme étrangère.
+
+Raccourcis : \`Ctrl+G\` ou \`Ctrl+B\` gras, \`Ctrl+I\` italique, \`Ctrl+K\` puis \`C\` pour changer le niveau de titre, \`Q\` citation, \`L\` liste, \`U\` souligné, \`D\` code en ligne.
+
+## Les réglages
+
+L'engrenage en haut à gauche ouvre les paramètres.
+
+- **Dossiers** : chemin du dossier de travail et du dossier d'idées, avec bouton pour parcourir.
+- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire, Personnalisé), tailles de texte par niveau de titre, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
+- **Langue** : Français ou English.
+
+## Raccourcis clavier
+
+| Raccourci | Action |
+|---|---|
+| \`Ctrl+N\` | Nouveau texte |
+| \`Ctrl+S\` | Enregistrer |
+| \`Ctrl+P\` | Recherche |
+| \`Ctrl+F\` | Rechercher / remplacer |
+| \`Ctrl+G\` ou \`Ctrl+B\` | Gras |
+| \`Ctrl+I\` | Italique |
+| \`Ctrl+Z\` / \`Ctrl+Shift+Z\` | Annuler / Répéter |
+| \`F\` | Mode focus |
+
+## Markdown supporté
+
+Ce document est lui-même un exemple. Titres, listes, tableaux, blocs de code, LaTeX, citations, liens et images.
 
 **Gras**, *italique*, ~~barré~~, <u>souligné</u>, \`code en ligne\`, ==surligné==.
 
-## Titres
+Une formule en ligne : $E = mc^2$.
 
-Du plus grand au plus petit. Le titre H1 est le titre du document, les suivants structurent le texte.
+Une formule centrée :
 
-### Sous-section (H3)
+$$ \\int_{-\\infty}^{+\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi} $$
 
-#### Niveau 4 (H4)
-
-##### Niveau 5 (H5)
-
-###### Niveau 6 (H6)
-
-## Listes
-
-- Liste à puces
-  - Sous-point
-    - Sous-sous-point
-
-1. Premier point numéroté
-2. Second point
-3. Troisième point
-
-- [x] Tâche terminée
-- [ ] Tâche à faire
-
-## Citations
-
-> Une citation pour isoler une remarque.
-
-> [!tip] Astuce
-> Un callout de style Obsidian, utile pour attirer l'attention.
-
-## Tableaux
-
-| Projet | Statut | Priorité |
-|--------|--------|----------|
-| Design | Terminé | Haute |
-| Rédaction | En cours | Moyenne |
-
-## Code
+Un bloc de code :
 
 \`\`\`python
 def salutation(nom):
     print("Bonjour, " + nom + " !")
 \`\`\`
 
-\`\`\`js
-function salutation(nom) {
-    return "Bonjour, " + nom + " !";
-}
-\`\`\`
+Une citation :
 
-## Mathématiques
+> Écrire, c'est penser lentement.
 
-Formule en ligne : $E = mc^2$.
+Un tableau :
 
-Formule centrée :
+| Style | Exemple |
+|---|---|
+| Gras | **texte** |
+| Italique | *texte* |
+| Barré | ~~texte~~ |
 
-$$ \\int_{-\\infty}^{+\\infty} e^{-x^2} \\, dx = \\sqrt{\\pi} $$
-
-## Liens et wikilinks
-
-[Guide Markdown](https://www.markdownguide.org)
-
-Un lien interne de style Obsidian : [[autre-document]]
-
-## Image
-
-Une image de test chargée depuis le réseau :
+Une image :
 
 ![Image de test](https://picsum.photos/600/300)
 
-## Notes de bas de page
-
-Une phrase avec une note de bas de page[^1].
-
-[^1]: Le texte de la note s'affiche en bas du document.
-
-## Séparateur
-
----
-
-Le reste vous appartient. Bonne écriture.
+Bonne écriture.
 `;
 
 // Ensure default workspace structure exists

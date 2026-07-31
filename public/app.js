@@ -4872,11 +4872,9 @@ if (panelCycleBtn) {
   panelCycleBtn.addEventListener('click', cyclePanel);
 }
 
-// Restore preferred view
-try {
-  var stored = localStorage.getItem('rightPanelView');
-  if (stored === 'toc' || stored === 'snapshots') setRightPanelView(stored);
-} catch (e) {}
+// The main view is always the ideas panel on load; the cycle button switches
+// and remembers the choice for the rest of the session.
+setRightPanelView('ideas');
 
 // ============ INLINE SELECTION TOOLBAR + BLOCK-ADD GUTTER BUTTON ============
 
