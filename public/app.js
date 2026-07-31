@@ -1604,11 +1604,23 @@ function markDirty() {
   saveIndicator.classList.remove('saved');
   saveIndicator.classList.add('dirty');
   saveText.textContent = __('save.modified');
-  
+
+  // Safety-net autosave: only fires after the user stops typing for a while,
+  // so continuous writing does not hammer the disk. Most saves happen when a
+  // block is validated instead (clicking away, moving to another line).
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveDocumentOnDisk();
-  }, 600);
+  }, 1500);
+}
+
+// Save when the user finishes a block (clicks elsewhere, moves to another
+// line), collapsing rapid line changes into a single write.
+let validationSaveTimer;
+function scheduleBlockValidationSave() {
+  if (!dirty || !state.activeDocId) return;
+  clearTimeout(validationSaveTimer);
+  validationSaveTimer = setTimeout(() => saveDocumentOnDisk(), 300);
 }
 
 function insertTextAtCaret(text) {
@@ -2602,6 +2614,8 @@ function updateActiveLine() {
         activeLineNode.innerHTML = raw.trim() === '' ? '<br>' : renderMarkdownLine(raw);
         activeLineNode.classList.remove('active-line');
       }
+      // The previous block was just validated (selection moved on): save it.
+      scheduleBlockValidationSave();
 
       // Transition new active line to raw text
       activeLineNode = node;
@@ -2631,6 +2645,8 @@ function updateActiveLine() {
       activeLineNode.innerHTML = raw.trim() === '' ? '<br>' : renderMarkdownLine(raw);
       activeLineNode.classList.remove('active-line');
       activeLineNode = null;
+      // The edited block was validated by clicking outside: save it.
+      scheduleBlockValidationSave();
       debouncedPostProcess();
     }
   }
