@@ -49,13 +49,20 @@ jobs:
           releaseDraft: false
           prerelease: false
 
-      # The raw binary, no installer: a portable Windows exe.
-      - name: Upload standalone Windows exe
+      # The app spawns node server.js, so the raw exe alone cannot run. Build a
+      # portable package with the exe, the server, its assets and node.exe.
+      - name: Build portable Windows package
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          cp src-tauri/target/release/scriptorium.exe "Scriptorium_${VERSION}_x64_portable.exe"
-          gh release upload "$GITHUB_REF_NAME" "Scriptorium_${VERSION}_x64_portable.exe" --clobber
+          DIR="Scriptorium_${VERSION}_x64_portable"
+          mkdir -p "${DIR}"
+          cp src-tauri/target/release/scriptorium.exe "${DIR}/Scriptorium.exe"
+          cp "$(which node)" "${DIR}/node.exe"
+          cp server.js package.json "${DIR}/"
+          cp -r public locales node_modules "${DIR}/"
+          powershell -Command "Compress-Archive -Path '${DIR}' -DestinationPath '${DIR}.zip' -Force"
+          gh release upload "$GITHUB_REF_NAME" "${DIR}.zip" --clobber

@@ -214,7 +214,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .setup(|app| {
             let root = find_project_root()
-                .ok_or_else(|| fatal("Dossier du projet Scriptorium introuvable. Lancez l'application depuis la racine du projet."))?;
+                .ok_or_else(|| fatal("Serveur Scriptorium introuvable. Utilisez l'archive portable, ou placez l'application dans le dossier du projet, à côté de server.js."))?;
 
             let handle = start_server(&root)
                 .map_err(|e| fatal(&e))?;
