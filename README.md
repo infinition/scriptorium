@@ -7,6 +7,8 @@ The editor stays out of your way. Headings, lists, code blocks and math render
 in place; the line under your cursor switches to raw markdown so you can edit
 it like a regular text file. Nothing leaves your machine.
 
+![Scriptorium](docs/screenshot.jpg)
+
 ## Usage
 
 Scriptorium runs two ways, from the same codebase:
