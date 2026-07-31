@@ -1471,6 +1471,7 @@ button { font: inherit; color: inherit; }
   color: var(--accent);
   margin-bottom: 8px;
   line-height: 1.5;
+  text-align: center;
 }
 
 .form-group {
@@ -1537,6 +1538,11 @@ button { font: inherit; color: inherit; }
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+/* The first-launch chooser is a centered dialog: its confirm button is
+   centered too, unlike the settings modals where actions sit right. */
+#workspaceModal .modal-actions {
+  justify-content: center;
 }
 .btn {
   padding: 8px 16px;
