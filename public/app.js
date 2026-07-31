@@ -1605,13 +1605,10 @@ function markDirty() {
   saveIndicator.classList.add('dirty');
   saveText.textContent = __('save.modified');
 
-  // Safety-net autosave: only fires after the user stops typing for a while,
-  // so continuous writing does not hammer the disk. Most saves happen when a
-  // block is validated instead (clicking away, moving to another line).
+  // No autosave while the user stays inside a block. The file is written when
+  // the block is validated (clicking away, moving to another line), on Ctrl+S,
+  // when switching documents, and via sendBeacon when the app closes.
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveDocumentOnDisk();
-  }, 1500);
 }
 
 // Save when the user finishes a block (clicks elsewhere, moves to another
