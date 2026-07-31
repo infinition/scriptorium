@@ -49,20 +49,20 @@ jobs:
           releaseDraft: false
           prerelease: false
 
-      # The app spawns node server.js, so the raw exe alone cannot run. Build a
-      # portable package with the exe, the server, its assets and node.exe.
-      - name: Build portable Windows package
+      # A single self-contained Windows exe: the app binary with the server,
+      # its assets, node_modules and node.exe compressed and appended to it.
+      - name: Build self-contained Windows exe
         if: matrix.platform == 'windows-latest' && startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          DIR="Scriptorium_${VERSION}_x64_portable"
-          mkdir -p "${DIR}"
-          cp src-tauri/target/release/scriptorium.exe "${DIR}/Scriptorium.exe"
-          cp "$(which node)" "${DIR}/node.exe"
-          cp server.js package.json "${DIR}/"
-          cp -r public locales node_modules "${DIR}/"
-          powershell -Command "Compress-Archive -Path '${DIR}' -DestinationPath '${DIR}.zip' -Force"
-          gh release upload "$GITHUB_REF_NAME" "${DIR}.zip" --clobber
+          cp "$(which node)" node.exe
+          tar -czf payload.tar.gz server.js package.json public locales node_modules node.exe
+          rm -f node.exe
+          cp src-tauri/target/release/scriptorium.exe "Scriptorium_${VERSION}_x64.exe"
+          printf '\x00SCRI_PORTABLE_PAYLOAD\x00' >> "Scriptorium_${VERSION}_x64.exe"
+          cat payload.tar.gz >> "Scriptorium_${VERSION}_x64.exe"
+          rm -f payload.tar.gz
+          gh release upload "$GITHUB_REF_NAME" "Scriptorium_${VERSION}_x64.exe" --clobber

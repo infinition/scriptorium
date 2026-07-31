@@ -4,6 +4,7 @@
 //! existing Node server (`node server.js`) and loads its URL. No business
 //! logic lives here, so the GUI behaves exactly like the browser version.
 
+use std::fs;
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
@@ -53,6 +54,34 @@ fn find_project_root() -> Option<PathBuf> {
         }
     }
     None
+}
+
+// A single self-contained Windows exe carries a compressed payload appended
+// after a marker: node.exe, server.js, the assets and node_modules. Extract it
+// once into the user data dir, then run node from there. This makes the exe
+// work anywhere, with no project folder and no Node install required.
+fn extract_portable_payload() -> Option<PathBuf> {
+    const MARKER: &[u8] = b"\x00SCRI_PORTABLE_PAYLOAD\x00";
+    let exe = std::env::current_exe().ok()?;
+    let bytes = fs::read(&exe).ok()?;
+    let pos = bytes.windows(MARKER.len()).rposition(|w| w == MARKER)? + MARKER.len();
+    if pos >= bytes.len() {
+        return None;
+    }
+
+    let version = env!("CARGO_PKG_VERSION");
+    let base = dirs::data_dir()?.join("Scriptorium").join("portable");
+    let marker_file = base.join(".version");
+    if fs::read_to_string(&marker_file).ok().as_deref() == Some(version) {
+        return Some(base);
+    }
+    let _ = fs::remove_dir_all(&base);
+    fs::create_dir_all(&base).ok()?;
+    let decoder = flate2::read::GzDecoder::new(&bytes[pos..]);
+    let mut archive = tar::Archive::new(decoder);
+    archive.unpack(&base).ok()?;
+    let _ = fs::write(&marker_file, version);
+    Some(base)
 }
 
 fn server_is_up(port: u16) -> bool {
@@ -108,7 +137,13 @@ fn start_server(root: &Path) -> Result<ServerHandle, String> {
         }
     }
     for &port in &CANDIDATE_PORTS {
-        let mut child = Command::new("node")
+        // Use the bundled node.exe when present (portable build), else PATH.
+        let node = if root.join("node.exe").exists() {
+            root.join("node.exe")
+        } else {
+            PathBuf::from("node")
+        };
+        let mut child = Command::new(node)
             .arg("server.js")
             .current_dir(root)
             .env("PORT", port.to_string())
@@ -214,6 +249,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .setup(|app| {
             let root = find_project_root()
+                .or_else(extract_portable_payload)
                 .ok_or_else(|| fatal("Serveur Scriptorium introuvable. Utilisez l'archive portable, ou placez l'application dans le dossier du projet, à côté de server.js."))?;
 
             let handle = start_server(&root)
