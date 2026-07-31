@@ -1540,9 +1540,11 @@ button { font: inherit; color: inherit; }
   gap: 10px;
 }
 /* The first-launch chooser is a centered dialog: its confirm button is
-   centered too, unlike the settings modals where actions sit right. */
+   centered too, unlike the settings modals where actions sit right. The
+   bottom padding keeps the button clear of the modal edge. */
 #workspaceModal .modal-actions {
   justify-content: center;
+  padding: 0 20px 22px;
 }
 .btn {
   padding: 8px 16px;
