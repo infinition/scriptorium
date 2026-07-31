@@ -1,151 +1,155 @@
 # Scriptorium
 
-Un éditeur Markdown sans distraction qui lit et écrit des fichiers `.md`
-ordinaires sur votre propre disque. Pensé pour l'écriture longue : manifestes,
-essais, notes, brouillons.
+A distraction-free markdown writer that reads and writes plain `.md` files on
+your own disk. Built for long-form work: manifestos, essays, notes, drafts.
 
-L'éditeur s'efface devant le texte. Les titres, listes, blocs de code et
-formules s'affichent en direct ; la ligne sous votre curseur passe en Markdown
-brut pour que vous l'éditiez comme un fichier texte. Rien ne quitte votre
-machine.
+The editor stays out of your way. Headings, lists, code blocks and math render
+in place; the line under your cursor switches to raw markdown so you can edit
+it like a regular text file. Nothing leaves your machine.
 
-## Installation
+## Usage
 
-### Version web
+Scriptorium runs two ways, from the same codebase:
+
+- **Web server**: run `node server.js`, open `http://localhost:3000`. Works in
+  any browser, including on a phone or tablet on your local network.
+- **Desktop GUI**: a native window (Tauri) that launches the same server and
+  displays the app. Identical behaviour, no browser needed.
+
+### Web server
 
 ```bash
 npm install
 npm start
 ```
 
-Ouvrez ensuite `http://localhost:3000`.
+Then open `http://localhost:3000`.
 
-### Version bureau (Tauri)
+The server binds to `127.0.0.1` by default. To reach it from another device on
+your network, run `HOST=0.0.0.0 npm start`; it then prints a URL with an access
+token.
+
+### Desktop GUI (Tauri)
 
 ```bash
 npm install
 npm run tauri:dev
 ```
 
-La fenêtre native démarre le même serveur Node et affiche l'application. Le
-comportement est strictement identique à la version web. Node doit être
-disponible dans le `PATH`.
+The native window starts the same Node server and shows the app. Node must be
+available in the `PATH`.
 
-Un pipeline de compilation automatique (GitHub Actions) produit les
-installateurs Windows, Linux et macOS à chaque tag de version `v*`. Retrouvez
-les binaires sur la page des releases :
+A build pipeline (GitHub Actions) produces installers for Windows, Linux and
+macOS on every `v*` version tag. Binaries are on the releases page:
 <https://github.com/infinition/scriptorium/releases>
 
-## Premier lancement
+## First launch
 
-Au premier lancement, quand aucun dossier de travail n'a encore été configuré,
-l'application demande de choisir un dossier existant ou d'en créer un. Ce choix
-est enregistré dans `config.json`, à côté de `server.js`. Changez-le plus tard
-depuis l'engrenage de la barre latérale, ou en éditant `config.json`.
+On first launch, when no working folder has been configured yet, the app asks
+you to pick an existing folder or create one. The choice is saved in
+`config.json`, next to `server.js`. Change it later from the gear icon in the
+sidebar, or edit `config.json` directly.
 
-Un espace de travail vierge est préparé avec un guide bilingue (français et
-anglais) qui décrit toutes les fonctions, plus deux thèmes d'idées généraux,
-un par langue.
+A fresh workspace is seeded with a bilingual guide (French and English)
+describing every feature, plus two general ideas themes, one per language.
 
-## L'espace de travail
+## Workspace layout
 
-Scriptorium reflète un dossier que vous possédez, structure pour structure :
+Scriptorium mirrors a folder you own, structure for structure:
 
 ```
 workspace/
-  Manifestes/                      <- une section (groupe dans la barre latérale)
-    mon-texte.md                   <- un document
-  Essais/
-    bienvenue.md
-  ideas/                           <- la source du nuage d'idées
-    général.md                     <- un thème par fichier
+  Manifestos/                      <- a section (sidebar group)
+    my-document.md                 <- a document
+  Essays/
+    welcome.md
+  ideas/                           <- the sentence-cloud source
+    general.md                     <- one theme per file
 ```
 
-- Un sous-dossier est une section. Renommez le dossier, la section est renommée.
-- Un `.md` à la racine atterrit dans la section implicite « Général ».
-- Glissez un `.md` sur une section pour l'importer.
-- Les fichiers `ideas/*.md` alimentent le panneau d'idées. Chaque ligne qui
-  commence par `- ` est une idée ; `- [x] ...` signifie archivée. Les fichiers
-  sont réécrits sur place quand vous cliquez sur une idée, donc les modifier
-  depuis un autre éditeur fonctionne aussi.
+- A subfolder is a section. Rename the folder, the section renames.
+- A `.md` at the root lands in the implicit "General" section.
+- Drag a `.md` onto a section to import it.
+- `ideas/*.md` files feed the ideas panel. Each line starting with `- ` is an
+  idea; `- [x] ...` means archived. The files are rewritten in place when you
+  click an idea, so editing them from another editor works too.
 
-Les noms de fichiers dérivent du titre (slugifié, ASCII). Changez le titre et
-le fichier est renommé à la sauvegarde.
+Filenames are derived from the title (slugified, ASCII). Change the title and
+the file is renamed on save.
 
-## Fonctions
+## Features
 
-- **Verrouiller** : cliquez sur « Scriptorium. » en haut à gauche pour bloquer
-  les modifications et suppressions. En vigueur côté serveur, pas seulement
-  dans l'interface.
-- **Panneau de droite** : le bouton en haut du panneau alterne entre les
-  idées, le sommaire et les instantanés.
-- **Idées** : un nuage de phrases classé par thème. Clic pour archiver, clic
-  droit pour insérer dans le texte, survol pour lire.
-- **Sommaire** : les titres du document. Cliquez un titre pour sauter à la
-  section.
-- **Instantanés** : l'historique de révision d'un document. Créez un
-  instantané avant une coupe, comparez, restaurez (la version actuelle prend
-  sa place dans la liste), supprimez.
-- **Fil d'ariane** : cliquez pour remonter en haut du document. Cliquez le nom
-  de fichier pour le copier.
-- **Mode focus** (`F`), **machine à écrire** (`T`), **focus paragraphe** (`P`),
-  **mode lecture** (`R` ou `Tab`), **défilement auto** (`A`).
-- **Recherche** (`Ctrl+P`) : plein texte dans les documents et les idées.
-- **Rechercher / remplacer** (`Ctrl+F`) : sur le source Markdown.
-- **Exporter** : impression / PDF, HTML autonome, Markdown.
-- **Coller une image** ou la glisser : elle est enregistrée dans le dossier
-  `assets/` du workspace et insérée dans le texte.
-- **Sécurité** : les chemins venant du client sont confinés au workspace. Un
-  nom de section ou de document ne peut être qu'un segment de chemin.
+- **Lock**: click "Scriptorium." at the top left to block edits and deletions.
+  Enforced server-side, not just in the UI.
+- **Right panel**: the button at the top of the panel cycles between ideas,
+  table of contents and snapshots.
+- **Ideas**: a sentence cloud grouped by theme. Click to archive, right-click
+  to insert into the text, hover to read.
+- **Table of contents**: the headings of the document. Click a heading to jump
+  to the section.
+- **Snapshots**: a document's revision history. Take a snapshot before a big
+  cut, compare, restore (the current version takes its place in the list),
+  delete.
+- **Breadcrumb**: click it to go back to the top of the document. Click the
+  filename to copy it.
+- **Focus mode** (`F`), **typewriter** (`T`), **paragraph focus** (`P`),
+  **reading mode** (`R` or `Tab`), **auto-scroll** (`A`).
+- **Search** (`Ctrl+P`): full text across documents and ideas.
+- **Find / Replace** (`Ctrl+F`): on the raw markdown source.
+- **Export**: print / PDF, standalone HTML, Markdown.
+- **Paste or drop an image**: it is saved into the workspace `assets/` folder
+  and inserted into the text.
+- **Safety**: paths coming from the client are confined to the workspace. A
+  section or document name can only ever be a single path segment.
 
-## Raccourcis clavier
+## Keyboard shortcuts
 
-| Raccourci | Action |
+| Shortcut | Action |
 |---|---|
-| `Ctrl+N` | Nouveau texte |
-| `Ctrl+S` | Enregistrer |
-| `Ctrl+P` | Recherche |
-| `Ctrl+F` | Rechercher / remplacer |
-| `Ctrl+G` ou `Ctrl+B` | Gras |
-| `Ctrl+I` | Italique |
-| `Ctrl+K` puis `C` | Changer le niveau de titre |
-| `Ctrl+K` puis `Q` | Citation |
-| `Ctrl+K` puis `L` | Liste |
-| `Ctrl+K` puis `U` | Souligné |
-| `Ctrl+K` puis `D` | Code en ligne |
-| `Ctrl+Z` / `Ctrl+Shift+Z` | Annuler / Répéter |
-| `T` | Machine à écrire |
-| `P` | Focus paragraphe |
-| `R` ou `Tab` | Mode lecture |
-| `A` | Défilement auto |
-| `F` | Mode focus |
+| `Ctrl+N` | New document |
+| `Ctrl+S` | Save |
+| `Ctrl+P` | Search |
+| `Ctrl+F` | Find / Replace |
+| `Ctrl+G` or `Ctrl+B` | Bold |
+| `Ctrl+I` | Italic |
+| `Ctrl+K` then `C` | Change heading level |
+| `Ctrl+K` then `Q` | Quote |
+| `Ctrl+K` then `L` | List |
+| `Ctrl+K` then `U` | Underline |
+| `Ctrl+K` then `D` | Inline code |
+| `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / Redo |
+| `T` | Typewriter |
+| `P` | Paragraph focus |
+| `R` or `Tab` | Reading mode |
+| `A` | Auto-scroll |
+| `F` | Focus mode |
 
-## Markdown supporté
+## Markdown support
 
-CommonMark plus quelques extensions utilisées par Obsidian et GitHub :
+CommonMark plus a few extensions used by Obsidian and GitHub:
 
-- Titres, listes, listes numérotées, cases à cocher (`- [ ]` / `- [x]`)
-- Gras, italique, barré, souligné (via `<u>`), code en ligne, surligné (`==text==`)
-- Liens, wikilinks (`[[nom]]`), images
-- Citations et callouts de style Obsidian (`> [!info] Titre`)
-- Tableaux
-- Séparateurs
-- Blocs de code avec coloration syntaxique (`highlight.js`)
-- LaTeX en ligne (`$x^2$`) et centré (`$$ ... $$`) via KaTeX
-- Notes de bas de page (`[^1]`)
+- Headings, lists, ordered lists, task lists (`- [ ]` / `- [x]`)
+- Bold, italic, strikethrough, underline (via `<u>`), inline code, highlight (`==text==`)
+- Links, wikilinks (`[[name]]`), images
+- Blockquotes and Obsidian-style callouts (`> [!info] Title`)
+- Tables
+- Horizontal rules
+- Fenced code blocks with syntax highlighting (`highlight.js`)
+- Inline LaTeX (`$x^2$`) and display LaTeX (`$$ ... $$`) via KaTeX
+- Footnotes (`[^1]`)
 
-## Développement
+## Development
 
-- Node.js + Express côté serveur. Toute l'API est dans `server.js`.
-- Pas de framework côté client : `public/{index.html, app.js, style.css}`.
-- `highlight.js` et `KaTeX` sont installés en dépendances et servis depuis
-  `node_modules` sous `/vendor`. Aucun CDN, tout fonctionne hors ligne.
-- Polices : Newsreader (texte), Inter (interface), JetBrains Mono (code).
-- La version bureau utilise Tauri (WebView2) comme fenêtre par-dessus le
-  serveur Node. `src-tauri/src/lib.rs` lance `node server.js` et ouvre la
-  fenêtre sur son URL.
-- Le site de présentation est dans `docs/` et publié sur GitHub Pages.
+- Node.js + Express on the server side. The whole API is in `server.js`.
+- No framework on the client: `public/{index.html, app.js, style.css}`.
+- `highlight.js` and `KaTeX` are installed as dependencies and served from
+  `node_modules` under `/vendor`. No CDN, everything works offline.
+- Fonts: Newsreader (body), Inter (UI), JetBrains Mono (code).
+- The desktop version uses Tauri (WebView2) as a window over the Node server.
+  `src-tauri/src/lib.rs` launches `node server.js` and opens the window on its
+  URL.
+- The presentation site lives in `docs/` and is published on GitHub Pages.
 
-## Licence
+## License
 
-ISC. Voir `package.json`.
+ISC. See `package.json`.
