@@ -22,6 +22,65 @@ the gear icon in the sidebar, or edit `config.json` directly. To run against a
 different folder for one session without touching the saved config, set
 `SCRIPTORIUM_WORKSPACE`.
 
+### Version bureau (Tauri)
+
+Une fenêtre native (Tauri + WebView2) affiche la même application. Elle lance
+`node server.js` et charge son URL. Aucune logique métier n'est réimplémentée
+dans la coquille, le comportement est strictement identique à la version web.
+
+```bash
+npm install
+npm run tauri:dev
+```
+
+La fenêtre démarre le serveur sur un port dédié (48731, secours 48732 et
+48733) et l'arrête à la fermeture, même en cas de fermeture forcée. Node doit
+être disponible dans le `PATH`.
+
+Les modes de lancement coexistent sans conflit :
+- Serveur seul : `npm start`, puis navigateur sur `http://localhost:3000`.
+- GUI seule : la fenêtre gère son propre serveur, aucun lancement manuel.
+- Si un serveur écoute déjà sur 48731, la fenêtre le réutilise et ne démarre
+  pas un second processus. Un serveur qu'elle n'a pas lancé n'est pas arrêté
+  à sa fermeture.
+
+#### Architecture
+
+La coquille Tauri ne contient pas de logique métier. Au démarrage elle
+localise la racine du projet (là où se trouvent `server.js`, `config.json` et
+`node_modules`), lance `node server.js` sur le port choisi, attend que le
+serveur réponde, puis ouvre la fenêtre sur `http://127.0.0.1:<port>/`.
+
+Le frontend est celui de la version web, inchangé. Toutes les requêtes vont
+directement au serveur HTTP. La parité avec la version navigateur est totale :
+même format de fichiers sur disque, même gestion des conflits d'édition,
+mêmes snapshots, imports, corbeille et flux d'événements.
+
+#### Correctifs apportés à la coquille initiale
+
+- Backend : le serveur Node est l'unique source de vérité. La coquille
+  initiale réimplémentait l'API en Rust, de façon incomplète (snapshots,
+  sections, déplacements, idées, thèmes et imports absents) et avec un format
+  de fichiers divergent (sous-titre écrit en `##` au lieu de `*...*`). Cette
+  réimplémentation a été supprimée.
+- Frontend : le formatage en ligne et l'écran de réglages étaient dupliqués
+  dans la coquille initiale, ce qui cassait l'édition. Le frontend est revenu
+  à l'implémentation unique de la version web.
+- Assets : KaTeX, highlight.js et les polices sont servis par le serveur Node
+  depuis `node_modules`, comme dans la version web. Aucune copie n'est
+  embarquée dans le bundle de la fenêtre.
+- Configuration : le `config.json` à la racine du projet est lu tel quel
+  (dossier de travail, thème personnalisé). La coquille initiale lisait un
+  fichier de configuration séparé dans le dossier de profil de l'utilisateur.
+- Cycle de vie : le serveur démarre avec la fenêtre et s'arrête avec elle,
+  même en cas de fermeture forcée (Job Object Windows).
+
+Pour empaqueter un `.exe` autonome :
+
+```bash
+npm run tauri:build
+```
+
 ### From a phone or tablet
 
 The server binds to `127.0.0.1` by default, so nothing outside this machine can
@@ -37,7 +96,7 @@ It then prints a URL containing an access token:
   Téléphone : http://192.168.1.20:3000/?token=xxxxxxxx
 ```
 
-Open that link once on the phone — the token is stored in `localStorage` and
+Open that link once on the phone. The token is stored in `localStorage` and
 removed from the address bar, and every later visit works from the plain URL.
 The token lives in `config.json`; delete it there to revoke access.
 
@@ -47,7 +106,7 @@ the server, since that is what reads and writes your files.
 
 ## Offline
 
-No CDN, no external font host — KaTeX, highlight.js and the three typefaces are
+No CDN, no external font host. KaTeX, highlight.js and the three typefaces are
 installed by `npm install` and served from `node_modules`. The only network
 traffic is between your browser and your own machine.
 
@@ -101,8 +160,8 @@ quote, code block, divider.
 
 Clicking in the space between two blocks inserts a new one there. That space is
 the only place an insertion happens: a click anywhere inside a block always
-edits that block, with no exception. The cursor says which one you will get —
-`text` over a block, `cell` over a gap — and only one of the two highlights is
+edits that block, with no exception. The cursor says which one you will get:
+`text` over a block, `cell` over a gap, and only one of the two highlights is
 ever shown. On touch, a short vibration marks the gap.
 
 Pasting always inserts plain text: content copied from a word processor or a
@@ -128,11 +187,11 @@ its id and position; only its contents move.
 ## Concurrent edits
 
 Documents are saved with the timestamp they were opened at. If the file changed
-in the meantime — the same document open on your phone, in another tab, or in
-an external editor — the save is refused and you are asked which version to
-keep, instead of one silently overwriting the other. When the conflict happens
-as the page is closing, and there is nobody to ask, the incoming version is
-written next to the original as `<name>.conflit-<date>.md`.
+in the meantime (the same document open on your phone, in another tab, or in an
+external editor), the save is refused and you are asked which version to keep,
+instead of one silently overwriting the other. When the conflict happens as the
+page is closing, and there is nobody to ask, the incoming version is written
+next to the original as `<name>.conflit-<date>.md`.
 
 ## Markdown support
 
@@ -163,6 +222,10 @@ in source.
   `@fontsource`.
 - `public/sw.js` caches the app shell so it opens offline; `/api/` is never
   cached.
+- La version bureau utilise Tauri (WebView2) comme simple fenêtre par-dessus le
+  serveur Node. Aucune logique métier n'est réimplémentée côté Rust :
+  `src-tauri/src/lib.rs` se contente de lancer `node server.js` et d'ouvrir la
+  fenêtre sur son URL.
 
 Paths coming from the client are confined to the workspace folder
 (`safeJoin`/`assertSegment` in `server.js`): a section or document name can

@@ -98,6 +98,36 @@ const ideasPanel = $('ideasPanel');
 
 // ============ API COMMUNICATIONS ============
 
+let sseInitialized = false;
+
+function initSSE() {
+  if (sseInitialized || !window.EventSource) return;
+  sseInitialized = true;
+  try {
+    const ev = new EventSource('/api/events');
+    ev.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'workspace-changed') {
+          onWorkspaceChangedExternally();
+        }
+      } catch (err) {}
+    };
+  } catch (err) {}
+}
+
+async function onWorkspaceChangedExternally() {
+  if (dirty) {
+    showToast('toast.external_change');
+    return;
+  }
+  await fetchWorkspace();
+  if (state.activeDocId) {
+    const doc = activeDoc();
+    if (doc) loadDocIntoEditor(doc);
+  }
+}
+
 async function fetchWorkspace() {
   updateLockStateUI();
   docHistory = {}; // Clear history cache on workspace load
@@ -138,6 +168,7 @@ async function fetchWorkspace() {
     }
     
     renderAll();
+    initSSE();
   } catch (err) {
     console.error('Error fetching workspace:', err);
     alert(__('alert.workspace_load_error', { message: err.message }));
@@ -276,12 +307,29 @@ async function createDocument(sectionId) {
   }
 }
 
+async function duplicateDocument(docId) {
+  try {
+    const res = await fetch('/api/documents/duplicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: docId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.activeDocId = data.document.id;
+      await fetchWorkspace();
+      showToast('toast.doc_duplicated');
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 async function deleteDocument(docId) {
   if (state.isLocked) {
     alert(__('alert.locked'));
     return;
   }
-  if (!confirm(__('confirm.doc_delete'))) return;
 
   try {
     const res = await fetch('/api/documents', {
@@ -295,7 +343,28 @@ async function deleteDocument(docId) {
         state.activeDocId = null;
       }
       await fetchWorkspace();
-      showToast('toast.doc_deleted');
+
+      if (data.trashId) {
+        showToastWithAction('toast.doc_deleted_undo', null, 'toast.undo_btn', async function () {
+          try {
+            const restoreRes = await fetch('/api/documents/restore-trash', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ trashId: data.trashId, sectionId: data.sectionId, filename: data.filename })
+            });
+            const restoreData = await restoreRes.json();
+            if (restoreData.success) {
+              state.activeDocId = restoreData.id;
+              await fetchWorkspace();
+              showToast('toast.doc_restored');
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }, 5000);
+      } else {
+        showToast('toast.doc_deleted');
+      }
     }
   } catch (err) {
     console.error(err);
@@ -621,6 +690,44 @@ function showToast(key, vars) {
   }, 2200);
 }
 
+function showToastWithAction(key, vars, actionLabelKey, onAction, duration) {
+  if (!toastContainer) toastContainer = document.getElementById('toastContainer');
+  if (!toastContainer) return;
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    var old = toastContainer.querySelector('.toast');
+    if (old) old.remove();
+  }
+
+  var el = document.createElement('div');
+  el.className = 'toast toast-action';
+
+  var textSpan = document.createElement('span');
+  textSpan.textContent = __(key, vars);
+  el.appendChild(textSpan);
+
+  var actBtn = document.createElement('button');
+  actBtn.type = 'button';
+  actBtn.className = 'toast-action-btn';
+  actBtn.textContent = __(actionLabelKey);
+  actBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    el.remove();
+    onAction();
+  });
+  el.appendChild(actBtn);
+
+  toastContainer.appendChild(el);
+
+  toastTimer = setTimeout(function () {
+    el.classList.add('toast-out');
+    setTimeout(function () { if (el.parentNode) el.remove(); }, 220);
+    toastTimer = null;
+  }, duration || 5000);
+}
+
 // On touch devices, show button titles as brief toasts (hover tooltips don't work)
 (function () {
   if (!window.matchMedia('(pointer: coarse)').matches) return;
@@ -693,14 +800,14 @@ function renderNav() {
       <span class="title">${escapeHtml(section.name)}</span>
       <span class="count">${section.documents.length}</span>
       <div class="nav-section-actions">
-        <button class="icon-btn" data-act="rename" title="Renommer">
+        <button class="icon-btn" data-act="rename" title="${escapeHtml(__('nav.section_rename_title'))}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>
-        <button class="icon-btn" data-act="add" title="Ajouter doc">
+        <button class="icon-btn" data-act="add" title="${escapeHtml(__('nav.section_add_title'))}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
         ${section.id !== '_general' ? `
-        <button class="icon-btn" data-act="delete" title="Supprimer section">
+        <button class="icon-btn" data-act="delete" title="${escapeHtml(__('nav.section_delete_title'))}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
         </button>` : ''}
       </div>
@@ -815,12 +922,13 @@ function renderNav() {
     documentsForNav(section.documents).forEach(doc => {
       const item = document.createElement('div');
       item.className = 'nav-item' + (doc.id === state.activeDocId ? ' active' : '');
+      item.dataset.docId = doc.id;
       item.draggable = true;
       var docLabel = doc.title || __('new_doc.default_title');
       item.innerHTML = `
         <span class="label" title="${escapeHtml(docLabel)}">${escapeHtml(docLabel)}</span>
         <span class="meta">${relDate(doc.updatedAt)}</span>
-        <button class="delete-doc" title="Supprimer">
+        <button class="delete-doc" title="${escapeHtml(__('nav.doc_delete_title'))}">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       `;
@@ -976,7 +1084,7 @@ function renderThemesTabs() {
   state.ideaThemes.forEach(theme => {
     const tab = document.createElement('button');
     tab.className = 'theme-tab' + (theme.id === state.activeThemeId ? ' active' : '');
-    tab.innerHTML = `<span>${escapeHtml(theme.name)}</span><span class="delete-theme" title="Supprimer">×</span>`;
+    tab.innerHTML = `<span>${escapeHtml(theme.name)}</span><span class="delete-theme" title="${escapeHtml(__('theme.tab_delete_title'))}">×</span>`;
     
     tab.addEventListener('click', (e) => {
       if (e.target.classList.contains('delete-theme')) {
@@ -5998,7 +6106,7 @@ let autoScrollState = 0; // 0=off, 1=slow, 2=medium, 3=normal
 let autoScrollTimerId = null;
 let autoScrollPaused = false;
 var AUTO_SCROLL_TICK_MS = 40;    // ~25 fps, smooth enough
-var AUTO_SCROLL_RATES = [0, 0.6, 1.2, 2.4]; // px per tick (0.6*25≈15px/s, 1.2*25=30px/s, 2.4*25=60px/s)
+var AUTO_SCROLL_RATES = [0, 0.6, 1.8, 3.6]; // px per tick (0.6*25=15px/s, 1.8*25=45px/s, 3.6*25=90px/s)
 let activeDiffSnapshot = null;
 
 function applyTextJustify(enable) {
@@ -7018,15 +7126,99 @@ if (isCoarsePointer) {
     if (menuEl) { menuEl.remove(); menuEl = null; }
   };
 
+  // The file manager opens on the machine running the server, so revealing a
+  // document only makes sense when the page is that same machine.
+  const isLocalMachine = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname);
+
+  async function openDocOnDisk(docId, mode) {
+    try {
+      const res = await fetch('/api/open-doc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: docId, mode })
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      if (mode === 'path') {
+        const data = await res.json();
+        await navigator.clipboard.writeText(data.path);
+        showToast('toast.path_copied');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('toast.open_failed');
+    }
+  }
+
+  async function openSectionFolder(sectionId) {
+    try {
+      const res = await fetch('/api/open-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sectionId })
+      });
+      if (!res.ok) throw new Error(String(res.status));
+    } catch (err) {
+      console.error(err);
+      showToast('toast.open_failed');
+    }
+  }
+
+  // Shared shell for both context menus.
+  function buildMenu(x, y, titleText) {
+    menuEl = document.createElement('div');
+    menuEl.className = 'block-menu visible doc-move-menu';
+    menuEl.innerHTML = `<div class="block-menu-title">${escapeHtml(titleText)}</div>`;
+    return () => {
+      document.body.appendChild(menuEl);
+      const r = menuEl.getBoundingClientRect();
+      menuEl.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
+      menuEl.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
+    };
+  }
+
+  function addItem(ico, label, onClick) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'block-menu-item';
+    item.innerHTML = `<span class="ico">${ico}</span><span></span>`;
+    item.lastChild.textContent = label;
+    item.addEventListener('click', () => { closeMenu(); onClick(); });
+    menuEl.appendChild(item);
+  }
+
+  function openSectionMenu(sectionId, x, y) {
+    closeMenu();
+    const section = state.sections.find(s => s.id === sectionId);
+    if (!section || !isLocalMachine) return;
+    const place = buildMenu(x, y, section.name);
+    addItem('📁', __('nav.section_open_folder'), () => openSectionFolder(sectionId));
+    place();
+  }
+
   function openMoveMenu(docId, x, y) {
     closeMenu();
     const doc = findDoc(docId);
     if (!doc) return;
     const currentSection = state.sections.find(s => s.documents.some(d => d.id === docId));
 
-    menuEl = document.createElement('div');
-    menuEl.className = 'block-menu visible doc-move-menu';
-    menuEl.innerHTML = `<div class="block-menu-title">Déplacer « ${escapeHtml(doc.title || __('new_doc.default_title'))} » vers…</div>`;
+    const place = buildMenu(x, y, doc.title || __('new_doc.default_title'));
+
+    if (isLocalMachine) {
+      addItem('📄', __('nav.doc_open_file'), () => openDocOnDisk(docId, 'file'));
+      addItem('📁', __('nav.doc_reveal'), () => openDocOnDisk(docId, 'reveal'));
+      addItem('⧉', __('nav.doc_copy_path'), () => openDocOnDisk(docId, 'path'));
+      addItem('📋', __('nav.doc_duplicate'), () => duplicateDocument(docId));
+      menuEl.insertAdjacentHTML('beforeend', '<div class="block-menu-sep"></div>');
+    } else {
+      addItem('📋', __('nav.doc_duplicate'), () => duplicateDocument(docId));
+      menuEl.insertAdjacentHTML('beforeend', '<div class="block-menu-sep"></div>');
+    }
+
+    const moveLabel = document.createElement('div');
+    moveLabel.className = 'block-menu-section';
+    moveLabel.textContent = __('nav.doc_move_section');
+    menuEl.appendChild(moveLabel);
+    const beforeSections = menuEl.children.length;
 
     state.sections
       .filter(s => !currentSection || s.id !== currentSection.id)
@@ -7042,37 +7234,34 @@ if (isCoarsePointer) {
         menuEl.appendChild(item);
       });
 
-    if (menuEl.children.length === 1) {
+    if (menuEl.children.length === beforeSections) {
       const empty = document.createElement('div');
       empty.className = 'block-menu-empty';
       empty.textContent = __('nav.doc_no_other_section');
       menuEl.appendChild(empty);
     }
 
-    document.body.appendChild(menuEl);
-    const r = menuEl.getBoundingClientRect();
-    menuEl.style.left = Math.max(8, Math.min(x, window.innerWidth - r.width - 8)) + 'px';
-    menuEl.style.top = Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) + 'px';
+    place();
   }
 
-  const docIdOf = (item) => {
-    // The nav is rendered from state, so the item's position inside its
-    // section maps back to the document it was built from.
-    const sectionEl = item.closest('.nav-section');
-    if (!sectionEl) return null;
-    const section = state.sections.find(s => s.id === sectionEl.dataset.id);
-    if (!section) return null;
-    const index = Array.from(sectionEl.querySelectorAll('.nav-item')).indexOf(item);
-    if (index < 0) return null;
-    return documentsForNav(section.documents)[index]?.id || null;
-  };
+  // renderNav stamps the id on the element, so the menu always acts on the
+  // document that was actually clicked — not on whatever now sits at that
+  // position after a sort or a filter.
+  const docIdOf = (item) => item.dataset.docId || null;
 
   nav.addEventListener('contextmenu', (e) => {
     const item = e.target.closest('.nav-item');
-    if (!item) return;
+    if (item) {
+      e.preventDefault();
+      const id = docIdOf(item);
+      if (id) openMoveMenu(id, e.clientX, e.clientY);
+      return;
+    }
+    // Right-clicking the section header opens its folder on disk.
+    const sectionEl = e.target.closest('.nav-section');
+    if (!sectionEl || !isLocalMachine) return;
     e.preventDefault();
-    const id = docIdOf(item);
-    if (id) openMoveMenu(id, e.clientX, e.clientY);
+    openSectionMenu(sectionEl.dataset.id, e.clientX, e.clientY);
   });
 
   // Own long-press detection: contextmenu on long-press is inconsistent across

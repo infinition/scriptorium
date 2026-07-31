@@ -1,0 +1,266 @@
+//! Scriptorium desktop shell.
+//!
+//! The desktop app is a plain window over the real web app: it spawns the
+//! existing Node server (`node server.js`) and loads its URL. No business
+//! logic lives here, so the GUI behaves exactly like the browser version.
+
+use std::net::{SocketAddr, TcpStream};
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command};
+use std::sync::Mutex;
+use std::time::Duration;
+
+// The spawned `node server.js` process, killed when the window closes.
+static SERVER: Mutex<Option<Child>> = Mutex::new(None);
+
+// Ports tried in order. A fixed port (rather than a random one) keeps the page
+// origin stable between launches, so localStorage (theme, font sizes,
+// preferences) survives restarts.
+const CANDIDATE_PORTS: [u16; 3] = [48731, 48732, 48733];
+
+// Where server.js, config.json and node_modules live. In dev, cargo runs from
+// src-tauri (the project root is its parent); a packaged or ad-hoc run may
+// happen from the repo root itself.
+fn find_project_root() -> Option<PathBuf> {
+    // SCRIPTORIUM_ROOT wins when set explicitly.
+    if let Ok(p) = std::env::var("SCRIPTORIUM_ROOT") {
+        let root = PathBuf::from(p);
+        if root.join("server.js").exists() {
+            return Some(root);
+        }
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        if cwd.join("server.js").exists() {
+            return Some(cwd);
+        }
+        if let Some(parent) = cwd.parent() {
+            if parent.join("server.js").exists() {
+                return Some(parent.to_path_buf());
+            }
+        }
+    }
+    // Walking up from the executable covers a direct run of the dev binary
+    // (src-tauri/target/debug/…), packaged or ad-hoc launches.
+    if let Ok(exe) = std::env::current_exe() {
+        let mut dir = exe.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+        for _ in 0..5 {
+            if dir.join("server.js").exists() {
+                return Some(dir);
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
+    }
+    None
+}
+
+fn server_is_up(port: u16) -> bool {
+    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().expect("adresse valide");
+    TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok()
+}
+
+// A running server: either spawned by us (child) or reused because one was
+// already listening (child is None, so nothing to kill at exit).
+struct ServerHandle {
+    port: u16,
+    child: Option<Child>,
+}
+
+// True when a Scriptorium server already answers on this port (a previous
+// instance, or a server started by hand). The GUI then hooks onto it instead
+// of starting a second one.
+fn existing_scriptorium_server(port: u16) -> bool {
+    use std::io::{Read, Write};
+
+    let addr: SocketAddr = format!("127.0.0.1:{port}").parse().expect("adresse valide");
+    let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(400)) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(400)));
+    let req = format!(
+        "GET /api/config HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+    );
+    if stream.write_all(req.as_bytes()).is_err() {
+        return false;
+    }
+    let mut buf = [0u8; 4096];
+    let mut body = String::new();
+    while let Ok(n) = stream.read(&mut buf) {
+        if n == 0 {
+            break;
+        }
+        body.push_str(&String::from_utf8_lossy(&buf[..n]));
+        if body.len() > 4096 {
+            break;
+        }
+    }
+    body.contains("workspaceDir")
+}
+
+// Reuses an already-running server if one is up, otherwise spawns
+// `node server.js` and waits until it answers on 127.0.0.1:<port>.
+fn start_server(root: &Path) -> Result<ServerHandle, String> {
+    for &port in &CANDIDATE_PORTS {
+        if existing_scriptorium_server(port) {
+            return Ok(ServerHandle { port, child: None });
+        }
+    }
+    for &port in &CANDIDATE_PORTS {
+        let mut child = Command::new("node")
+            .arg("server.js")
+            .current_dir(root)
+            .env("PORT", port.to_string())
+            .env("HOST", "127.0.0.1")
+            .spawn()
+            .map_err(|e| format!("Impossible de lancer node server.js : {e}"))?;
+
+        let mut up = false;
+        for _ in 0..40 {
+            if server_is_up(port) {
+                up = true;
+                break;
+            }
+            // The process died before listening (e.g. missing node_modules).
+            if let Ok(Some(_)) = child.try_wait() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(250));
+        }
+
+        if up {
+            return Ok(ServerHandle { port, child: Some(child) });
+        }
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    Err("Le serveur Scriptorium n'a pas pu démarrer. Lancez \"npm install\" à la racine du projet, puis réessayez.".to_string())
+}
+
+// Shows a native error dialog and returns an error to abort startup.
+fn fatal(message: &str) -> Box<dyn std::error::Error> {
+    let _ = rfd::MessageDialog::new()
+        .set_title("Scriptorium")
+        .set_description(message)
+        .set_level(rfd::MessageLevel::Error)
+        .show();
+    Box::new(std::io::Error::other(message))
+}
+
+fn kill_server() {
+    if let Some(mut child) = SERVER.lock().unwrap().take() {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+// On Windows, binds `child` to a Job Object configured with "kill on close".
+// The OS then terminates node whenever this process exits, even on a
+// force-kill (taskkill /F) or a crash, which a plain child.kill() cannot cover.
+#[cfg(windows)]
+mod job {
+    use std::mem::size_of;
+    use std::os::windows::io::AsRawHandle;
+    use std::process::Child;
+
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    pub fn bind_kill_on_close(child: &Child) {
+        unsafe {
+            let job: HANDLE = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            if job.is_null() {
+                return;
+            }
+            let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+            info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            if SetInformationJobObject(
+                job,
+                JobObjectExtendedLimitInformation,
+                &info as *const _ as *const core::ffi::c_void,
+                size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            ) == 0
+            {
+                CloseHandle(job);
+                return;
+            }
+            if AssignProcessToJobObject(job, child.as_raw_handle()) == 0 {
+                CloseHandle(job);
+                return;
+            }
+            // Keep the job handle alive for the whole process lifetime: a raw
+            // handle is never auto-closed, and the OS closes it when this
+            // process exits, which triggers the kill-on-close of every process
+            // in the job (the node server).
+            let _ = job;
+        }
+    }
+}
+
+#[cfg(not(windows))]
+mod job {
+    use std::process::Child;
+
+    pub fn bind_kill_on_close(_child: &Child) {}
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let app = tauri::Builder::default()
+        .setup(|app| {
+            let root = find_project_root()
+                .ok_or_else(|| fatal("Dossier du projet Scriptorium introuvable. Lancez l'application depuis la racine du projet."))?;
+
+            let handle = start_server(&root)
+                .map_err(|e| fatal(&e))?;
+
+            // Ensure a server we spawned dies with us, even on a force-kill.
+            if let Some(child) = &handle.child {
+                job::bind_kill_on_close(child);
+            }
+
+            let url: tauri::Url = format!("http://127.0.0.1:{}/", handle.port)
+                .parse()
+                .expect("URL invalide");
+
+            match tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::External(url))
+                .title("Scriptorium")
+                .inner_size(1200.0, 800.0)
+                .min_inner_size(320.0, 480.0)
+                .resizable(true)
+                .center()
+                .build()
+            {
+                Ok(_) => {
+                    // None when the server was already running: nothing to kill.
+                    *SERVER.lock().unwrap() = handle.child;
+                    Ok(())
+                }
+                Err(e) => {
+                    if let Some(mut child) = handle.child {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                    }
+                    Err(fatal(&format!("Impossible de créer la fenêtre : {e}")))
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|_app_handle, event| {
+        // Stop node as the event loop dies. On Windows the Job Object already
+        // guarantees it; this is the fallback for the other platforms.
+        if matches!(event, tauri::RunEvent::Exit) {
+            kill_server();
+        }
+    });
+
+    // The window is closed and the event loop has exited: stop the Node server.
+    kill_server();
+}

@@ -4,7 +4,9 @@
   "description": "Distraction-free markdown writing application with local disk sync and sentence cloud ideas",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "tauri:dev": "npx @tauri-apps/cli dev",
+    "tauri:build": "npx @tauri-apps/cli build"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

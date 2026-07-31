@@ -205,7 +205,7 @@ function guarded(handler) {
 // purely cosmetic: the API deleted regardless of it.
 function requireUnlocked(req, res) {
   if (workspaceLocked) {
-    res.status(423).json({ error: 'Espace de travail verrouillé' });
+    res.status(423).json({ error: serverMsg(req, 'server.error_workspace_locked') });
     return false;
   }
   return true;
@@ -230,14 +230,14 @@ app.use((req, res, next) => {
     try {
       originHost = new URL(origin).hostname;
     } catch {
-      return res.status(403).json({ error: 'Origine refusée' });
+      return res.status(403).json({ error: serverMsg(req, 'server.error_origin_refused') });
     }
     if (originHost !== hostnameOf(req.headers.host)) {
-      return res.status(403).json({ error: 'Origine refusée' });
+      return res.status(403).json({ error: serverMsg(req, 'server.error_origin_refused') });
     }
   }
   if (LOOPBACK_ONLY && !isLoopbackHost(hostnameOf(req.headers.host))) {
-    return res.status(403).json({ error: 'Hôte refusé' });
+    return res.status(403).json({ error: serverMsg(req, 'server.error_host_refused') });
   }
   next();
 });
@@ -253,7 +253,7 @@ app.use('/api', (req, res, next) => {
   )) {
     return next();
   }
-  res.status(401).json({ error: 'Jeton d\'accès manquant ou invalide' });
+  res.status(401).json({ error: serverMsg(req, 'server.error_token_missing') });
 });
 
 // ============ VENDORED ASSETS ============
@@ -279,8 +279,56 @@ for (const [route, pkg] of Object.entries(VENDOR_MOUNTS)) {
   }
 }
 
-app.use('/locales', express.static(path.join(__dirname, 'locales'), { maxAge: '1h' }));
+// No max-age: the files are two hops away on the same machine, and an hour of
+// caching meant an edited translation only showed up an hour later. The ETag
+// still turns the reload into a 304.
+app.use('/locales', express.static(path.join(__dirname, 'locales')));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// SSE (Server-Sent Events) for real-time workspace updates
+const sseClients = new Set();
+
+app.get('/api/events', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  sseClients.add(res);
+
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
+
+function broadcastEvent(type, data = {}) {
+  const payload = `data: ${JSON.stringify({ type, ...data })}\n\n`;
+  for (const client of sseClients) {
+    try { client.write(payload); } catch (e) {}
+  }
+}
+
+let workspaceWatcher = null;
+let watcherTimer = null;
+
+function setupWorkspaceWatcher() {
+  if (workspaceWatcher) {
+    try { workspaceWatcher.close(); } catch (e) {}
+    workspaceWatcher = null;
+  }
+  if (!fs.existsSync(workspaceDir)) return;
+  try {
+    workspaceWatcher = fs.watch(workspaceDir, { recursive: true }, (eventType, filename) => {
+      if (!filename) return;
+      const base = path.basename(filename);
+      if (base.startsWith('.') || filename.includes('.trash') || filename.includes('.snapshots')) return;
+      clearTimeout(watcherTimer);
+      watcherTimer = setTimeout(() => {
+        broadcastEvent('workspace-changed', { filename });
+      }, 350);
+    });
+  } catch (err) {}
+}
 
 // Ensure default workspace structure exists
 function ensureWorkspaceDirs() {
@@ -352,6 +400,7 @@ function ensureWorkspaceDirs() {
         fs.writeFileSync(path.join(workspaceDir, 'Manifestes', 'Bienvenue.md'), welcomeContent, 'utf8');
       }
     }
+    setupWorkspaceWatcher();
   } catch (err) {
     console.error('Error ensuring workspace directories:', err);
   }
@@ -586,12 +635,26 @@ app.post('/api/snapshots', (req, res) => {
   }
 });
 
-// Open workspace or ideas folder in the OS file manager
-app.post('/api/open-folder', (req, res) => {
-  const { type } = req.body || {};
-  const targetFolder = type === 'ideas' ? getIdeasDir() : workspaceDir;
+// The file manager and the default editor open on the machine running the
+// server, so a phone on the LAN must not be able to pop windows on it.
+function requireLocalHost(req, res) {
+  if (!isLoopbackHost(hostnameOf(req.headers.host))) {
+    res.status(403).json({ error: serverMsg(req, 'server.error_host_refused') });
+    return false;
+  }
+  return true;
+}
+
+// Open the workspace, the ideas folder, or one section folder in the OS file
+// manager.
+app.post('/api/open-folder', guarded((req, res) => {
+  if (!requireLocalHost(req, res)) return;
+  const { type, sectionId } = req.body || {};
+  const targetFolder = sectionId ? resolveSectionFolder(sectionId, req)
+    : type === 'ideas' ? getIdeasDir()
+    : workspaceDir;
   if (!fs.existsSync(targetFolder)) {
-    return res.status(404).json({ error: 'Folder not found' });
+    return res.status(404).json({ error: serverMsg(req, 'server.error_folder_not_found') });
   }
   // execFile passes the path as an argv entry, so quotes and & in a folder
   // name can no longer break out into a second shell command.
@@ -600,7 +663,36 @@ app.post('/api/open-folder', (req, res) => {
     : 'xdg-open';
   execFile(opener, [targetFolder], () => {});
   res.json({ success: true });
-});
+}));
+
+// Reveal a document in the OS file manager, or open it with its default app.
+// The file manager always opens on the machine running the server, so the UI
+// only offers this when the page is served on loopback.
+app.post('/api/open-doc', guarded((req, res) => {
+  if (!requireLocalHost(req, res)) return;
+  const { id, mode } = req.body || {};
+  const { folder, fullPath } = resolveDocPath(id, req);
+  if (!fs.existsSync(fullPath)) {
+    return res.status(404).json({ error: serverMsg(req, 'server.error_doc_not_found') });
+  }
+
+  // "path" launches nothing: the client only wants the absolute path to copy.
+  if (mode === 'path') return res.json({ success: true, path: fullPath });
+
+  // execFile, never a shell: a filename with & or a quote stays one argv entry.
+  if (process.platform === 'win32') {
+    // "explorer /select,<path>" selects the file in its folder; "explorer
+    // <path>" hands it to the default handler. explorer.exe exits 1 even on
+    // success, so its status is not worth reading.
+    execFile('explorer', [mode === 'file' ? fullPath : `/select,${fullPath}`], () => {});
+  } else if (process.platform === 'darwin') {
+    execFile('open', mode === 'file' ? [fullPath] : ['-R', fullPath], () => {});
+  } else {
+    // No portable "reveal" on Linux — fall back to opening the folder.
+    execFile('xdg-open', [mode === 'file' ? fullPath : folder], () => {});
+  }
+  res.json({ success: true });
+}));
 
 // Pick folder via native Windows FolderBrowserDialog
 app.post('/api/pick-folder', (req, res) => {
@@ -664,7 +756,7 @@ app.get('/api/workspace', (req, res) => {
       const stat = fs.statSync(fullPath);
       
       if (stat.isDirectory()) {
-        if (item === '.git' || item === 'node_modules') continue;
+        if (item.startsWith('.') || item === 'node_modules') continue;
         
         // Skip ideas directory if located inside workspace
         if (path.resolve(fullPath) === resolvedIdeasDir || item === 'ideas') {
@@ -760,7 +852,7 @@ app.get('/api/workspace', (req, res) => {
 function saveViaBeacon(req, res) {
   const { id, title, subtitle, content, knownUpdatedAt } = req.body;
   const { filename, folder, fullPath } = resolveDocPath(id, req);
-  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'Document not found on disk' });
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: serverMsg(req, 'server.error_doc_not_found') });
 
   let fileContent = '';
   if (title) fileContent += `# ${String(title).trim()}\n\n`;
@@ -830,13 +922,13 @@ app.post('/api/documents', guarded((req, res) => {
 // Save document (Update content / Title / Subtitle)
 app.put('/api/documents', guarded((req, res) => {
   const { id, title, subtitle, content, knownUpdatedAt } = req.body;
-  if (!id) return res.status(400).json({ error: 'Document ID is required' });
+  if (!id) return res.status(400).json({ error: serverMsg(req, 'server.error_doc_id_required') });
 
   try {
     const { sectionId, filename: oldFilename, folder: sectionFolder, fullPath: oldPath } = resolveDocPath(id, req);
 
     if (!fs.existsSync(oldPath)) {
-      return res.status(404).json({ error: 'Document not found on disk' });
+      return res.status(404).json({ error: serverMsg(req, 'server.error_doc_not_found') });
     }
 
     // Optimistic concurrency: if the file moved on since the client last read
@@ -847,7 +939,7 @@ app.put('/api/documents', guarded((req, res) => {
       // 1s of slack: mtime resolution varies across filesystems.
       if (current - knownUpdatedAt > 1000) {
         return res.status(409).json({
-          error: 'Le fichier a été modifié ailleurs depuis son ouverture',
+          error: serverMsg(req, 'server.error_doc_conflict'),
           conflict: true,
           diskUpdatedAt: current,
           diskContent: fs.readFileSync(oldPath, 'utf8')
@@ -862,22 +954,25 @@ app.put('/api/documents', guarded((req, res) => {
     fileContent += content || '';
     
     // Check if filename needs to change based on the title
+    // The extension of the file on disk is preserved: a .txt imported from
+    // elsewhere stays a .txt instead of silently becoming a .md on first save.
+    const ext = path.extname(oldFilename) || '.md';
     let newFilename = oldFilename;
     if (title && title.trim() !== '') {
       const safe = safeFilename(title);
-      newFilename = `${safe}.md`;
+      newFilename = `${safe}${ext}`;
     }
-    
+
     let targetPath = safeJoin(sectionFolder, newFilename);
 
     // Resolve name collision if renaming
     if (newFilename !== oldFilename && fs.existsSync(targetPath)) {
       let index = 1;
-      const base = newFilename.replace(/\.md$/, '');
-      while (fs.existsSync(path.join(sectionFolder, `${base}-${index}.md`))) {
+      const base = newFilename.slice(0, -ext.length);
+      while (fs.existsSync(path.join(sectionFolder, `${base}-${index}${ext}`))) {
         index++;
       }
-      newFilename = `${base}-${index}.md`;
+      newFilename = `${base}-${index}${ext}`;
       targetPath = safeJoin(sectionFolder, newFilename);
     }
     
@@ -911,23 +1006,128 @@ app.put('/api/documents', guarded((req, res) => {
   }
 }));
 
-// Delete document
+function getTrashDir() {
+  const trashFolder = path.join(workspaceDir, '.trash');
+  if (!fs.existsSync(trashFolder)) fs.mkdirSync(trashFolder, { recursive: true });
+  return trashFolder;
+}
+
+// Duplicate document
+app.post('/api/documents/duplicate', guarded((req, res) => {
+  const { id } = req.body || {};
+  if (!id) return res.status(400).json({ error: serverMsg(req, 'server.error_doc_id_required') });
+
+  try {
+    const { sectionId, filename: oldFilename, folder: sectionFolder, fullPath: oldPath } = resolveDocPath(id, req);
+    if (!fs.existsSync(oldPath)) {
+      return res.status(404).json({ error: serverMsg(req, 'server.error_doc_not_found') });
+    }
+
+    const ext = path.extname(oldFilename) || '.md';
+    const base = oldFilename.slice(0, -ext.length);
+    const copyTag = getLang(req) === 'fr' ? 'copie' : 'copy';
+    let newFilename = `${base} (${copyTag})${ext}`;
+    let index = 2;
+    while (fs.existsSync(path.join(sectionFolder, newFilename))) {
+      newFilename = `${base} (${copyTag} ${index})${ext}`;
+      index++;
+    }
+
+    const targetPath = safeJoin(sectionFolder, newFilename);
+    fs.copyFileSync(oldPath, targetPath);
+
+    const text = fs.readFileSync(targetPath, 'utf8');
+    const docInfo = parseMarkdownDoc(text, newFilename);
+    const fileStat = fs.statSync(targetPath);
+    const newId = sectionId === '_general' ? `_general/${newFilename}` : `${sectionId}/${newFilename}`;
+
+    res.json({
+      success: true,
+      document: {
+        id: newId,
+        filename: newFilename,
+        title: docInfo.title,
+        subtitle: docInfo.subtitle,
+        content: docInfo.body,
+        createdAt: fileStat.birthtimeMs,
+        updatedAt: fileStat.mtimeMs
+      }
+    });
+  } catch (err) {
+    if (err instanceof PathError) throw err;
+    console.error('Error duplicating document:', err);
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Delete document — moves to .trash folder for recovery / undo
 app.delete('/api/documents', guarded((req, res) => {
   const { id } = req.body;
-  if (!id) return res.status(400).json({ error: 'ID is required' });
+  if (!id) return res.status(400).json({ error: serverMsg(req, 'server.error_doc_id_required') });
   if (!requireUnlocked(req, res)) return;
 
   try {
-    const { fullPath: filePath } = resolveDocPath(id, req);
+    const { sectionId, filename, fullPath: filePath } = resolveDocPath(id, req);
 
     if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+      const trashFolder = getTrashDir();
+      const trashId = `${Date.now()}_${filename}`;
+      const trashPath = path.join(trashFolder, trashId);
+      fs.renameSync(filePath, trashPath);
+
+      return res.json({
+        success: true,
+        trashId,
+        sectionId,
+        filename
+      });
     }
 
     res.json({ success: true });
   } catch (err) {
     if (err instanceof PathError) throw err;
     console.error('Error deleting document:', err);
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// Restore trashed document (Undo delete)
+app.post('/api/documents/restore-trash', guarded((req, res) => {
+  const { trashId, sectionId, filename } = req.body || {};
+  if (!trashId || !sectionId || !filename) {
+    return res.status(400).json({ error: 'trashId, sectionId, filename required' });
+  }
+
+  try {
+    const trashFolder = getTrashDir();
+    const trashPath = safeJoin(trashFolder, trashId);
+    if (!fs.existsSync(trashPath)) {
+      return res.status(404).json({ error: serverMsg(req, 'server.error_doc_not_found') });
+    }
+
+    const sectionFolder = resolveSectionFolder(sectionId, req);
+    if (!fs.existsSync(sectionFolder)) {
+      fs.mkdirSync(sectionFolder, { recursive: true });
+    }
+
+    let targetFilename = filename;
+    const ext = path.extname(filename) || '.md';
+    const base = filename.slice(0, -ext.length);
+    let index = 1;
+    while (fs.existsSync(path.join(sectionFolder, targetFilename))) {
+      targetFilename = `${base}-${index}${ext}`;
+      index++;
+    }
+
+    const targetPath = safeJoin(sectionFolder, targetFilename);
+    fs.renameSync(trashPath, targetPath);
+
+    const restoredId = sectionId === '_general' ? `_general/${targetFilename}` : `${sectionId}/${targetFilename}`;
+
+    res.json({ success: true, id: restoredId });
+  } catch (err) {
+    if (err instanceof PathError) throw err;
+    console.error('Error restoring document:', err);
     res.status(500).json({ error: err.message });
   }
 }));

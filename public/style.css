@@ -3673,6 +3673,27 @@ mark.find-match-mark.find-match-current {
   -webkit-backdrop-filter: blur(12px);
 }
 
+.toast.toast-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.toast-action-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.toast-action-btn:hover {
+  opacity: 0.9;
+}
+
 .toast.toast-out {
   animation: toastOut 0.2s ease-in forwards;
 }

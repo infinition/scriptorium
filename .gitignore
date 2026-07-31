@@ -30,3 +30,7 @@ Thumbs.db
 dist/
 build/
 .cache/
+
+# Tauri (Rust) build output
+src-tauri/target/
+src-tauri/gen/
