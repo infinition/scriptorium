@@ -256,6 +256,7 @@
   "editor.block_quote": "Quote",
   "editor.block_code": "Code block",
   "editor.block_image": "Image",
+  "image.edit_url": "Edit the image URL",
   "editor.block_divider": "Divider",
   "editor.block_menu_text": "Text",
   "editor.block_menu_lists": "Lists",

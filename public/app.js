@@ -7356,6 +7356,46 @@ content.addEventListener('mousedown', (e) => {
   e.preventDefault();
 });
 
+// Clicking a rendered image lets you edit its URL instead of doing nothing.
+content.addEventListener('mousedown', (e) => {
+  const img = e.target && e.target.closest ? e.target.closest('.md-img') : null;
+  if (!img || !content.contains(img)) return;
+  e.preventDefault(); // keep the line rendered while the URL is edited
+  editImageUrl(img);
+});
+
+async function editImageUrl(img) {
+  const line = getLineForNode(img);
+  if (!line) return;
+  const imgs = Array.from(line.querySelectorAll('.md-img'));
+  const idx = imgs.indexOf(img);
+  if (idx === -1) return;
+
+  const raw = line.dataset.raw !== undefined ? line.dataset.raw : line.textContent;
+  // The Nth rendered image corresponds to the Nth image pattern in the raw.
+  const imgRe = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  let m, found = null, count = 0;
+  while ((m = imgRe.exec(raw)) !== null) {
+    if (count === idx) { found = { full: m[0], alt: m[1], url: m[2], index: m.index }; break; }
+    count++;
+  }
+  if (!found) return;
+
+  const newUrl = await themedPrompt(__('image.edit_url'), found.url);
+  if (newUrl === null || newUrl === found.url) return;
+
+  const newRaw = raw.slice(0, found.index) + `![${found.alt}](${newUrl})` + raw.slice(found.index + found.full.length);
+  line.dataset.raw = newRaw;
+  if (line === activeLineNode) {
+    line.textContent = newRaw;
+  } else {
+    line.innerHTML = renderMarkdownLine(newRaw);
+  }
+  applyLineKind(line, newRaw);
+  markDirty();
+  updateStats();
+}
+
 // Touch has no hover: the mode is resolved by the tap itself, and the pulse is
 // what tells the finger which one it got.
 content.addEventListener('pointerdown', (e) => {
