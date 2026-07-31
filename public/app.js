@@ -135,7 +135,7 @@ async function fetchWorkspace() {
     // Get config first
     const configRes = await fetch('/api/config');
     if (configRes.status === 401) {
-      alert(__('alert.token_missing'));
+      await themedAlert(__('alert.token_missing'));
       return;
     }
     const configData = await configRes.json();
@@ -178,7 +178,7 @@ async function fetchWorkspace() {
     initSSE();
   } catch (err) {
     console.error('Error fetching workspace:', err);
-    alert(__('alert.workspace_load_error', { message: err.message }));
+    await themedAlert(__('alert.workspace_load_error', { message: err.message }));
   }
 }
 
@@ -204,7 +204,7 @@ async function saveDocumentOnDisk() {
 
     if (res.status === 409) {
       const conflict = await res.json();
-      handleSaveConflict(doc, conflict);
+      await handleSaveConflict(doc, conflict);
       return;
     }
 
@@ -255,13 +255,13 @@ async function saveDocumentOnDisk() {
 
 // The file moved on since we opened it. Never resolve this silently: both
 // versions are someone's work, so the choice belongs to the user.
-function handleSaveConflict(doc, conflict) {
+async function handleSaveConflict(doc, conflict) {
   saveIndicator.classList.remove('saved');
   saveIndicator.classList.add('dirty');
   saveText.textContent = __('save.conflict');
   dirty = true;
 
-  const keepMine = confirm(__('confirm.conflict_keep'));
+  const keepMine = await themedConfirm(__('confirm.conflict_keep'));
 
   if (keepMine) {
     // Adopt the disk timestamp so the retry passes the freshness check.
@@ -346,7 +346,7 @@ async function duplicateDocument(docId) {
 
 async function deleteDocument(docId) {
   if (state.isLocked) {
-    alert(__('alert.locked'));
+    await themedAlert(__('alert.locked'));
     return;
   }
 
@@ -402,7 +402,7 @@ async function createSection(name) {
       await fetchWorkspace();
       showToast('toast.section_created');
     } else {
-      alert(data.error || __('alert.section_create_error'));
+      await themedAlert(data.error || __('alert.section_create_error'));
     }
   } catch (err) {
     console.error(err);
@@ -424,7 +424,7 @@ async function renameSection(oldId, newName) {
       await fetchWorkspace();
       showToast('toast.section_renamed');
     } else {
-      alert(data.error || __('alert.section_rename_error'));
+      await themedAlert(data.error || __('alert.section_rename_error'));
     }
   } catch (err) {
     console.error(err);
@@ -433,16 +433,16 @@ async function renameSection(oldId, newName) {
 
 async function deleteSection(sectionId) {
   if (state.isLocked) {
-    alert(__('alert.locked'));
+    await themedAlert(__('alert.locked'));
     return;
   }
   const section = state.sections.find(s => s.id === sectionId);
   if (!section) return;
 
   const count = section.documents.length;
-  if (count > 0 && !confirm(__('confirm.section_delete_docs', { name: section.name, count: count }))) {
+  if (count > 0 && !(await themedConfirm(__('confirm.section_delete_docs', { name: section.name, count: count }), null, true))) {
     return;
-  } else if (count === 0 && !confirm(__('confirm.section_delete_empty', { name: section.name }))) {
+  } else if (count === 0 && !(await themedConfirm(__('confirm.section_delete_empty', { name: section.name }), null, true))) {
     return;
   }
 
@@ -557,7 +557,7 @@ async function createTheme(name) {
       await fetchWorkspace();
       showToast('toast.theme_created');
     } else {
-      alert(data.error || __('alert.theme_create_error'));
+      await themedAlert(data.error || __('alert.theme_create_error'));
     }
   } catch (err) {
     console.error(err);
@@ -566,13 +566,13 @@ async function createTheme(name) {
 
 async function deleteTheme(id) {
   if (state.isLocked) {
-    alert(__('alert.locked'));
+    await themedAlert(__('alert.locked'));
     return;
   }
   const theme = state.ideaThemes.find(t => t.id === id);
   if (!theme) return;
 
-  if (!confirm(__('confirm.theme_delete', { name: theme.name }))) return;
+  if (!(await themedConfirm(__('confirm.theme_delete', { name: theme.name }), null, true))) return;
 
   try {
     const res = await fetch('/api/themes', {
@@ -844,7 +844,7 @@ function renderNav() {
     header.querySelector('[data-act="rename"]').addEventListener('click', (e) => {
       e.stopPropagation();
       if (section.id === '_general') {
-        alert(__('nav.section_rename'));
+        themedAlert(__('nav.section_rename'));
         return;
       }
       const titleEl = header.querySelector('.title');
@@ -1121,8 +1121,8 @@ function renderThemesTabs() {
   const addBtn = document.createElement('button');
   addBtn.className = 'theme-tab add';
   addBtn.textContent = __('theme.add');
-  addBtn.addEventListener('click', () => {
-    const name = prompt(__('prompt.theme_name'));
+  addBtn.addEventListener('click', async () => {
+    const name = await themedPrompt(__('prompt.theme_name'));
     if (!name || !name.trim()) return;
     createTheme(name);
   });
@@ -1298,7 +1298,7 @@ const deleteTimers = new Map(); // ideaText -> { timer, element }
 
 function startDeleting(themeId, ideaText, chip) {
   if (state.isLocked) {
-    alert(__('alert.locked'));
+    themedAlert(__('alert.locked'));
     return;
   }
   // If archive was pending, cancel it first
@@ -1340,7 +1340,7 @@ async function commitDeleteIdea(themeId, ideaText) {
     renderIdeas();
   } catch (err) {
     console.error('Failed to delete idea:', err);
-    alert(__('alert.idea_delete_error'));
+    await themedAlert(__('alert.idea_delete_error'));
     renderIdeas();
   }
 }
@@ -1423,7 +1423,7 @@ async function commitEditIdea(themeId, oldText, newText, ideaObj) {
     showToast('toast.idea_edited');
   } catch (err) {
     console.error('Failed to edit idea:', err);
-    alert(__('alert.idea_edit_error'));
+    await themedAlert(__('alert.idea_edit_error'));
     renderIdeas();
   }
 }
@@ -3749,7 +3749,7 @@ ideasPanel.addEventListener('drop', async (e) => {
     e.preventDefault();
     const theme = activeTheme();
     if (!theme) {
-      alert(__('alert.no_theme'));
+      themedAlert(__('alert.no_theme'));
       return;
     }
     
@@ -3854,8 +3854,8 @@ window.addEventListener('resize', () => {
 });
 
 // Add Section action
-$('addSectionBtn').addEventListener('click', () => {
-  const name = prompt(__('prompt.section_name'));
+$('addSectionBtn').addEventListener('click', async () => {
+  const name = await themedPrompt(__('prompt.section_name'));
   if (!name || !name.trim()) return;
   createSection(name);
 });
@@ -4847,8 +4847,19 @@ function applyInlineFormat(act) {
   setTimeout(showSelectionToolbar, 30);
 }
 
-function insertLinkAroundSelection() {
-  var url = prompt(__('prompt.url'), 'https://');
+async function insertLinkAroundSelection() {
+  // The themed prompt is async and steals focus, which would drop the editor
+  // selection before wrapSelectionInline runs. Capture and restore it.
+  const sel = window.getSelection();
+  const saved = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+  const url = await themedPrompt(__('prompt.url'), 'https://');
+  if (saved) {
+    const selNow = window.getSelection();
+    if (selNow) {
+      selNow.removeAllRanges();
+      selNow.addRange(saved);
+    }
+  }
   if (!url) return;
   wrapSelectionInline('[', `](${url})`);
 }
@@ -6487,14 +6498,14 @@ async function loadSnapshotsForDoc(docId) {
   renderSnapshotsList();
 }
 
-function createSnapshot() {
+async function createSnapshot() {
   if (!state.activeDocId) return;
   // "Révision du 13:54" announced a date and gave a time. The label has to
   // stand on its own: it survives a swap, which moves the entry's timestamp.
   const now = new Date();
   var dateStr = now.toLocaleDateString(getLocale() === 'fr' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'long' });
   var defaultName = __('prompt.default_snapshot_name', { date: dateStr, time: clockTime(now.getTime()) });
-  var name = prompt(__('prompt.snapshot_name'), defaultName);
+  var name = await themedPrompt(__('prompt.snapshot_name'), defaultName);
   if (!name) return;
 
   const docTitle = title ? title.value : '';
@@ -6571,11 +6582,11 @@ function openDiffModal(snapId) {
 // Restoring swaps rather than overwrites: the version leaving the editor takes
 // the snapshot's place, so restoring again brings it straight back. Without the
 // swap, the state you were in when you clicked Restore is simply gone.
-function restoreActiveSnapshot() {
+async function restoreActiveSnapshot() {
   if (!activeDiffSnapshot || !state.activeDocId) return false;
-  if (!confirm(
+  if (!(await themedConfirm(
     __('confirm.restore_snapshot', { name: activeDiffSnapshot.name })
-  )) return false;
+  ))) return false;
 
   saveHistory(state.activeDocId, true);
 
@@ -6668,9 +6679,9 @@ function renderSnapshotsList() {
       '</div>';
 
     card.querySelector('.view-diff-btn').addEventListener('click', () => openDiffModal(snap.id));
-    card.querySelector('.restore-btn').addEventListener('click', () => {
+    card.querySelector('.restore-btn').addEventListener('click', async () => {
       activeDiffSnapshot = snap;
-      if (restoreActiveSnapshot()) {
+      if (await restoreActiveSnapshot()) {
         showToast('toast.snapshot_restored');
       }
     });
@@ -6742,8 +6753,8 @@ function initProWriterTools() {
   $('createSnapshotBtn')?.addEventListener('click', createSnapshot);
   $('closeDiffBtn')?.addEventListener('click', () => $('diffModal')?.classList.remove('active'));
   $('closeDiffModalBtn')?.addEventListener('click', () => $('diffModal')?.classList.remove('active'));
-  $('restoreSnapshotBtn')?.addEventListener('click', () => {
-    if (restoreActiveSnapshot()) showToast('toast.snapshot_restored');
+  $('restoreSnapshotBtn')?.addEventListener('click', async () => {
+    if (await restoreActiveSnapshot()) showToast('toast.snapshot_restored');
   });
 }
 
@@ -6826,6 +6837,110 @@ function initWorkspaceSetupModal() {
 }
 
 initWorkspaceSetupModal();
+
+// ============ THEMED DIALOGS ============
+// Replace native browser confirm()/alert()/prompt() with a themed modal that
+// follows the current color theme, on desktop and mobile alike.
+
+let activeDialogResolve = null;
+
+function showDialog(options) {
+  return new Promise((resolve) => {
+    activeDialogResolve = resolve;
+    const modal = $('dialogModal');
+    const titleEl = $('dialogTitle');
+    const msgEl = $('dialogMessage');
+    const inputEl = $('dialogInput');
+    const okBtn = $('dialogOkBtn');
+    const cancelBtn = $('dialogCancelBtn');
+    const closeBtn = $('dialogCloseBtn');
+    const useInput = !!options.input;
+    const cancelable = !!options.cancelLabel;
+
+    if (titleEl) titleEl.textContent = options.title || '';
+    if (msgEl) {
+      msgEl.textContent = options.message || '';
+      msgEl.classList.toggle('hidden', !options.message);
+    }
+    if (inputEl) {
+      inputEl.classList.toggle('hidden', !useInput);
+      if (useInput) inputEl.value = options.defaultValue || '';
+    }
+    if (okBtn) {
+      okBtn.textContent = options.okLabel || __('dialog.ok');
+      okBtn.classList.toggle('btn-danger', !!options.danger);
+    }
+    if (cancelBtn) {
+      cancelBtn.textContent = options.cancelLabel || '';
+      cancelBtn.classList.toggle('hidden', !cancelable);
+    }
+    if (closeBtn) closeBtn.classList.toggle('hidden', !cancelable);
+
+    const finish = (result) => {
+      if (modal) modal.classList.remove('active');
+      if (okBtn) okBtn.onclick = null;
+      if (cancelBtn) cancelBtn.onclick = null;
+      if (closeBtn) closeBtn.onclick = null;
+      if (modal) modal.onclick = null;
+      if (inputEl) inputEl.onkeydown = null;
+      if (titleEl) titleEl.textContent = '';
+      const r = activeDialogResolve;
+      activeDialogResolve = null;
+      if (r) r(result);
+    };
+
+    okBtn.onclick = () => finish(useInput ? (inputEl ? inputEl.value : '') : true);
+    cancelBtn.onclick = () => finish(cancelable ? (useInput ? null : false) : undefined);
+    closeBtn.onclick = () => finish(cancelable ? (useInput ? null : false) : undefined);
+    if (modal) {
+      modal.onclick = (e) => {
+        if (e.target === modal && cancelable) finish(useInput ? null : false);
+      };
+    }
+
+    if (useInput && inputEl) {
+      setTimeout(() => inputEl.focus(), 30);
+      inputEl.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); okBtn.click(); }
+        else if (e.key === 'Escape' && cancelable) { e.preventDefault(); cancelBtn.click(); }
+      };
+    }
+
+    if (modal) modal.classList.add('active');
+  });
+}
+
+async function themedConfirm(message, title, danger) {
+  const result = await showDialog({
+    title: title || __('dialog.title_confirm'),
+    message,
+    okLabel: __('dialog.confirm'),
+    cancelLabel: __('dialog.cancel'),
+    danger: !!danger
+  });
+  return result === true;
+}
+
+async function themedAlert(message, title) {
+  await showDialog({
+    title: title || __('app.name'),
+    message,
+    okLabel: __('dialog.ok'),
+    cancelLabel: null
+  });
+}
+
+async function themedPrompt(message, defaultValue, title) {
+  const result = await showDialog({
+    title: title || __('app.name'),
+    message,
+    input: true,
+    defaultValue: defaultValue || '',
+    okLabel: __('dialog.confirm'),
+    cancelLabel: __('dialog.cancel')
+  });
+  return typeof result === 'string' ? result : null;
+}
 
 document.addEventListener('selectionchange', updateActiveLine);
 

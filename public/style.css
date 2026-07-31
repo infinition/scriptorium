@@ -1546,6 +1546,26 @@ button { font: inherit; color: inherit; }
   justify-content: center;
   padding: 0 20px 22px;
 }
+
+/* Themed confirm / alert / prompt dialog, replacing native browser boxes.
+   Responsive: width 90% on small screens (base .modal rule), capped at 440px. */
+.dialog-modal {
+  max-width: 440px;
+}
+.dialog-modal .modal-desc {
+  white-space: pre-line;
+  word-break: break-word;
+}
+#dialogInput {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+}
+@media (max-width: 480px) {
+  .dialog-modal .modal-body { padding: 16px; }
+  .dialog-modal .modal-actions { flex-wrap: wrap; }
+  .dialog-modal .btn { flex: 1; }
+}
 .btn {
   padding: 8px 16px;
   border-radius: 5px;
@@ -1566,6 +1586,12 @@ button { font: inherit; color: inherit; }
   color: var(--accent);
 }
 .btn-primary:hover { background: var(--accent); color: var(--bg); }
+.btn-danger {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+.btn-danger:hover { background: var(--danger); color: var(--bg); }
 
 /* ============ SETTINGS: TABS + APPEARANCE ============ */
 .modal-wide { max-width: 560px; }

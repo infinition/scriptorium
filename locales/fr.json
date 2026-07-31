@@ -142,6 +142,11 @@
   "workspace.confirm": "Utiliser ce dossier",
   "workspace.path_required": "Saisissez d\u2019abord un chemin de dossier.",
 
+  "dialog.ok": "OK",
+  "dialog.confirm": "Confirmer",
+  "dialog.cancel": "Annuler",
+  "dialog.title_confirm": "Confirmation",
+
   "settings.title": "Param\u00e8tres",
   "settings.tab_folders": "Dossiers",
   "settings.tab_appearance": "Apparence",

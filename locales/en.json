@@ -142,6 +142,11 @@
   "workspace.confirm": "Use this folder",
   "workspace.path_required": "Enter a folder path first.",
 
+  "dialog.ok": "OK",
+  "dialog.confirm": "Confirm",
+  "dialog.cancel": "Cancel",
+  "dialog.title_confirm": "Confirmation",
+
   "settings.title": "Settings",
   "settings.tab_folders": "Folders",
   "settings.tab_appearance": "Appearance",
