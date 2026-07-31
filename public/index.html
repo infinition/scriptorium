@@ -634,15 +634,16 @@
 <!-- THEMED DIALOG (confirm / alert / prompt) -->
 <div class="modal-overlay" id="dialogModal">
   <div class="modal dialog-modal">
-    <div class="modal-header">
+    <div class="modal-header dialog-header">
+      <div class="dialog-icon" id="dialogIcon"></div>
       <h3 id="dialogTitle"></h3>
-      <button class="close-btn" id="dialogCloseBtn" type="button" aria-label="Close">&times;</button>
+      <button class="close-btn dialog-close-btn" id="dialogCloseBtn" type="button" data-i18n-aria-label="dialog.close" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body">
       <p id="dialogMessage" class="modal-desc"></p>
       <input type="text" id="dialogInput" autocomplete="off" spellcheck="false" />
     </div>
-    <div class="modal-actions">
+    <div class="modal-actions dialog-actions">
       <button class="btn btn-secondary" id="dialogCancelBtn" type="button"></button>
       <button class="btn btn-primary" id="dialogOkBtn" type="button"></button>
     </div>

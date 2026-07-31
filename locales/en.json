@@ -146,6 +146,7 @@
   "dialog.confirm": "Confirm",
   "dialog.cancel": "Cancel",
   "dialog.title_confirm": "Confirmation",
+  "dialog.close": "Close",
 
   "settings.title": "Settings",
   "settings.tab_folders": "Folders",

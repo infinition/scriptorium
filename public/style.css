@@ -1561,6 +1561,39 @@ button { font: inherit; color: inherit; }
   box-sizing: border-box;
   margin-top: 4px;
 }
+/* Centered icon block at the top of the dialog, like the workspace chooser. */
+.dialog-header {
+  position: relative;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 22px 20px 12px;
+  text-align: center;
+}
+.dialog-header .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+}
+.dialog-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 2px;
+  color: var(--accent);
+}
+.dialog-icon svg {
+  width: 30px;
+  height: 30px;
+}
+.dialog-icon.danger { color: var(--danger); }
+/* Bottom space under the action buttons, matching the workspace chooser. */
+.dialog-actions {
+  padding: 0 20px 22px;
+}
 @media (max-width: 480px) {
   .dialog-modal .modal-body { padding: 16px; }
   .dialog-modal .modal-actions { flex-wrap: wrap; }
