@@ -538,12 +538,18 @@ button { font: inherit; color: inherit; }
   transition: opacity 0.15s ease;
 }
 .breadcrumb:hover { opacity: 0.85; }
-.breadcrumb .sep { opacity: 0.5; }
-.breadcrumb .current {
-  color: var(--text-muted);
+/* Every segment must stay on one line. Without min-width: 0 a flex item never
+   shrinks below its content, so text-overflow can't kick in; the section name
+   and the filename then wrap and inflate the whole top bar on narrow screens. */
+.breadcrumb > span {
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.breadcrumb .sep { opacity: 0.5; }
+.breadcrumb .current {
+  color: var(--text-muted);
 }
 
 .topbar-actions {
