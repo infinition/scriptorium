@@ -2427,6 +2427,26 @@ function setCaretInLine(line, charOffset) {
   sel.addRange(r);
 }
 
+// Re-select [start, end) inside a line's single text node, keeping a visible
+// selection after formatting so the effect can be toggled live.
+function setSelectionInLine(line, start, end) {
+  let textNode = line.firstChild;
+  if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+    textNode = document.createTextNode(line.textContent);
+    line.innerHTML = '';
+    line.appendChild(textNode);
+  }
+  const len = textNode.nodeValue.length;
+  const s = Math.max(0, Math.min(start, len));
+  const e = Math.max(s, Math.min(end, len));
+  const sel = window.getSelection();
+  const r = document.createRange();
+  r.setStart(textNode, s);
+  r.setEnd(textNode, e);
+  sel.removeAllRanges();
+  sel.addRange(r);
+}
+
 function makeLineRawAndActive(line) {
   if (!line) return;
   const raw = (line.dataset.raw !== undefined) ? line.dataset.raw : line.textContent;
@@ -2636,21 +2656,127 @@ function markerRunDepth(text, s, e, ch) {
   return { depth: Math.min(before, after), innerS, innerE };
 }
 
+// Nearest asterisk runs of length >= n enclosing the selection, skipping
+// shorter runs (e.g. a single '*' when toggling bold). Returns null when the
+// selection is not inside an enclosing run of that marker.
+function findEnclosingRuns(text, innerS, innerE, n) {
+  let leftStart = -1, leftLen = 0;
+  let i = innerS - 1;
+  while (i >= 0) {
+    if (text.charAt(i) === '*') {
+      let j = i;
+      while (j >= 0 && text.charAt(j) === '*') j--;
+      const runStart = j + 1;
+      const runLen = i - j;
+      if (runLen >= n) { leftStart = runStart; leftLen = runLen; break; }
+      i = j;
+    } else {
+      i--;
+    }
+  }
+  if (leftStart === -1) return null;
+
+  let rightStart = -1, rightLen = 0;
+  i = innerE;
+  while (i < text.length) {
+    if (text.charAt(i) === '*') {
+      let j = i;
+      while (j < text.length && text.charAt(j) === '*') j++;
+      const runLen = j - i;
+      if (runLen >= n) { rightStart = i; rightLen = runLen; break; }
+      i = j;
+    } else {
+      i++;
+    }
+  }
+  if (rightStart === -1 || rightStart < innerS) return null;
+
+  return {
+    leftStart, leftLen, rightStart, rightLen,
+    contentStart: leftStart + leftLen,
+    contentEnd: rightStart
+  };
+}
+
+// Toggle an asterisk marker ('*' italic, '**' bold, '***' bold+italic) around
+// [s,e). Wraps plain text, unwraps or splits when the selection sits inside an
+// enclosing run (so a word inside a bold paragraph toggles off just that word),
+// and when a selection already mixes bold runs, strips every bold marker so a
+// paragraph toggles back to plain in one go while italic and strikethrough
+// stay untouched.
+function toggleAsteriskRun(text, s, e, n) {
+  const marker = '*'.repeat(n);
+
+  let innerS = s, innerE = e;
+  while (innerS < innerE && text.charAt(innerS) === '*') innerS++;
+  while (innerE > innerS && text.charAt(innerE - 1) === '*') innerE--;
+  const leadInSel = innerS - s;
+  const trailInSel = e - innerE;
+
+  // Italic nests inside bold rather than splitting it: it only unwraps when
+  // the selection sits directly between single asterisks (e.g. inside `*...*`),
+  // otherwise it wraps and creates `**...*mot*...**`.
+  if (n === 1) {
+    const leftAdj = leadInSel > 0 ? leadInSel : runLengthBefore(text, innerS, '*');
+    const rightAdj = trailInSel > 0 ? trailInSel : runLengthAfter(text, innerE, '*');
+    if (leftAdj >= 1 && rightAdj >= 1) {
+      return splitAsteriskRun(text, innerS, innerE, 1);
+    }
+    const selectedText = text.slice(s, e);
+    return { newText: text.slice(0, s) + marker + selectedText + marker + text.slice(e), newStart: s + 1, newEnd: s + 1 + selectedText.length };
+  }
+
+  const run = findEnclosingRuns(text, innerS, innerE, n);
+  if (run) {
+    return splitAsteriskRun(text, innerS, innerE, n, run);
+  }
+  if (text.slice(s, e).indexOf(marker) !== -1) {
+    // Mixed bold inside the selection: strip every marker, keeping italic,
+    // strikethrough and the rest intact.
+    const inner = text.slice(s, e).split(marker).join('');
+    return { newText: text.slice(0, s) + inner + text.slice(e), newStart: s, newEnd: s + inner.length };
+  }
+  const selectedText = text.slice(s, e);
+  return { newText: text.slice(0, s) + marker + selectedText + marker + text.slice(e), newStart: s + n, newEnd: s + n + selectedText.length };
+}
+
+// Split or unwrap an asterisk run: the selection loses `n` layers while the
+// surrounding A/B parts keep their full depth (re-wrapped), and uneven runs
+// leave residual asterisks at the edges (italic inside bold closes correctly).
+function splitAsteriskRun(text, innerS, innerE, n, run) {
+  const found = run || findEnclosingRuns(text, innerS, innerE, n);
+  if (!found) return null;
+
+  const { leftStart, leftLen, rightStart, rightLen, contentStart, contentEnd } = found;
+  let A = text.slice(contentStart, innerS);
+  let B = text.slice(innerE, contentEnd);
+  let trailSpace = '', leadSpace = '';
+  const mTrail = A.match(/[ \t]+$/);
+  if (mTrail) { trailSpace = mTrail[0]; A = A.slice(0, A.length - mTrail[0].length); }
+  const mLead = B.match(/^[ \t]+/);
+  if (mLead) { leadSpace = mLead[0]; B = B.slice(mLead[0].length); }
+
+  const depth = Math.min(leftLen, rightLen);
+  const dMark = '*'.repeat(depth);
+  const selMark = '*'.repeat(Math.max(0, depth - n));
+  const partA = A ? dMark + A + dMark : '';
+  const partB = B ? dMark + B + dMark : '';
+  const leftRemain = '*'.repeat(leftLen - depth);
+  const rightRemain = '*'.repeat(rightLen - depth);
+
+  const newText = text.slice(0, leftStart) + leftRemain + partA + trailSpace + selMark + text.slice(innerS, innerE) + selMark + leadSpace + partB + rightRemain + text.slice(rightStart + rightLen);
+  const newStart = leftStart + leftRemain.length + partA.length + trailSpace.length + selMark.length;
+  const newEnd = newStart + (innerE - innerS);
+  return { newText, newStart, newEnd };
+}
+
 // Toggle `prefix`/`suffix` markup on/off around [s,e) in `text`, returning the
 // new text plus the new [start,end) of the (still-selected) inner text.
 function toggleInlineMarkers(text, s, e, prefix, suffix) {
   const selectedText = text.slice(s, e);
 
   if (prefix === suffix && /^\*+$/.test(prefix)) {
-    const n = prefix.length;
-    const { depth, innerS, innerE } = markerRunDepth(text, s, e, '*');
-    if (depth >= n) {
-      const newText = text.slice(0, innerS - n) + text.slice(innerS, innerE) + text.slice(innerE + n);
-      return { newText, newStart: innerS - n, newEnd: (innerS - n) + (innerE - innerS) };
-    }
-    const wrapped = prefix + selectedText + suffix;
-    const newText = text.slice(0, s) + wrapped + text.slice(e);
-    return { newText, newStart: s + prefix.length, newEnd: s + prefix.length + selectedText.length };
+    return toggleAsteriskRun(text, s, e, prefix.length);
   }
 
   if (selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length >= prefix.length + suffix.length) {
@@ -4892,24 +5018,36 @@ function setLineBlockType(kind) {
   const inner = stripBlockPrefix(text);
   // Clicking the format that's already applied toggles it back to a plain paragraph.
   const targetKind = currentBlockKind(text) === kind ? 'p' : kind;
-  let newText = inner;
-  switch (targetKind) {
-    case 'p':     newText = inner; break;
-    case 'h1':    newText = '# '    + inner; break;
-    case 'h2':    newText = '## '   + inner; break;
-    case 'h3':    newText = '### '  + inner; break;
-    case 'h4':    newText = '#### ' + inner; break;
-    case 'h5':    newText = '##### '+ inner; break;
-    case 'h6':    newText = '######'+ ' ' + inner; break;
-    case 'ul':    newText = '- '    + inner; break;
-    case 'ol':    newText = '1. '   + inner; break;
-    case 'task':  newText = '- [ ] '+ inner; break;
-    case 'quote': newText = '> '    + inner; break;
+  const PREFIX = { p: '', h1: '# ', h2: '## ', h3: '### ', h4: '#### ', h5: '##### ', h6: '###### ', ul: '- ', ol: '1. ', task: '- [ ] ', quote: '> ' };
+  const oldPrefixLen = (PREFIX[currentBlockKind(text)] || '').length;
+  const newPrefixLen = (PREFIX[targetKind] || '').length;
+  const newText = (PREFIX[targetKind] || '') + inner;
+
+  // Keep the caret or selection where it was instead of jumping to the end, so
+  // H1 then H2 can be pressed in a row and the result is visible live.
+  const sel = window.getSelection();
+  let selStart = null, selEnd = null;
+  if (sel && sel.rangeCount) {
+    const r = sel.getRangeAt(0);
+    if (activeLineNode.contains(r.startContainer) && activeLineNode.contains(r.endContainer)) {
+      selStart = rangeOffsetIn(activeLineNode, r.startContainer, r.startOffset);
+      selEnd = rangeOffsetIn(activeLineNode, r.endContainer, r.endOffset);
+    }
   }
+
   activeLineNode.textContent = newText;
   activeLineNode.dataset.raw = newText;
   applyLineKind(activeLineNode, newText);
-  setCaretInLine(activeLineNode, newText.length);
+
+  if (selStart !== null) {
+    const shift = (pos) => {
+      if (pos <= oldPrefixLen) return Math.min(pos + newPrefixLen - oldPrefixLen, newPrefixLen);
+      return Math.min(pos + newPrefixLen - oldPrefixLen, newText.length);
+    };
+    setSelectionInLine(activeLineNode, shift(selStart), shift(selEnd));
+  } else {
+    setCaretInLine(activeLineNode, newText.length);
+  }
   markDirty();
   updateStats();
   saveHistory(state.activeDocId, true);
