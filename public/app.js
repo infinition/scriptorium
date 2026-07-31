@@ -46,6 +46,10 @@ let archiveTimers = new Map();
 // Save timers
 let saveTimer;
 let dirty = false;
+// Set right after we wrote a document ourselves: the file watcher echoes the
+// write back as "workspace-changed", and that echo must not trigger a full
+// reload (which would drop the editor selection) for a change we caused.
+let suppressOwnSaveReload = false;
 
 // History state map for documents (docId -> { stack, index, lastSaveTime, lastWasTyping })
 let docHistory = {};
@@ -117,6 +121,11 @@ function initSSE() {
 }
 
 async function onWorkspaceChangedExternally() {
+  // Echo of our own save: swallow it so the editor keeps its selection.
+  if (suppressOwnSaveReload) {
+    suppressOwnSaveReload = false;
+    return;
+  }
   if (dirty) {
     showToast('toast.external_change');
     return;
@@ -243,6 +252,7 @@ async function saveDocumentOnDisk() {
       saveIndicator.classList.add('saved');
       saveText.textContent = __('save.saved');
       dirty = false;
+      suppressOwnSaveReload = true;
 
       renderNav();
       updateBreadcrumbAndMeta();
