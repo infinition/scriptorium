@@ -285,6 +285,8 @@
   "multi.block_count_plural": "{count} blocks",
   "multi.merge_title": "Merge selected blocks into one (content and formatting preserved)",
   "multi.delete_title": "Delete selected blocks",
+  "multi.merge_short": "Merge",
+  "multi.delete_short": "Delete",
 
   "statusbar.mots": "words",
   "statusbar.signes": "chars",

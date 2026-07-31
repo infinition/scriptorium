@@ -3061,7 +3061,11 @@ window.addEventListener('keydown', (e) => {
   // letter into the text (Tab keeps indenting while the editor has focus).
   if (!ctrl && !e.altKey && !e.metaKey && !inField) {
     const k = e.key.toLowerCase();
-    if (k === 'tab') { e.preventDefault(); applyReadingMode((readingModeState + 1) % 3); return; }
+    // Tab cycles the display modes only when no focusable control is focused,
+    // so it keeps its standard role of moving focus between buttons and links.
+    if (k === 'tab' && target.tagName !== 'BUTTON' && target.tagName !== 'SELECT' && target.tagName !== 'A') {
+      e.preventDefault(); applyReadingMode((readingModeState + 1) % 3); return;
+    }
     if (k === 't') { e.preventDefault(); applyTypewriterMode(!typewriterState); return; }
     if (k === 'p') { e.preventDefault(); applyFocusLineMode(!focusLineState); return; }
     if (k === 'r') { e.preventDefault(); applyReadingMode((readingModeState + 1) % 3); return; }

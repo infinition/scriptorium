@@ -282,6 +282,8 @@
   "multi.block_count_plural": "{count} blocs",
   "multi.merge_title": "Fusionner les blocs s\u00e9lectionn\u00e9s en un seul bloc (contenu et mise en forme conserv\u00e9s)",
   "multi.delete_title": "Supprimer les blocs s\u00e9lectionn\u00e9s",
+  "multi.merge_short": "Fusionner",
+  "multi.delete_short": "Supprimer",
 
   "statusbar.mots": "mots",
   "statusbar.signes": "signes",
