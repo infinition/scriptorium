@@ -1960,6 +1960,11 @@ mark.idea-hl {
   .app.show-ideas { grid-template-columns: 0 1fr 320px; }
   .app.show-ideas .sidebar { opacity: 0; pointer-events: none; }
   .editor-container { padding: 30px 40px 35vh; gap: 30px; }
+  /* Between 720px and the desktop breakpoint the ideas panel is hidden (0 width)
+     but there was no button to reopen it: the mobile ideas toggle now covers
+     that whole range. The left sidebar stays a fixed column, so only the ideas
+     button needs showing. */
+  .mobile-ideas { display: inline-flex; }
 }
 
 @media (max-width: 720px) {
