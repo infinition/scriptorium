@@ -1473,12 +1473,11 @@ app.post('/api/open-doc', guarded((req, res) => {
   // execFile, never a shell: a filename with & or a quote stays one argv entry.
   if (process.platform === 'win32') {
     // "explorer /select,<path>" selects the file in its folder; "explorer
-    // <path>" hands it to the default handler. explorer.exe exits 1 even on
-    // success, so its status is not worth reading. The path must be quoted:
-    // explorer ignores an unquoted /select, path that contains spaces and
-    // falls back to the Documents folder.
-    const target = mode === 'file' ? `"${fullPath}"` : `/select,"${fullPath}"`;
-    execFile('explorer', [target], () => {});
+    // <path>" hands it to the default handler. Pass the raw path as one argv
+    // entry: Windows quotes it for us and explorer handles the quoted path
+    // with spaces. Adding quotes inside the argument makes explorer mis-parse
+    // it and fall back to the Documents folder.
+    execFile('explorer', [mode === 'file' ? fullPath : `/select,${fullPath}`], () => {});
   } else if (process.platform === 'darwin') {
     execFile('open', mode === 'file' ? [fullPath] : ['-R', fullPath], () => {});
   } else {
