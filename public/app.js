@@ -8465,20 +8465,21 @@ function insertEmoji(emoji) {
   closeEmojiPicker();
   if (!ctx) return;
   if (ctx.isContentEditable) {
-    if (ctx.range) {
-      const node = ctx.range.startContainer;
-      const off = ctx.range.startOffset;
-      if (node.nodeType === Node.TEXT_NODE && node.nodeValue && node.nodeValue.slice(off - 2, off) === '@@') {
-        node.nodeValue = node.nodeValue.slice(0, off - 2) + emoji + node.nodeValue.slice(off);
-        const r = document.createRange();
-        r.setStart(node, off - 2 + emoji.length);
-        r.collapse(true);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(r);
-      } else {
-        ctx.range.insertNode(document.createTextNode(emoji));
+    const line = ctx.line;
+    if (line && line.isConnected) {
+      const raw = line.textContent;
+      let start = Math.max(0, Math.min(ctx.lineOff || 0, raw.length));
+      if (raw.slice(start, start + 2) !== '@@') {
+        // The offset drifted: replace the last '@@' in the line as a fallback.
+        const idx = raw.lastIndexOf('@@');
+        start = idx !== -1 ? idx : raw.length;
       }
+      const newRaw = raw.slice(0, start) + emoji + raw.slice(start + 2);
+      line.textContent = newRaw;
+      line.dataset.raw = newRaw;
+      setCaretInLine(line, start + emoji.length);
+    } else if (ctx.range) {
+      ctx.range.insertNode(document.createTextNode(emoji));
     }
     if (content) content.dispatchEvent(new Event('input', { bubbles: true }));
   } else {
@@ -8520,7 +8521,9 @@ document.addEventListener('input', (e) => {
       const node = range.startContainer;
       const off = range.startOffset;
       if (node.nodeType === Node.TEXT_NODE && node.nodeValue && node.nodeValue.slice(off - 2, off) === '@@') {
-        openEmojiPicker({ el, isContentEditable: true, range: range.cloneRange() });
+        const line = getLineForNode(node);
+        const lineOff = line ? rangeOffsetIn(line, node, off) : -1;
+        openEmojiPicker({ el, isContentEditable: true, line, lineOff: lineOff >= 2 ? lineOff - 2 : 0 });
       }
     }
   }
