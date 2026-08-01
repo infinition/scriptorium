@@ -51,6 +51,34 @@ const CONFIG_FILE = path.join(__dirname, 'config.json');
 const CUSTOM_THEME_FILE = path.join(__dirname, 'theme.custom.json');
 let workspaceDir = path.join(require('os').homedir(), 'Scriptorium');
 let ideasDirSetting = '';
+
+// User preferences live in <workspace>/.scriptorium/settings.json so every
+// workspace is an independent, portable unit (theme, fonts, backgrounds,
+// icons, spacing, language, …).
+function getSettingsFile() {
+  return path.join(getScriptoriumDir(), 'settings.json');
+}
+function loadWorkspaceSettings() {
+  try {
+    if (fs.existsSync(getSettingsFile())) {
+      const data = JSON.parse(fs.readFileSync(getSettingsFile(), 'utf8'));
+      return (data && typeof data === 'object') ? data : {};
+    }
+  } catch (err) {
+    console.error('Error loading workspace settings:', err);
+  }
+  return {};
+}
+function saveWorkspaceSettings(settings) {
+  try {
+    fs.mkdirSync(getScriptoriumDir(), { recursive: true });
+    fs.writeFileSync(getSettingsFile(), JSON.stringify(settings || {}, null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    console.error('Error saving workspace settings:', err);
+    return false;
+  }
+}
 let accessToken = '';
 let workspaceLocked = false;
 // False until config.json records a workspace: the client then shows the
@@ -68,10 +96,18 @@ function loadCustomTheme() {
   return null;
 }
 
-// Named custom colour themes, one JSON file per theme in <workspace>/.themes/.
-// Each file holds { name, vars } where vars maps CSS variable -> hex colour.
+// All app-managed data lives in one hidden folder at the workspace root, so a
+// workspace is a complete portable unit. Subfolders: themes, fonts, media,
+// icons, snapshots, plus settings.json for the user preferences.
+function getScriptoriumDir() {
+  return path.join(workspaceDir, '.scriptorium');
+}
+
+// Named custom colour themes, one JSON file per theme in
+// <workspace>/.scriptorium/themes/. Each file holds { name, vars } where vars
+// maps CSS variable -> hex colour.
 function getThemesDir() {
-  return path.join(workspaceDir, '.themes');
+  return path.join(getScriptoriumDir(), 'themes');
 }
 
 function ensureThemesDir() {
@@ -138,7 +174,7 @@ const MEDIA_IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
 const MEDIA_VIDEO_EXT = ['.mp4', '.webm', '.mov', '.ogv'];
 
 function getMediaDir() {
-  return path.join(workspaceDir, '.media');
+  return path.join(getScriptoriumDir(), 'media');
 }
 
 function listMediaFiles() {
@@ -159,7 +195,7 @@ function listMediaFiles() {
 const ICON_EXTENSIONS = ['.svg', '.png', '.webp', '.ico', '.jpg', '.jpeg'];
 
 function getIconsDir() {
-  return path.join(workspaceDir, '.icons');
+  return path.join(getScriptoriumDir(), 'icons');
 }
 
 function listIconFiles() {
@@ -184,7 +220,7 @@ function listIconFiles() {
 const FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2'];
 
 function getFontsDir() {
-  return path.join(workspaceDir, '.fonts');
+  return path.join(getScriptoriumDir(), 'fonts');
 }
 
 function listCustomFonts() {
@@ -810,6 +846,36 @@ Une image :
 Bonne écriture.
 `;
 
+// Migrates pre-.scriptorium workspaces: the old hidden folders (.themes,
+// .fonts, .media, .icons, .snapshots) move under .scriptorium/ so every
+// workspace is a single portable unit.
+function migrateWorkspaceLayout() {
+  if (!workspaceConfigured || !fs.existsSync(workspaceDir)) return;
+  const moves = [
+    ['.themes', 'themes'],
+    ['.fonts', 'fonts'],
+    ['.media', 'media'],
+    ['.icons', 'icons'],
+    ['.snapshots', 'snapshots']
+  ];
+  for (const [oldName, newName] of moves) {
+    const src = path.join(workspaceDir, oldName);
+    const dst = path.join(getScriptoriumDir(), newName);
+    if (!fs.existsSync(src)) continue;
+    if (fs.existsSync(dst)) {
+      // The new location already has data: keep it, drop the old duplicate.
+      fs.rmSync(src, { recursive: true, force: true });
+    } else {
+      try {
+        fs.mkdirSync(path.dirname(dst), { recursive: true });
+        fs.renameSync(src, dst);
+      } catch (err) {
+        console.error('Error migrating ' + oldName + ':', err);
+      }
+    }
+  }
+}
+
 // Ensure default workspace structure exists
 function ensureWorkspaceDirs() {
   // Creates the folder skeleton only. Demo content (welcome docs, idea themes)
@@ -820,10 +886,12 @@ function ensureWorkspaceDirs() {
     if (!fs.existsSync(workspaceDir)) {
       fs.mkdirSync(workspaceDir, { recursive: true });
     }
+    migrateWorkspaceLayout();
     const ideasDir = getIdeasDir();
     if (!fs.existsSync(ideasDir)) {
       fs.mkdirSync(ideasDir, { recursive: true });
     }
+    fs.mkdirSync(getScriptoriumDir(), { recursive: true });
     setupWorkspaceWatcher();
   } catch (err) {
     console.error('Error ensuring workspace directories:', err);
@@ -841,7 +909,7 @@ function seedNewWorkspace() {
       const p = path.resolve(workspaceDir, item);
       let isDir = false;
       try { isDir = fs.statSync(p).isDirectory(); } catch (e) {}
-      return isDir && !['.git', 'node_modules', '.themes', '.snapshots'].includes(item) && p !== resolvedIdeasDir && item !== 'ideas';
+      return isDir && !['.git', 'node_modules', '.scriptorium', '.themes', '.snapshots'].includes(item) && p !== resolvedIdeasDir && item !== 'ideas';
     });
     // A folder that already contains documents must not be polluted with demos.
     if (subdirs.length > 0) return;
@@ -1313,7 +1381,7 @@ app.delete('/api/media/:id', guarded((req, res) => {
 // Snapshots (revision history) — persisted on disk in the workspace, one JSON
 // file per document, under <workspace>/.snapshots/
 function snapshotsDir() {
-  return path.join(workspaceDir, '.snapshots');
+  return path.join(getScriptoriumDir(), 'snapshots');
 }
 
 function snapshotsFileFor(docId) {
@@ -1510,6 +1578,24 @@ app.post('/api/pick-folder', (req, res) => {
     }
   });
 });
+
+// Workspace preferences (theme, fonts, backgrounds, icons, spacing, language)
+// stored in .scriptorium/settings.json, so each workspace is portable.
+app.get('/api/settings', (req, res) => {
+  res.json({ settings: loadWorkspaceSettings() });
+});
+
+app.post('/api/settings', guarded((req, res) => {
+  const settings = (req.body && req.body.settings) || {};
+  if (typeof settings !== 'object' || Array.isArray(settings)) {
+    return res.status(400).json({ error: 'Invalid settings' });
+  }
+  if (saveWorkspaceSettings(settings)) {
+    res.json({ success: true });
+  } else {
+    res.status(500).json({ error: 'Failed to save settings' });
+  }
+}));
 
 // Get Workspace layout (sections, documents, ideas themes)
 app.get('/api/workspace', (req, res) => {

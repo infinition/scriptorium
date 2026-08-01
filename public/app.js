@@ -1,5 +1,42 @@
 'use strict';
 
+// ============ WORKSPACE-SCOPED PREFERENCES ============
+// Every scriptorium* localStorage key is mirrored to
+// <workspace>/.scriptorium/settings.json, so a workspace is an independent,
+// portable unit. The pre-paint script hydrates localStorage from the file;
+// here writes are synced back (debounced).
+(function () {
+  const origSet = Storage.prototype.setItem;
+  const origRemove = Storage.prototype.removeItem;
+  let saveTimer = null;
+  const isPref = (k) => typeof k === 'string' && k.indexOf('scriptorium') === 0;
+  function scheduleSync() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      const out = {};
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (isPref(k)) out[k] = localStorage.getItem(k);
+        }
+      } catch (e) {}
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: out })
+      }).catch(() => {});
+    }, 400);
+  }
+  Storage.prototype.setItem = function (k, v) {
+    origSet.call(this, k, v);
+    if (this === localStorage && isPref(k)) scheduleSync();
+  };
+  Storage.prototype.removeItem = function (k) {
+    origRemove.call(this, k);
+    if (this === localStorage && isPref(k)) scheduleSync();
+  };
+})();
+
 // ============ ACCESS TOKEN ============
 // When the server is exposed on the LAN (HOST=0.0.0.0), it prints a URL with
 // ?token=… — open that once on the phone and the token is remembered here.

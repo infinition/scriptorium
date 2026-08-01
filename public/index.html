@@ -35,6 +35,21 @@
 <link rel="stylesheet" href="style.css">
 <script defer src="i18n.js"></script>
 <script>
+// Hydrate localStorage from the workspace settings file before the app reads
+// it, so every workspace carries its own preferences (theme, fonts, icons…).
+(function () {
+  try {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/settings', false); // synchronous, runs before app.js
+    xhr.send();
+    if (xhr.status === 200) {
+      var ws = JSON.parse(xhr.responseText).settings || {};
+      for (var k in ws) {
+        if (k.indexOf('scriptorium') === 0) localStorage.setItem(k, ws[k]);
+      }
+    }
+  } catch (e) {}
+})();
 // Apply the saved color theme before first paint, so switching themes never
 // flashes the default theme for a frame on reload.
 (function () {
