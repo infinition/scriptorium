@@ -37,3 +37,4 @@ src-tauri/gen/
 
 # Local editor tooling
 .claude/
+config.json.bak
