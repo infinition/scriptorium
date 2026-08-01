@@ -3850,6 +3850,38 @@ function initFontSizeControls() {
   });
 }
 
+// Space between blocks, in em so it scales with the base font size. The gap
+// between two blocks is also the click target that inserts a new block there.
+const BLOCK_GAP_DEFAULT = 0.62;
+function loadBlockGap() {
+  const raw = parseFloat(localStorage.getItem('scriptoriumBlockGap'));
+  return isFinite(raw) && raw >= 0 ? raw : BLOCK_GAP_DEFAULT;
+}
+let blockGapState = loadBlockGap();
+function formatBlockGap(v) {
+  return (Number.isInteger(v) ? v : Math.round(v * 100) / 100) + 'em';
+}
+function applyBlockGap(v) {
+  blockGapState = v;
+  document.documentElement.style.setProperty('--block-gap', v + 'em');
+  localStorage.setItem('scriptoriumBlockGap', String(v));
+}
+function syncBlockGapSliderUI() {
+  const input = $('blockGapSlider');
+  const valueEl = $('blockGapValue');
+  if (input) input.value = blockGapState;
+  if (valueEl) valueEl.textContent = formatBlockGap(blockGapState);
+}
+function initBlockGapControl() {
+  applyBlockGap(blockGapState);
+  syncBlockGapSliderUI();
+  $('blockGapSlider')?.addEventListener('input', () => {
+    applyBlockGap(parseFloat($('blockGapSlider').value));
+    const valueEl = $('blockGapValue');
+    if (valueEl) valueEl.textContent = formatBlockGap(blockGapState);
+  });
+}
+
 // Settings Modal Events
 async function saveAndCloseSettings() {
   const newPath = workspacePathInput ? workspacePathInput.value.trim() : '';
@@ -7508,6 +7540,7 @@ function renderAll() {
 fetchWorkspace();
 initColorTheme();
 initFontSizeControls();
+initBlockGapControl();
 initProWriterTools();
 initLanguageSettings();
 initReadingFadeSlider();

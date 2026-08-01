@@ -391,6 +391,8 @@ The ideas panel gathers short sentences, grouped by theme. It is a notebook of f
 - Right-click to insert it into your text at the cursor.
 - Hover to read the idea in full.
 - The \`+\` button adds an idea to the active theme. Esc cancels.
+- The magnifying glass filters the ideas of the current theme as you type.
+- **Drag & drop**: drag an idea to reorder it, or drop it on another theme's tab to move it there. A horizontal line shows where it will land. Drag an idea into the editor to insert it as a new block. Select a word in the editor, or drag a whole block, onto the panel to add it as an idea.
 
 ## Contents
 
@@ -415,6 +417,7 @@ The breadcrumb at the top shows the section, the title and the filename. Click i
 - **Undo / Redo** (\`Ctrl+Z\` / \`Ctrl+Shift+Z\`).
 - **Remove empty lines**.
 - **Justify**: aligns the text left and right.
+- **Readable line length**: next to Justify, toggles the text between a centred readable column and full width.
 - **Spell check**: toggles spell checking.
 - **Auto-scroll** (\`A\`): scrolls the text, click to set the speed.
 - **Find / Replace** (\`Ctrl+F\`).
@@ -427,6 +430,9 @@ Markdown renders live. The line you are editing switches to raw text, the others
 - The \`+\` button in the margin inserts a block: paragraph, headings H1 to H6, lists, checkbox, quote, code block, image, divider.
 - The block handle moves it, the trash deletes it.
 - Click an image to switch back to its Markdown source and edit the URL directly.
+- Pasting or dropping an image saves it into the workspace \`assets\` folder and inserts it as Markdown.
+- A quote starting with \`> [!note]\` becomes a coloured callout (tip, warning, danger, question…).
+- \`Ctrl\`+click blocks to select several, then merge them into one or delete them together.
 - A click between two blocks inserts a new block there.
 - Pasting inserts plain text, never foreign formatting.
 
@@ -437,7 +443,7 @@ Shortcuts: \`Ctrl+G\` or \`Ctrl+B\` bold, \`Ctrl+I\` italic, \`Ctrl+K\` then \`C
 The gear at the top left opens the settings.
 
 - **Folders**: workspace path and ideas folder, with a browse button.
-- **Appearance**: colour themes (Default, Ivory, Polaire, Custom), text sizes per heading level, reading fade, hide YAML frontmatter, colour headings and formatting differently.
+- **Appearance**: colour themes (Default, Ivory, Polaire, Custom), text sizes per heading level, the space between blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
 - **Language**: Français or English.
 
 ## Keyboard shortcuts
@@ -457,6 +463,7 @@ The gear at the top left opens the settings.
 | \`A\` | Auto-scroll |
 | \`Tab\` | Cycle display modes |
 | \`F\` | Focus mode |
+| \`Ctrl\`+click | Select several blocks |
 
 ## Supported Markdown
 
@@ -480,6 +487,16 @@ def greet(name):
 A quote:
 
 > Writing is thinking slowly.
+
+A callout:
+
+> [!note] A note
+> Callouts bring attention to a passage. Try tip, warning, danger, question.
+
+A checkbox list:
+
+- [ ] a task to do
+- [x] a task already done
 
 A table:
 
@@ -539,6 +556,8 @@ Le panneau d'idées rassemble des phrases courtes, classées par thème. C'est u
 - Clic droit pour l'insérer dans votre texte au curseur.
 - Survol pour lire l'idée en entier.
 - Le bouton \`+\` ajoute une idée au thème actif. Échap annule.
+- La loupe filtre les idées du thème courant au fil de la frappe.
+- **Glisser-déposer** : glissez une idée pour la réordonner, ou déposez-la sur l'onglet d'un autre thème pour l'y déplacer. Une ligne horizontale indique l'endroit où elle atterrira. Glissez une idée dans l'éditeur pour l'insérer comme nouveau bloc. Sélectionnez un mot dans l'éditeur, ou glissez un bloc entier, sur le panneau pour l'ajouter comme idée.
 
 ## Le sommaire
 
@@ -563,6 +582,7 @@ Le fil d'ariane en haut affiche la section, le titre et le nom du fichier. Cliqu
 - **Annuler / Répéter** (\`Ctrl+Z\` / \`Ctrl+Shift+Z\`).
 - **Supprimer les lignes vides**.
 - **Justifier** : aligne le texte à gauche et à droite.
+- **Longueur de ligne lisible** : à côté de Justifier, alterne entre une colonne lisible centrée et la pleine largeur.
 - **Correcteur** : active ou coupe la vérification orthographique.
 - **Défilement auto** (\`A\`) : fait défiler le texte, clic pour régler la vitesse.
 - **Rechercher / remplacer** (\`Ctrl+F\`).
@@ -575,6 +595,9 @@ Le Markdown s'affiche en direct. La ligne que vous éditez passe en texte brut, 
 - Le bouton \`+\` dans la marge insère un bloc : paragraphe, titres H1 à H6, listes, case à cocher, citation, bloc de code, image, séparateur.
 - La poignée de bloc le déplace, la corbeille le supprime.
 - Cliquez sur une image pour revenir à son code Markdown et modifier l'URL directement.
+- Coller ou déposer une image l'enregistre dans le dossier \`assets\` de l'espace de travail et l'insère en Markdown.
+- Une citation commençant par \`> [!note]\` devient une note colorée (tip, warning, danger, question…).
+- \`Ctrl\`+clic sur des blocs pour en sélectionner plusieurs, puis les fusionner en un seul ou les supprimer ensemble.
 - Un clic entre deux blocs insère un nouveau bloc à cet endroit.
 - Coller insère du texte brut, jamais de mise en forme étrangère.
 
@@ -585,7 +608,7 @@ Raccourcis : \`Ctrl+G\` ou \`Ctrl+B\` gras, \`Ctrl+I\` italique, \`Ctrl+K\` puis
 L'engrenage en haut à gauche ouvre les paramètres.
 
 - **Dossiers** : chemin du dossier de travail et du dossier d'idées, avec bouton pour parcourir.
-- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire, Personnalisé), tailles de texte par niveau de titre, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
+- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire, Personnalisé), tailles de texte par niveau de titre, espacement entre les blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
 - **Langue** : Français ou English.
 
 ## Raccourcis clavier
@@ -605,6 +628,7 @@ L'engrenage en haut à gauche ouvre les paramètres.
 | \`A\` | Défilement auto |
 | \`Tab\` | Alterner les modes d'affichage |
 | \`F\` | Mode focus |
+| \`Ctrl\`+clic | Sélectionner plusieurs blocs |
 
 ## Markdown supporté
 
@@ -628,6 +652,16 @@ def salutation(nom):
 Une citation :
 
 > Écrire, c'est penser lentement.
+
+Une note colorée :
+
+> [!note] Une note
+> Les notes mettent en avant un passage. Essayez tip, warning, danger, question.
+
+Une liste à cocher :
+
+- [ ] une tâche à faire
+- [x] une tâche déjà faite
 
 Un tableau :
 

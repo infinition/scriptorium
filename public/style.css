@@ -615,7 +615,8 @@ button { font: inherit; color: inherit; }
      about 8px to hit. The outline is a pseudo-element now (no hit area) and the
      gap is slightly wider, which roughly doubles the target without taking a
      single pixel away from the blocks themselves. */
-  margin-bottom: 0.62em;
+  /* Gap between blocks, adjustable in Settings > Appearance (--block-gap). */
+  margin-bottom: var(--block-gap, 0.62em);
   outline: none;
   /* avoid layout shift on active toggle: don't animate sizing */
   transition: background-color 0.15s ease;

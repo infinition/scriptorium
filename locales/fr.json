@@ -182,6 +182,8 @@
   "settings.reset_font_btn": "R\u00e9initialiser les tailles",
   "settings.reading_fade_desc": "Fondu du mode lecture machine \u00e0 \u00e9crire : r\u00e9glez l'intensit\u00e9 du d\u00e9grad\u00e9 en haut et en bas.",
   "settings.reading_fade_label": "Taille du fondu",
+  "settings.block_gap_desc": "Espacement entre les blocs : la taille du retour \u00e0 la ligne entre deux paragraphes.",
+  "settings.block_gap_label": "Espace entre les blocs",
   "settings.cancel_btn": "Annuler",
   "settings.save_btn": "Enregistrer",
   "settings.language_desc": "Choisissez la langue de l'application. Le changement s'applique imm\u00e9diatement.",
