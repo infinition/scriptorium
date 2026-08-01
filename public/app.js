@@ -3743,6 +3743,42 @@ function resetCurrentTheme() {
 }
 $('resetThemeBtn')?.addEventListener('click', resetCurrentTheme);
 
+// Duplicates the current theme (colours + fonts) under a new name.
+async function cloneCurrentTheme() {
+  const name = await themedPrompt(__('prompt.clone_theme_name'));
+  if (!name || !name.trim()) return;
+  let vars, fonts;
+  if (isCustomThemeId(colorThemeState.id)) {
+    const t = getCustomThemeById(colorThemeState.id);
+    vars = (t && t.vars) || colorThemeState.customVars || getComputedThemeVars('default');
+    fonts = (t && t.fonts) || null;
+  } else {
+    vars = getComputedThemeVars(colorThemeState.id);
+    fonts = getThemeFonts(colorThemeState.id);
+  }
+  try {
+    const res = await fetch('/api/color-themes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: null, name: name.trim(), vars, fonts })
+    });
+    const data = await res.json();
+    if (data.success) {
+      await loadColorThemes();
+      colorThemeState.id = 'custom:' + data.id;
+      colorThemeState.customVars = vars;
+      localStorage.setItem('scriptoriumColorTheme', colorThemeState.id);
+      applyColorTheme(colorThemeState.id, { skipPersist: true });
+      renderColorThemeSwatches();
+      selectColorTheme(colorThemeState.id);
+      showToast('toast.theme_cloned');
+    }
+  } catch (err) {
+    console.error('clone theme error', err);
+  }
+}
+$('cloneThemeBtn')?.addEventListener('click', cloneCurrentTheme);
+
 function buildColorFieldGrid(containerId, fields) {
   const container = $(containerId);
   if (!container) return;

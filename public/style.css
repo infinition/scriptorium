@@ -1882,6 +1882,18 @@ mark.idea-hl {
 }
 .color-theme-swatch:hover { border-color: var(--border-strong); }
 .color-theme-swatch.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.theme-action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.theme-action-buttons .btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .color-theme-swatch-preview {
   width: 100%;
   height: 34px;
