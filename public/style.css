@@ -481,8 +481,11 @@ button { font: inherit; color: inherit; }
 }
 .add-section-btn:hover { color: var(--text-muted); border-color: var(--text-faint); }
 
+/* Same thickness as the editor's statusbar (buttons 23px + 2x10px padding),
+   so the three bottom bars read as one continuous, aligned line. */
 .sidebar-footer {
-  padding: 14px 20px;
+  padding: 9px 20px;
+  height: 43px;
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -1105,6 +1108,25 @@ button { font: inherit; color: inherit; }
   box-shadow: 0 0 0 1px var(--accent);
 }
 .idea-chip.dragging { opacity: 0.5; }
+/* While a block is dragged toward the panel, chips must not look hovered:
+   the between-ideas drop line is the only cue. Restores the base look. */
+.ideas-panel.block-dragging .idea-chip:hover,
+.ideas-panel.block-dragging .idea-chip:focus,
+.ideas-panel.block-dragging .idea-chip:focus-within {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: var(--bg-elevated);
+  box-shadow: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 12px;
+  z-index: auto;
+}
+.ideas-panel.block-dragging .idea-chip:hover .chip-actions {
+  opacity: 0;
+  pointer-events: none;
+}
 .sel-btn-add-idea { color: var(--accent); font-weight: 700; }
 
 .ideas-toolbar {
@@ -1384,12 +1406,13 @@ mark.idea-hl {
 }
 
 .ideas-footer {
-  padding: 12px 16px;
+  padding: 6px 16px;
+  height: 43px;
   border-top: 1px solid var(--border);
   color: var(--text-faint);
   font-size: 10px;
   text-align: center;
-  line-height: 1.6;
+  line-height: 1.4;
 }
 .ideas-footer kbd {
   font-family: var(--mono);

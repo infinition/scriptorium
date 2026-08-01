@@ -1194,6 +1194,7 @@ function renderIdeas() {
       chip.className = `idea-chip ${sizeClass}` + (idea.archived ? ' archived' : '');
       chip.title = idea.text;
       chip.dataset.id = idea.id;
+      chip.dataset.ideaText = idea.text;
       chip.setAttribute('tabindex', '0');
       
       const textEl = document.createElement('span');
@@ -1385,6 +1386,9 @@ let draggedIdea = null;
 // The between-blocks boundary under the cursor during an idea drag into the
 // editor (from findInsertionBoundary), used by the drop to place the new block.
 let ideaDropHit = null;
+// While a block is dragged over the ideas panel, remembers where the new idea
+// will be inserted: { themeId, beforeText, after } or null when not over a chip.
+let blockIdeaDrop = null;
 
 function startDeleting(themeId, ideaText, chip) {
   if (state.isLocked) {
@@ -1532,6 +1536,50 @@ function positionIdeasDropIndicator(chip, before) {
 function hideIdeasDropIndicator() {
   const ind = $('ideasDropIndicator');
   if (ind) ind.style.display = 'none';
+}
+
+// During a block drag over the ideas panel, shows the same between-ideas line
+// as the reorder drag and remembers the insertion target for the drop.
+function updateBlockIdeaDropPosition(clientX, clientY) {
+  blockIdeaDrop = null;
+  if (state.ideasMode === 'archived' || !ideasPanel || !ideasList) {
+    hideIdeasDropIndicator();
+    return;
+  }
+  const panelRect = ideasPanel.getBoundingClientRect();
+  if (clientX < panelRect.left || clientX > panelRect.right ||
+      clientY < panelRect.top || clientY > panelRect.bottom) {
+    hideIdeasDropIndicator();
+    return;
+  }
+  const chips = Array.from(ideasList.children).filter(el => el.classList && el.classList.contains('idea-chip'));
+  if (chips.length === 0) {
+    hideIdeasDropIndicator();
+    return;
+  }
+  let target = null;
+  let before = true;
+  for (const chip of chips) {
+    const r = chip.getBoundingClientRect();
+    const mid = r.top + r.height / 2;
+    target = chip;
+    if (clientY < mid) {
+      before = true;
+      break;
+    }
+    before = false;
+  }
+  if (!target) {
+    hideIdeasDropIndicator();
+    return;
+  }
+  const theme = activeTheme();
+  blockIdeaDrop = {
+    themeId: theme ? theme.id : null,
+    beforeText: target.dataset.ideaText,
+    after: !before
+  };
+  positionIdeasDropIndicator(target, before);
 }
 
 // ============ EDIT IDEA (inline) ============
@@ -5603,6 +5651,19 @@ async function addBlockTextToIdeas(text) {
   await addIdea(theme.id, text);
 }
 
+// Adds the block's text as a new idea in `themeId`, then moves it to sit just
+// before or after `beforeText`, matching the line shown during the drag.
+async function addBlockTextToIdeasAt(text, themeId, beforeText, after) {
+  const theme = state.ideaThemes.find(t => t.id === themeId);
+  if (!theme) {
+    themedAlert(__('alert.no_theme'));
+    return;
+  }
+  await addIdea(themeId, text);
+  const fresh = state.ideaThemes.find(t => t.id === themeId);
+  if (fresh) await reorderIdeas(fresh, text, beforeText, after);
+}
+
 function startBlockDrag(line, e) {
   if (!line || !content.contains(line)) return;
 
@@ -5613,6 +5674,8 @@ function startBlockDrag(line, e) {
   setHoveredLine(null);
   hideBlockTrashBtnNow();
   dragStartX = e.clientX;
+  // Chips must not look hovered while dragging a block: the drop line is the cue.
+  if (ideasPanel) ideasPanel.classList.add('block-dragging');
 
   // Create drag ghost element
   if (blockDragGhostEl) blockDragGhostEl.remove();
@@ -5664,15 +5727,23 @@ function onBlockDragMove(e) {
 
   updateDeleteZoneVisibility(e.clientX, wrapRect);
   // Over the ideas panel the drop means "add as an idea", never a delete.
-  const deleteEdge = isOverIdeasPanel(e.clientX, e.clientY) ? null : getDeleteEdge(e.clientX, wrapRect);
+  const overIdeas = isOverIdeasPanel(e.clientX, e.clientY);
+  const deleteEdge = overIdeas ? null : getDeleteEdge(e.clientX, wrapRect);
   updateDeleteZoneHighlight(deleteEdge);
   if (deleteEdge) {
     blockDragGhostEl.classList.add('delete-mode');
     draggedLineNode.classList.add('delete-mode');
     if (blockDropIndicator) blockDropIndicator.style.display = 'none';
+    hideIdeasDropIndicator();
+  } else if (overIdeas) {
+    blockDragGhostEl.classList.remove('delete-mode');
+    draggedLineNode.classList.remove('delete-mode');
+    if (blockDropIndicator) blockDropIndicator.style.display = 'none';
+    updateBlockIdeaDropPosition(e.clientX, e.clientY);
   } else {
     blockDragGhostEl.classList.remove('delete-mode');
     draggedLineNode.classList.remove('delete-mode');
+    hideIdeasDropIndicator();
     updateDropIndicatorPosition(e.clientY);
   }
 }
@@ -5829,7 +5900,14 @@ function onBlockDragEnd(e) {
     if (isOverIdeasPanel(e.clientX, e.clientY)) {
       const text = (draggedLineNode.textContent || '').trim();
       draggedLineNode.classList.remove('delete-mode');
-      if (text) addBlockTextToIdeas(text);
+      hideIdeasDropIndicator();
+      if (text) {
+        if (blockIdeaDrop && blockIdeaDrop.themeId && blockIdeaDrop.beforeText) {
+          addBlockTextToIdeasAt(text, blockIdeaDrop.themeId, blockIdeaDrop.beforeText, blockIdeaDrop.after);
+        } else {
+          addBlockTextToIdeas(text);
+        }
+      }
     } else {
       const isDeleteZone = !!getDeleteEdge(e.clientX, editorWrap.getBoundingClientRect());
 
@@ -5859,6 +5937,8 @@ function onBlockDragEnd(e) {
   targetDropLine = null;
   lastDragEvent = null;
   dragStartX = null;
+  blockIdeaDrop = null;
+  if (ideasPanel) ideasPanel.classList.remove('block-dragging');
 
   updateBlockAddPosition();
   updateBlockDragPosition();
