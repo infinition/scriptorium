@@ -4129,9 +4129,9 @@ async function loadAppMedia() {
 }
 
 // Video ping-pong: play forward, reverse at the end, forward again at 0.
-// WebView2 does not honour a negative playbackRate, so the backward leg is
-// driven manually: near the end the video pauses and a rAF loop steps
-// currentTime down to 0, then native forward playback resumes.
+// WebView2 neither honours a negative playbackRate nor fires reliable events
+// here, so a single rAF loop drives it: native forward playback until near the
+// end, pause, then step currentTime backwards to 0, then resume forward.
 function setupVideoLoop(video, mode) {
   if (mode !== 'reverse') {
     video.loop = true;
@@ -4140,39 +4140,29 @@ function setupVideoLoop(video, mode) {
   }
   video.loop = false;
   video.playbackRate = 1;
-  let reversing = false;
-  let raf = null;
+  let dir = 1; // 1 forward, -1 reverse
 
-  const stopReverse = () => {
-    if (raf) { cancelAnimationFrame(raf); raf = null; }
-    reversing = false;
-  };
-
-  const reverseTick = () => {
+  const tick = () => {
+    if (!video.isConnected) return; // background changed: stop the loop
+    requestAnimationFrame(tick);
     if (!video.duration) return;
-    const t = video.currentTime - (1 / 60);
-    if (t <= 0) {
-      video.currentTime = 0;
-      stopReverse();
-      video.playbackRate = 1;
-      video.play().catch(() => {});
-      return;
+    if (dir === 1) {
+      if (video.currentTime >= video.duration - 0.08) {
+        video.pause();
+        dir = -1;
+      }
+    } else {
+      const t = video.currentTime - (1 / 60);
+      if (t <= 0) {
+        video.currentTime = 0;
+        dir = 1;
+        video.play().catch(() => {});
+      } else {
+        video.currentTime = t;
+      }
     }
-    video.currentTime = t;
-    raf = requestAnimationFrame(reverseTick);
   };
-
-  video.addEventListener('timeupdate', () => {
-    if (reversing || !video.duration) return;
-    if (video.currentTime >= video.duration - 0.06) {
-      video.pause();
-      video.currentTime = video.duration;
-      reversing = true;
-      raf = requestAnimationFrame(reverseTick);
-    }
-  });
-  // Safety net: never stay frozen at the end.
-  video.addEventListener('ended', () => { video.currentTime = 0; video.play().catch(() => {}); });
+  requestAnimationFrame(tick);
 }
 
 function applyAppBackground(bg) {
