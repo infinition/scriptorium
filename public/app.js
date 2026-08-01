@@ -3876,6 +3876,51 @@ $('saveCustomThemeBtn')?.addEventListener('click', async () => {
   }
 });
 
+// Renames the current theme on the server and refreshes the swatch list.
+async function renameCurrentTheme(name) {
+  const id = customThemeKey(colorThemeState.id);
+  const current = getCustomThemeById(colorThemeState.id);
+  try {
+    const res = await fetch('/api/color-themes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        name,
+        vars: current ? current.vars : (colorThemeState.customVars || {}),
+        fonts: (current && current.fonts) || null
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      await loadColorThemes();
+      colorThemeState.id = 'custom:' + data.id;
+      localStorage.setItem('scriptoriumColorTheme', colorThemeState.id);
+      renderColorThemeSwatches();
+      const nameInput = $('customThemeName');
+      if (nameInput) nameInput.value = data.name;
+      showToast('toast.custom_theme_saved');
+    }
+  } catch (err) {
+    console.error('rename theme error', err);
+  }
+}
+
+// Rename as soon as the field is committed (blur or Enter), so it is always
+// taken into account without depending on the Save button.
+$('customThemeName')?.addEventListener('change', () => {
+  if (!isCustomThemeId(colorThemeState.id)) return;
+  const nameInput = $('customThemeName');
+  const newName = nameInput ? nameInput.value.trim() : '';
+  if (!newName) return;
+  const current = getCustomThemeById(colorThemeState.id);
+  if (current && current.name === newName) return;
+  renameCurrentTheme(newName);
+});
+$('customThemeName')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); }
+});
+
 // Starts a brand-new named theme from the current colours.
 async function createNewColorTheme() {
   const name = await themedPrompt(__('prompt.color_theme_name'));
