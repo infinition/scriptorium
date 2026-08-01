@@ -89,6 +89,35 @@ fn server_is_up(port: u16) -> bool {
     TcpStream::connect_timeout(&addr, Duration::from_millis(250)).is_ok()
 }
 
+// Spawns the Node server. On Windows, node is a console app and would open a
+// CMD window of its own; CREATE_NO_WINDOW keeps it hidden so the GUI looks
+// self-contained. stdout/stderr go nowhere (the GUI does not need the logs).
+fn spawn_node(node: &Path, root: &Path, port: u16) -> std::io::Result<Child> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        use std::process::Stdio;
+        Command::new(node)
+            .arg("server.js")
+            .current_dir(root)
+            .env("PORT", port.to_string())
+            .env("HOST", "127.0.0.1")
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new(node)
+            .arg("server.js")
+            .current_dir(root)
+            .env("PORT", port.to_string())
+            .env("HOST", "127.0.0.1")
+            .spawn()
+    }
+}
+
 // A running server: either spawned by us (child) or reused because one was
 // already listening (child is None, so nothing to kill at exit).
 struct ServerHandle {
@@ -143,12 +172,7 @@ fn start_server(root: &Path) -> Result<ServerHandle, String> {
         } else {
             PathBuf::from("node")
         };
-        let mut child = Command::new(node)
-            .arg("server.js")
-            .current_dir(root)
-            .env("PORT", port.to_string())
-            .env("HOST", "127.0.0.1")
-            .spawn()
+        let mut child = spawn_node(&node, root, port)
             .map_err(|e| format!("Impossible de lancer node server.js : {e}"))?;
 
         let mut up = false;
