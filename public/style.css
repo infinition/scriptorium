@@ -2089,6 +2089,65 @@ mark.idea-hl {
   font-size: 11px;
   color: var(--text-faint);
 }
+
+/* Custom icon picker (dropdown with thumbnails) */
+.icon-pick-btn {
+  flex-shrink: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 7px 10px;
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+.icon-pick-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.icon-picker {
+  position: fixed;
+  z-index: 12000;
+  min-width: 220px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+}
+.icon-pick-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.icon-pick-item:hover { background: var(--bg-hover); color: var(--text); }
+.icon-pick-item.active { color: var(--accent); }
+.icon-pick-thumb {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.icon-pick-thumb svg { width: 15px; height: 15px; }
+.icon-pick-thumb img { width: 18px; height: 18px; object-fit: contain; }
+.icon-pick-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .color-theme-swatch-label {
   font-size: 11.5px;
   color: var(--text-muted);

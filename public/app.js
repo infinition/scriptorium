@@ -8677,33 +8677,71 @@ function syncIconsUI() {
     label.className = 'icon-edit-name';
     label.textContent = key;
     row.appendChild(label);
-    const select = document.createElement('select');
-    select.className = 'text-select icon-edit-select';
-    const noneOpt = document.createElement('option');
-    noneOpt.value = '';
-    noneOpt.textContent = __('settings.icon_default');
-    select.appendChild(noneOpt);
-    appIconFiles.forEach(ic => {
-      const opt = document.createElement('option');
-      opt.value = ic.url;
-      opt.textContent = ic.name;
-      select.appendChild(opt);
+    const pickBtn = document.createElement('button');
+    pickBtn.type = 'button';
+    pickBtn.className = 'icon-pick-btn';
+    const override = overrides[key];
+    pickBtn.textContent = override
+      ? ((appIconFiles.find(ic => ic.url === override) || {}).name || __('settings.icon_default'))
+      : __('settings.icon_default');
+    pickBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openIconPicker(key, pickBtn);
     });
-    select.value = overrides[key] || '';
-    select.addEventListener('change', () => {
-      const map = loadThemeIcons();
-      const themeOverrides = map[colorThemeState.id] || {};
-      if (select.value) themeOverrides[key] = select.value;
-      else delete themeOverrides[key];
-      map[colorThemeState.id] = themeOverrides;
-      saveThemeIcons(map);
-      renderAllIcons();
-      syncIconsUI();
-    });
-    row.appendChild(select);
+    row.appendChild(pickBtn);
     list.appendChild(row);
   });
 }
+
+// Custom dropdown for choosing an imported icon (with thumbnails).
+let iconPickTarget = null;
+
+function openIconPicker(key, btn) {
+  iconPickTarget = key;
+  const overrides = getThemeIconOverrides();
+  const picker = $('iconPicker');
+  if (!picker) return;
+  picker.innerHTML = '';
+  const addItem = (label, thumb, active, onClick) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'icon-pick-item' + (active ? ' active' : '');
+    item.innerHTML = `<span class="icon-pick-thumb">${thumb}</span><span class="icon-pick-label">${label}</span>`;
+    item.addEventListener('click', onClick);
+    picker.appendChild(item);
+  };
+  addItem(__('settings.icon_default'), UI_ICONS[key] || '', !overrides[key], () => setIconOverride(key, ''));
+  appIconFiles.forEach(ic => {
+    addItem(escapeHtml(ic.name), `<img src="${ic.url}" alt="" />`, overrides[key] === ic.url, () => setIconOverride(key, ic.url));
+  });
+  picker.classList.remove('hidden');
+  const r = btn.getBoundingClientRect();
+  const pr = picker.getBoundingClientRect();
+  picker.style.top = Math.min(r.bottom + 4, Math.max(8, window.innerHeight - pr.height - 8)) + 'px';
+  picker.style.left = Math.min(r.left, Math.max(8, window.innerWidth - pr.width - 8)) + 'px';
+}
+
+function setIconOverride(key, url) {
+  const map = loadThemeIcons();
+  const themeOverrides = map[colorThemeState.id] || {};
+  if (url) themeOverrides[key] = url;
+  else delete themeOverrides[key];
+  map[colorThemeState.id] = themeOverrides;
+  saveThemeIcons(map);
+  renderAllIcons();
+  syncIconsUI();
+  iconPickTarget = null;
+  const picker = $('iconPicker');
+  if (picker) picker.classList.add('hidden');
+}
+
+document.addEventListener('mousedown', (e) => {
+  if (iconPickTarget && !(e.target.closest && e.target.closest('#iconPicker'))) {
+    iconPickTarget = null;
+    const picker = $('iconPicker');
+    if (picker) picker.classList.add('hidden');
+  }
+});
 
 async function initIconControl() {
   await loadAppIcons();
