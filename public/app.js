@@ -1297,9 +1297,10 @@ function renderIdeas() {
       });
       chip.addEventListener('dragend', () => {
         draggedIdea = null;
+        ideaDropHit = null;
         chip.classList.remove('dragging');
         hideIdeasDropIndicator();
-        hideIdeaDropCursor();
+        hideGutterIndicator();
       });
       chip.addEventListener('dragover', (e) => {
         if (draggedIdea && draggedIdea.themeId === theme.id && idea.text !== draggedIdea.text) {
@@ -1381,6 +1382,9 @@ const deleteTimers = new Map(); // ideaText -> { timer, element }
 // The idea currently being dragged (for reorder, move to another theme, or
 // dropping into the editor). { themeId, text }
 let draggedIdea = null;
+// The between-blocks boundary under the cursor during an idea drag into the
+// editor (from findInsertionBoundary), used by the drop to place the new block.
+let ideaDropHit = null;
 
 function startDeleting(themeId, ideaText, chip) {
   if (state.isLocked) {
@@ -1434,16 +1438,22 @@ async function commitDeleteIdea(themeId, ideaText) {
 // Inserts an idea's text at the pointer position in the editor. Uses the
 // browser's caret-from-point when available so the idea lands where it was
 // dropped, not just at the remembered caret.
-function insertIdeaAtDropPoint(text, x, y) {
-  const pos = (document.caretPositionFromPoint && document.caretPositionFromPoint(x, y)) || null;
-  const line = pos ? getLineForNode(pos.offsetNode) : null;
-  if (line) {
-    const renderedOff = rangeOffsetIn(line, pos.offsetNode, pos.offset);
-    const rawOff = renderedToRawOffset(line, renderedOff);
-    if (line !== activeLineNode) makeLineRawAndActive(line);
-    setCaretInLine(line, rawOff);
+// Inserts the dropped idea as a new block before or after the line the drag is
+// pointing at (the same boundary the block drop indicator shows).
+function insertIdeaBlockAtBoundary(text, hit) {
+  saveHistory(state.activeDocId, true);
+  const newLine = makeLineNode(text);
+  if (hit) {
+    content.insertBefore(newLine, hit.insertBefore ? hit.line : hit.line.nextSibling);
+  } else {
+    content.appendChild(newLine);
   }
-  insertMarkdownAtCaret(text);
+  makeLineRawAndActive(newLine);
+  setCaretInLine(newLine, text.length);
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
 }
 
 // Reorders the active ideas of a theme so `draggedText` sits just before
@@ -1522,47 +1532,6 @@ function positionIdeasDropIndicator(chip, before) {
 function hideIdeasDropIndicator() {
   const ind = $('ideasDropIndicator');
   if (ind) ind.style.display = 'none';
-}
-
-// Vertical caret shown in the editor while dragging an idea, so the exact
-// insertion point is visible before release. The idea lands at a caret
-// position inside a line (see insertIdeaAtDropPoint), so a line-wide caret is
-// the accurate cue, unlike the block drag's between-blocks line.
-function positionIdeaDropCursor(x, y) {
-  const cur = $('ideaDropCursor');
-  if (!cur || !editorWrap) return;
-  const pos = (document.caretPositionFromPoint && document.caretPositionFromPoint(x, y)) || null;
-  const line = pos ? getLineForNode(pos.offsetNode) : null;
-  if (!line || !content.contains(line)) {
-    cur.style.display = 'none';
-    return;
-  }
-  // Measure the pixel position of the caret inside the line's rendered text.
-  let left = line.getBoundingClientRect().left;
-  if (pos && pos.offsetNode) {
-    let r = document.createRange();
-    r.selectNodeContents(line);
-    try {
-      r.setEnd(pos.offsetNode, pos.offset);
-    } catch (err) {
-      r = null;
-    }
-    if (r) {
-      const rect = r.getBoundingClientRect();
-      if (rect && (rect.width > 0 || rect.height > 0)) left = rect.right;
-    }
-  }
-  const wrapRect = editorWrap.getBoundingClientRect();
-  const lineRect = line.getBoundingClientRect();
-  cur.style.top = (lineRect.top - wrapRect.top + editorWrap.scrollTop) + 'px';
-  cur.style.height = lineRect.height + 'px';
-  cur.style.left = (left - wrapRect.left + editorWrap.scrollLeft) + 'px';
-  cur.style.display = 'block';
-}
-
-function hideIdeaDropCursor() {
-  const cur = $('ideaDropCursor');
-  if (cur) cur.style.display = 'none';
 }
 
 // ============ EDIT IDEA (inline) ============
@@ -6333,29 +6302,34 @@ content.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   }
-  // While dragging an idea, show the exact caret position it will land at.
+  // While dragging an idea, show the same between-blocks insertion line as the
+  // block drag, and remember the boundary for the drop.
   if (draggedIdea) {
-    positionIdeaDropCursor(e.clientX, e.clientY);
+    const hit = findInsertionBoundary(e.clientY);
+    ideaDropHit = hit;
+    if (hit) showGutterIndicator(hit);
   } else {
-    hideIdeaDropCursor();
+    hideGutterIndicator();
   }
 });
 
 content.addEventListener('dragleave', (e) => {
-  if (!content.contains(e.relatedTarget)) hideIdeaDropCursor();
+  if (!content.contains(e.relatedTarget)) hideGutterIndicator();
 });
 
 content.addEventListener('drop', (e) => {
   const dt = e.dataTransfer;
   if (!dt) return;
-  // An idea dragged from the panel lands at the drop point in the editor.
+  // An idea dragged from the panel lands as a new block at the shown boundary.
   if (draggedIdea) {
     e.preventDefault();
     e.stopPropagation();
-    hideIdeaDropCursor();
+    hideGutterIndicator();
     const draggedText = draggedIdea.text;
+    const hit = ideaDropHit;
     draggedIdea = null;
-    insertIdeaAtDropPoint(draggedText, e.clientX, e.clientY);
+    ideaDropHit = null;
+    insertIdeaBlockAtBoundary(draggedText, hit);
     return;
   }
   const imageFiles = Array.from(dt.files || []).filter(f => f.type && f.type.indexOf('image/') === 0);
