@@ -201,6 +201,7 @@
   "settings.icons_search": "Search an icon…",
   "settings.icons_import_btn": "Import icons…",
   "settings.icon_default": "Default",
+  "settings.icons_empty": "No custom icons yet — import some above.",
   "settings.font_sizes_desc": "Text size \u2014 each level is independently adjustable.",
   "settings.font_doc_title_label": "Doc title",
   "settings.font_doc_subtitle_label": "Doc subtitle",

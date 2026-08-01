@@ -8635,6 +8635,31 @@ async function importIconFiles(files) {
 function syncIconsUI() {
   const list = $('iconEditList');
   if (!list) return;
+  // Gallery of the imported icons, so you can see what each one looks like.
+  const gallery = $('iconGallery');
+  if (gallery) {
+    gallery.innerHTML = '';
+    if (appIconFiles.length) {
+      appIconFiles.forEach(ic => {
+        const item = document.createElement('div');
+        item.className = 'icon-gallery-item';
+        item.title = ic.name;
+        const img = document.createElement('img');
+        img.src = ic.url;
+        img.alt = '';
+        item.appendChild(img);
+        const name = document.createElement('span');
+        name.textContent = ic.name;
+        item.appendChild(name);
+        gallery.appendChild(item);
+      });
+    } else {
+      const hint = document.createElement('div');
+      hint.className = 'icon-gallery-empty';
+      hint.textContent = __('settings.icons_empty');
+      gallery.appendChild(hint);
+    }
+  }
   const q = ($('iconSearchInput') ? $('iconSearchInput').value : '').trim().toLowerCase();
   const overrides = getThemeIconOverrides();
   const keys = Object.keys(UI_ICONS).filter(k => !q || k.toLowerCase().includes(q));

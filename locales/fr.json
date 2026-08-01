@@ -201,6 +201,7 @@
   "settings.icons_search": "Rechercher une icône…",
   "settings.icons_import_btn": "Importer des icônes…",
   "settings.icon_default": "Défaut",
+  "settings.icons_empty": "Aucune icône importée pour l'instant — importe-en ci-dessus.",
   "settings.font_sizes_desc": "Taille du texte \u2014 chaque niveau est r\u00e9glable ind\u00e9pendamment.",
   "settings.font_doc_title_label": "Titre document",
   "settings.font_doc_subtitle_label": "Sous-titre doc",
