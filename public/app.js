@@ -9691,4 +9691,7 @@ if (isCoarsePointer) {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
 })();
 
-setTimeout(() => content.focus(), 100);
+// No startup focus: WebView2 draws a blinking caret at the top of the document
+// when a freshly rendered document is focused before the user interacts, and
+// every later click returns the caret there until the user types. The editor
+// gets focused by the user's first click instead, like the working build.

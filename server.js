@@ -508,7 +508,8 @@ function setupWorkspaceWatcher() {
       if (base.startsWith('.') || filename.includes('.trash') || filename.includes('.snapshots')) return;
       clearTimeout(watcherTimer);
       watcherTimer = setTimeout(() => {
-        broadcastEvent('workspace-changed', { filename });
+        // TEMP disabled to test the click-caret bug
+        // broadcastEvent('workspace-changed', { filename });
       }, 350);
     });
   } catch (err) {}
