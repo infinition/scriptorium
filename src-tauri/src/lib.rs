@@ -41,12 +41,18 @@ fn find_project_root() -> Option<PathBuf> {
         }
     }
     // Walking up from the executable covers a direct run of the dev binary
-    // (src-tauri/target/debug/…), packaged or ad-hoc launches.
+    // (src-tauri/target/debug/…), packaged or ad-hoc launches. In a bundled
+    // macOS app the server lives in Contents/Resources, so that folder is
+    // checked at each level too.
     if let Ok(exe) = std::env::current_exe() {
         let mut dir = exe.parent().map(|p| p.to_path_buf()).unwrap_or_default();
-        for _ in 0..5 {
+        for _ in 0..6 {
             if dir.join("server.js").exists() {
                 return Some(dir);
+            }
+            let resources = dir.join("Resources");
+            if resources.join("server.js").exists() {
+                return Some(resources);
             }
             if !dir.pop() {
                 break;
@@ -166,12 +172,16 @@ fn start_server(root: &Path) -> Result<ServerHandle, String> {
         }
     }
     for &port in &CANDIDATE_PORTS {
-        // Use the bundled node.exe when present (portable build), else PATH.
-        let node = if root.join("node.exe").exists() {
-            root.join("node.exe")
-        } else {
-            PathBuf::from("node")
-        };
+        // Use a bundled node binary when present (portable Windows build or a
+        // macOS/Linux bundle), else the system node on PATH.
+        let candidates = [
+            root.join("node.exe"),
+            root.join("node"),
+            root.join("bundle-node").join("node.exe"),
+            root.join("bundle-node").join("node"),
+        ];
+        let node = candidates.iter().find(|p| p.exists()).cloned()
+            .unwrap_or_else(|| PathBuf::from("node"));
         let mut child = spawn_node(&node, root, port)
             .map_err(|e| format!("Impossible de lancer node server.js : {e}"))?;
 

@@ -38,6 +38,29 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      # Bundle a node runtime next to the server so the packaged app runs on a
+      # machine without node installed. The file lands in Resources/bundle-node
+      # and the Rust shell spawns it (see lib.rs).
+      - name: Bundle node runtime
+        shell: bash
+        run: |
+          mkdir -p src-tauri/bundle-node
+          NODE_VERSION=v20.19.0
+          case "${{ matrix.platform }}" in
+            macos-latest) NODE_OS=darwin;  NODE_ARCH=arm64; EXT=tar.gz; BIN=bin/node;   OUT=node;;
+            ubuntu-22.04) NODE_OS=linux;   NODE_ARCH=x64;   EXT=tar.gz; BIN=bin/node;   OUT=node;;
+            windows-latest) NODE_OS=win;   NODE_ARCH=x64;   EXT=zip;    BIN=node.exe;  OUT=node.exe;;
+          esac
+          curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-${NODE_OS}-${NODE_ARCH}.${EXT}" -o node_bin.${EXT}
+          if [ "${EXT}" = "zip" ]; then
+            unzip -o node_bin.zip "node-${NODE_VERSION}-${NODE_OS}-${NODE_ARCH}/${BIN}"
+            cp "node-${NODE_VERSION}-${NODE_OS}-${NODE_ARCH}/${BIN}" "src-tauri/bundle-node/${OUT}"
+          else
+            tar -xzf node_bin.${EXT} "node-${NODE_VERSION}-${NODE_OS}-${NODE_ARCH}/${BIN}"
+            cp "node-${NODE_VERSION}-${NODE_OS}-${NODE_ARCH}/${BIN}" "src-tauri/bundle-node/${OUT}"
+            chmod +x "src-tauri/bundle-node/${OUT}"
+          fi
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
