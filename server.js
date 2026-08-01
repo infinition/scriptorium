@@ -1017,7 +1017,8 @@ app.get('/api/config', (req, res) => {
     ideasDir: ideasDirSetting,
     effectiveIdeasDir: getIdeasDir(),
     locked: workspaceLocked,
-    configured: workspaceConfigured
+    configured: workspaceConfigured,
+    appDir: __dirname
   });
 });
 
@@ -1373,6 +1374,7 @@ app.post('/api/open-folder', guarded((req, res) => {
   const { type, sectionId } = req.body || {};
   const targetFolder = sectionId ? resolveSectionFolder(sectionId, req)
     : type === 'ideas' ? getIdeasDir()
+    : type === 'app' ? __dirname
     : workspaceDir;
   if (!fs.existsSync(targetFolder)) {
     return res.status(404).json({ error: serverMsg(req, 'server.error_folder_not_found') });
@@ -1515,7 +1517,7 @@ app.get('/api/workspace', (req, res) => {
   // No workspace configured yet: return an empty layout, the client shows the
   // first-launch chooser instead.
   if (!workspaceConfigured) {
-    return res.json({ configured: false, sections: [], ideaThemes: [] });
+    return res.json({ configured: false, sections: [], ideaThemes: [], appDir: __dirname });
   }
 
   try {
@@ -1614,7 +1616,7 @@ app.get('/api/workspace', (req, res) => {
       }
     }
     
-    res.json({ sections, ideaThemes });
+    res.json({ sections, ideaThemes, appDir: __dirname });
   } catch (err) {
     console.error('Error scanning workspace:', err);
     res.status(500).json({ error: 'Failed to scan workspace: ' + err.message });

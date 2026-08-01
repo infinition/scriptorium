@@ -166,6 +166,8 @@
   "settings.ideas_placeholder": "Default: 'ideas' subfolder of the workspace",
   "settings.ideas_hint": "Leave empty to use the 'ideas' folder inside the workspace.",
   "settings.folder_browse_title": "Browse / Choose a folder",
+  "settings.app_dir_label": "Application folder (server and config):",
+  "settings.open_app_dir_title": "Open the application folder",
   "settings.appearance_desc": "Choose a visual theme. Changes are applied immediately.",
   "settings.frontmatter_label": "Hide YAML frontmatter (block starting with \u00ab\u00a0---\u00a0\u00bb at the top of the document, e.g. Obsidian notes). Still preserved in the file.",
   "settings.mdcolor_label": "Color headings (H1-H6), bold, quotes, links, code, strikethrough, etc. differently.",

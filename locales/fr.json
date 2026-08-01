@@ -166,6 +166,8 @@
   "settings.ideas_placeholder": "Par d\u00e9faut : sous-dossier \u2018ideas\u2019 du workspace",
   "settings.ideas_hint": "Laissez vide pour utiliser le dossier \u00ab\u00a0ideas\u00a0\u00bb \u00e0 l\u2019int\u00e9rieur du workspace.",
   "settings.folder_browse_title": "Parcourir / Choisir un dossier",
+  "settings.app_dir_label": "Répertoire de l'application (serveur et config) :",
+  "settings.open_app_dir_title": "Ouvrir le répertoire de l'application",
   "settings.appearance_desc": "Choisissez un th\u00e8me visuel. Le changement s\u2019applique imm\u00e9diatement.",
   "settings.frontmatter_label": "Masquer le frontmatter YAML (bloc \u00ab\u00a0---\u00a0\u00bb en t\u00eate de document, ex. notes Obsidian). Il reste conserv\u00e9 dans le fichier.",
   "settings.mdcolor_label": "Colorer diff\u00e9remment les titres (H1-H6), le gras, les citations, les liens, le code, le texte barr\u00e9, etc.",

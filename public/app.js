@@ -150,6 +150,7 @@ async function fetchWorkspace() {
     const configData = await configRes.json();
     state.workspaceDir = configData.workspaceDir;
     state.ideasDir = configData.ideasDir || '';
+    state.appDir = configData.appDir || '';
     // The server owns the padlock now — adopt its value rather than localStorage.
     if (typeof configData.locked === 'boolean') {
       state.isLocked = configData.locked;
@@ -4686,8 +4687,25 @@ async function saveAndCloseSettings() {
 $('openSettingsBtn').addEventListener('click', () => {
   workspacePathInput.value = state.workspaceDir || '';
   ideasPathInput.value = state.ideasDir || '';
+  const appDirInput = $('appDirInput');
+  if (appDirInput) appDirInput.value = state.appDir || '';
   settingsModal.classList.add('active');
   updateSettingsOverlayState();
+});
+
+// Opens the app folder (server.js, config.json) in the OS file manager.
+$('openAppDirBtn')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/api/open-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'app' })
+    });
+    if (!res.ok) throw new Error(String(res.status));
+  } catch (err) {
+    console.error(err);
+    showToast('toast.open_failed');
+  }
 });
 
 settingsModal.addEventListener('click', (e) => {
@@ -8426,10 +8444,41 @@ function openEmojiPicker(ctx) {
   if (modal) modal.classList.add('active');
   if (search) search.focus();
 }
-function closeEmojiPicker() {
+function closeEmojiPicker(removeTrigger) {
   const modal = $('emojiModal');
   if (modal) modal.classList.remove('active');
+  // Left without choosing: the two @@@ that opened the picker should go away.
+  if (removeTrigger && emojiPickerTarget) removeEmojiTrigger(emojiPickerTarget);
   emojiPickerTarget = null;
+}
+function removeEmojiTrigger(ctx) {
+  if (ctx.isContentEditable) {
+    const line = ctx.line;
+    if (line && line.isConnected) {
+      const raw = line.textContent;
+      const start = Math.max(0, Math.min(ctx.lineOff || 0, raw.length));
+      if (raw.slice(start, start + 2) === '@@') {
+        const newRaw = raw.slice(0, start) + raw.slice(start + 2);
+        line.textContent = newRaw;
+        line.dataset.raw = newRaw;
+        setCaretInLine(line, start);
+        if (content) content.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  } else {
+    const el = ctx.el;
+    if (!el) return;
+    const v = el.value || '';
+    const start = typeof ctx.replaceStart === 'number' ? ctx.replaceStart : 0;
+    const end = typeof ctx.replaceEnd === 'number' ? ctx.replaceEnd : v.length;
+    if (v.slice(start, start + 2) === '@@') {
+      el.value = v.slice(0, start) + v.slice(end);
+      el.selectionStart = el.selectionEnd = start;
+      el.focus();
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
 }
 function renderEmojiGrid(query) {
   const grid = $('emojiGrid');
@@ -8500,37 +8549,51 @@ function insertEmoji(emoji) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 }
-$('emojiCloseBtn')?.addEventListener('click', closeEmojiPicker);
+$('emojiCloseBtn')?.addEventListener('click', () => closeEmojiPicker(true));
 $('emojiSearch')?.addEventListener('input', (e) => renderEmojiGrid(e.target.value));
-$('emojiModal')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEmojiPicker(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmojiPicker(); });
+$('emojiModal')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEmojiPicker(true); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmojiPicker(true); });
 
-// Typing @@ in any text field opens the picker, remembering where to insert.
+// Typing or pasting @@ in any text field opens the picker, remembering where
+// to insert. A paste can fire input before the caret has settled, so a deferred
+// re-check catches it too.
 document.addEventListener('input', (e) => {
   const el = e.target;
   if (!el) return;
   if (el.closest && el.closest('#emojiModal')) return; // the picker's own search
   if (e.isComposing || emojiPickerTarget) return;
 
-  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-    const v = el.value || '';
-    const pos = el.selectionStart;
-    if (typeof pos === 'number' && v.slice(pos - 2, pos) === '@@') {
-      openEmojiPicker({ el, isContentEditable: false, replaceStart: pos - 2, replaceEnd: pos });
-    }
-  } else if (el.isContentEditable) {
-    const sel = window.getSelection();
-    if (sel.rangeCount) {
-      const range = sel.getRangeAt(0);
-      const node = range.startContainer;
-      const off = range.startOffset;
-      if (node.nodeType === Node.TEXT_NODE && node.nodeValue && node.nodeValue.slice(off - 2, off) === '@@') {
+  const tryTrigger = () => {
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      const v = el.value || '';
+      const pos = el.selectionStart;
+      if (typeof pos === 'number' && v.slice(pos - 2, pos) === '@@') {
+        openEmojiPicker({ el, isContentEditable: false, replaceStart: pos - 2, replaceEnd: pos });
+        return true;
+      }
+    } else if (el.isContentEditable) {
+      const sel = window.getSelection();
+      if (sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        const off = range.startOffset;
         const line = getLineForNode(node);
         const lineOff = line ? rangeOffsetIn(line, node, off) : -1;
-        openEmojiPicker({ el, isContentEditable: true, line, lineOff: lineOff >= 2 ? lineOff - 2 : 0 });
+        // Compare against the whole line text: a pasted @@ can be split across
+        // several text nodes, so the immediate text node alone is not enough.
+        if (line && lineOff >= 2) {
+          const lineText = line.textContent;
+          if (lineText.slice(lineOff - 2, lineOff) === '@@') {
+            openEmojiPicker({ el, isContentEditable: true, line, lineOff: lineOff - 2 });
+            return true;
+          }
+        }
       }
     }
-  }
+    return false;
+  };
+
+  if (!tryTrigger()) setTimeout(tryTrigger, 0);
 });
 
 // ============ CUSTOM UI ICONS (per theme) ============
@@ -9198,8 +9261,9 @@ content.addEventListener('pointerdown', (e) => {
 });
 
 // Clicking the checkbox of a task list toggles it between [ ] and [x], in
-// reading and editing modes alike.
-content.addEventListener('click', (e) => {
+// reading and editing modes alike. Handled on mousedown so the caret does not
+// move into the block first (which would switch it to raw and destroy the box).
+content.addEventListener('mousedown', (e) => {
   const box = e.target.closest ? e.target.closest('.task-box') : null;
   if (!box) return;
   e.preventDefault();
