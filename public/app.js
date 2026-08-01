@@ -3704,6 +3704,9 @@ function selectColorTheme(id) {
   const editor = $('customThemeEditor');
   const isCustom = isCustomThemeId(id);
   if (editor) editor.classList.toggle('hidden', !isCustom);
+  // Built-in themes get a reset button (clears font/background overrides).
+  const resetBtn = $('resetThemeBtn');
+  if (resetBtn) resetBtn.classList.toggle('hidden', isCustom);
   const nameInput = $('customThemeName');
   if (nameInput) {
     if (isCustom) {
@@ -3717,6 +3720,28 @@ function selectColorTheme(id) {
   }
   if (isCustom) populateCustomThemeFields();
 }
+
+// Restores a built-in theme to its defaults: clears the font and background
+// overrides stored for it. Custom themes also carry colours, reset in their
+// own editor.
+function resetCurrentTheme() {
+  const themeId = colorThemeState.id;
+  const fontMap = loadBuiltinThemeFonts();
+  if (fontMap[themeId]) {
+    delete fontMap[themeId];
+    localStorage.setItem('scriptoriumThemeFonts', JSON.stringify(fontMap));
+  }
+  const bgMap = loadThemeBackgrounds();
+  if (bgMap[themeId]) {
+    delete bgMap[themeId];
+    saveThemeBackgrounds(bgMap);
+  }
+  applyThemeFonts();
+  populateFontSelects();
+  applyThemeBackground();
+  showToast('toast.theme_reset');
+}
+$('resetThemeBtn')?.addEventListener('click', resetCurrentTheme);
 
 function buildColorFieldGrid(containerId, fields) {
   const container = $(containerId);
@@ -3741,6 +3766,7 @@ function buildColorFieldGrid(containerId, fields) {
     alpha.step = 1;
     alpha.value = 100;
     alpha.className = 'color-alpha';
+    alpha.id = 'colorAlpha' + f.key;
     alpha.dataset.alphaKey = f.key;
     alpha.title = __('settings.color_alpha_title');
     alpha.addEventListener('input', onCustomColorInput);
@@ -3964,6 +3990,8 @@ async function initColorTheme() {
   await loadCustomFonts();
   applyThemeFonts();
   populateFontSelects();
+  const resetBtnInit = $('resetThemeBtn');
+  if (resetBtnInit) resetBtnInit.classList.toggle('hidden', isCustomThemeId(colorThemeState.id));
   if (isCustomThemeId(colorThemeState.id)) {
     const theme = getCustomThemeById(colorThemeState.id);
     colorThemeState.customVars = (theme && theme.vars) || colorThemeState.customVars || getComputedThemeVars('default');
