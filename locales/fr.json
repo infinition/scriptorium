@@ -101,6 +101,9 @@
   "ideas.empty_active": "Aucune id\u00e9e \u2014 ajoutez-en une.",
   "ideas.empty_archived": "Aucune id\u00e9e archiv\u00e9e.",
   "ideas.import_theme_title": "Importer th\u00e8me .md",
+  "ideas.search_title": "Rechercher des id\u00e9es",
+  "ideas.search_placeholder": "Rechercher des id\u00e9es...",
+  "ideas.search_clear": "Effacer",
   "ideas.insert_title": "Ins\u00e9rer au curseur",
   "ideas.edit_title": "Modifier",
   "ideas.archive_title": "Archiver",
@@ -275,6 +278,7 @@
   "editor.selection_heading2_title": "Titre 2",
   "editor.selection_heading3_title": "Titre 3",
   "editor.selection_quote_title": "Citation",
+  "editor.selection_add_idea_title": "Ajouter aux idées",
   "editor.selection_toolbar_aria": "Mise en forme",
 
   "multi.block_count": "{count} bloc",

@@ -1125,6 +1125,25 @@ function renderThemesTabs() {
       renderThemesTabs();
       renderIdeas();
     });
+    // Dropping an idea onto a tab moves it to that theme.
+    tab.addEventListener('dragover', (e) => {
+      if (draggedIdea && draggedIdea.themeId !== theme.id) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        tab.classList.add('drag-over');
+      }
+    });
+    tab.addEventListener('dragleave', () => tab.classList.remove('drag-over'));
+    tab.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      tab.classList.remove('drag-over');
+      if (draggedIdea && draggedIdea.themeId !== theme.id) {
+        const dragged = draggedIdea;
+        draggedIdea = null;
+        moveIdeaToTheme(dragged, theme);
+      }
+    });
     themesTabs.appendChild(tab);
   });
   
@@ -1158,7 +1177,11 @@ function renderIdeas() {
   activeCountEl.textContent = active.length ? `(${active.length})` : '';
   archivedCountEl.textContent = archived.length ? `(${archived.length})` : '';
 
-  const shown = state.ideasMode === 'archived' ? archived : active;
+  let shown = state.ideasMode === 'archived' ? archived : active;
+  if (ideasSearchQuery) {
+    const q = ideasSearchQuery.toLowerCase();
+    shown = shown.filter(i => i.text.toLowerCase().indexOf(q) !== -1);
+  }
 
   if (shown.length === 0) {
     ideasList.innerHTML = `<div class="ideas-empty">${state.ideasMode === 'archived' ? __('ideas.empty_archived') : __('ideas.empty_active')}</div>`;
@@ -1175,7 +1198,11 @@ function renderIdeas() {
       
       const textEl = document.createElement('span');
       textEl.className = 'idea-text';
-      textEl.textContent = idea.text;
+      if (ideasSearchQuery) {
+        textEl.innerHTML = highlightText(idea.text, ideasSearchQuery);
+      } else {
+        textEl.textContent = idea.text;
+      }
       chip.appendChild(textEl);
       
       const actionsEl = document.createElement('div');
@@ -1252,10 +1279,43 @@ function renderIdeas() {
       chip.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         insertTextAtCaret(idea.text);
-        
+
         // Visual feedback pulse
         chip.classList.add('pulse');
         setTimeout(() => chip.classList.remove('pulse'), 400);
+      });
+
+      // Drag: reorder within the theme, drop onto another tab to move it, or
+      // drop into the editor to insert at the drop point.
+      chip.draggable = true;
+      chip.addEventListener('dragstart', (e) => {
+        draggedIdea = { themeId: theme.id, text: idea.text };
+        e.dataTransfer.effectAllowed = 'copyMove';
+        e.dataTransfer.setData('text/plain', idea.text);
+        chip.classList.add('dragging');
+        e.stopPropagation();
+      });
+      chip.addEventListener('dragend', () => {
+        draggedIdea = null;
+        chip.classList.remove('dragging');
+      });
+      chip.addEventListener('dragover', (e) => {
+        if (draggedIdea && draggedIdea.themeId === theme.id && idea.text !== draggedIdea.text) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          chip.classList.add('drag-over');
+        }
+      });
+      chip.addEventListener('dragleave', () => chip.classList.remove('drag-over'));
+      chip.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        chip.classList.remove('drag-over');
+        if (draggedIdea && draggedIdea.themeId === theme.id && idea.text !== draggedIdea.text) {
+          const draggedText = draggedIdea.text;
+          draggedIdea = null;
+          reorderIdeas(theme, draggedText, idea.text);
+        }
       });
 
       ideasList.appendChild(chip);
@@ -1305,6 +1365,9 @@ function cancelArchiving(ideaText) {
 // ============ DELETE IDEA (5s fade-out, click again to cancel) ============
 
 const deleteTimers = new Map(); // ideaText -> { timer, element }
+// The idea currently being dragged (for reorder, move to another theme, or
+// dropping into the editor). { themeId, text }
+let draggedIdea = null;
 
 function startDeleting(themeId, ideaText, chip) {
   if (state.isLocked) {
@@ -1352,6 +1415,73 @@ async function commitDeleteIdea(themeId, ideaText) {
     console.error('Failed to delete idea:', err);
     await themedAlert(__('alert.idea_delete_error'));
     renderIdeas();
+  }
+}
+
+// Inserts an idea's text at the pointer position in the editor. Uses the
+// browser's caret-from-point when available so the idea lands where it was
+// dropped, not just at the remembered caret.
+function insertIdeaAtDropPoint(text, x, y) {
+  const pos = (document.caretPositionFromPoint && document.caretPositionFromPoint(x, y)) || null;
+  const line = pos ? getLineForNode(pos.offsetNode) : null;
+  if (line) {
+    const renderedOff = rangeOffsetIn(line, pos.offsetNode, pos.offset);
+    const rawOff = renderedToRawOffset(line, renderedOff);
+    if (line !== activeLineNode) makeLineRawAndActive(line);
+    setCaretInLine(line, rawOff);
+  }
+  insertMarkdownAtCaret(text);
+}
+
+// Reorders the active ideas of a theme so `draggedText` sits just before
+// `beforeText`. Persisted by rewriting the theme file.
+async function reorderIdeas(theme, draggedText, beforeText) {
+  const active = theme.ideas.filter(i => !i.archived);
+  const dragged = active.find(i => i.text === draggedText);
+  if (!dragged) return;
+  const rest = active.filter(i => i.text !== draggedText);
+  const idx = beforeText ? rest.findIndex(i => i.text === beforeText) : rest.length;
+  const newActive = idx === -1 ? [...rest, dragged] : [...rest.slice(0, idx), dragged, ...rest.slice(idx)];
+  const order = newActive.map(i => i.text);
+  try {
+    const res = await fetch('/api/ideas/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ themeId: theme.id, order })
+    });
+    if (res.ok) {
+      theme.ideas = [...newActive, ...theme.ideas.filter(i => i.archived)];
+      renderIdeas();
+    }
+  } catch (err) {
+    console.error('reorder error', err);
+  }
+}
+
+// Deletes an idea from its current theme without the delete toast, so a move
+// to another theme only announces the final add.
+async function removeIdeaDirect(themeId, ideaText) {
+  const res = await fetch('/api/ideas/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ themeId, ideaText })
+  });
+  if (!res.ok) throw new Error('Delete failed');
+  const theme = state.ideaThemes.find(t => t.id === themeId);
+  if (theme) theme.ideas = theme.ideas.filter(i => i.text !== ideaText);
+}
+
+// Moves an idea from its current theme to another theme.
+async function moveIdeaToTheme(dragged, targetTheme) {
+  if (state.isLocked) {
+    themedAlert(__('alert.locked'));
+    return;
+  }
+  try {
+    await removeIdeaDirect(dragged.themeId, dragged.text);
+    await addIdea(targetTheme.id, dragged.text);
+  } catch (err) {
+    console.error('move idea error', err);
   }
 }
 
@@ -3995,6 +4125,75 @@ $('archiveTab').addEventListener('click', () => {
   renderIdeas();
 });
 
+// ============ IDEAS SEARCH ============
+// Filters the current theme's bubbles and highlights the matches. The loupe
+// button toggles the field; Esc clears and closes, the cross clears the text.
+let ideasSearchQuery = '';
+const ideasSearchBtn = $('ideasSearchBtn');
+const ideasSearch = $('ideasSearch');
+const ideasSearchInput = $('ideasSearchInput');
+const ideasSearchClear = $('ideasSearchClear');
+
+function clearIdeasSearch() {
+  ideasSearchQuery = '';
+  if (ideasSearchInput) ideasSearchInput.value = '';
+  if (ideasSearchClear) ideasSearchClear.classList.add('hidden');
+  renderIdeas();
+}
+
+function toggleIdeasSearch(show) {
+  if (!ideasSearch) return;
+  const open = show !== undefined ? show : ideasSearch.classList.contains('hidden');
+  ideasSearch.classList.toggle('hidden', !open);
+  if (open && ideasSearchInput) {
+    ideasSearchInput.focus();
+  } else {
+    clearIdeasSearch();
+  }
+}
+
+function highlightText(text, query) {
+  if (!query) return escapeHtml(text);
+  const lower = text.toLowerCase();
+  const q = query.toLowerCase();
+  let out = '';
+  let i = 0;
+  while (true) {
+    const idx = lower.indexOf(q, i);
+    if (idx === -1) { out += escapeHtml(text.slice(i)); break; }
+    out += escapeHtml(text.slice(i, idx)) + '<mark class="idea-hl">' + escapeHtml(text.slice(idx, idx + q.length)) + '</mark>';
+    i = idx + q.length;
+  }
+  return out;
+}
+
+if (ideasSearchBtn) {
+  ideasSearchBtn.addEventListener('click', () => toggleIdeasSearch());
+}
+if (ideasSearchInput) {
+  ideasSearchInput.addEventListener('input', () => {
+    ideasSearchQuery = ideasSearchInput.value.trim();
+    if (ideasSearchClear) ideasSearchClear.classList.toggle('hidden', !ideasSearchQuery);
+    renderIdeas();
+  });
+  ideasSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      toggleIdeasSearch(false);
+      if (ideasSearchBtn) ideasSearchBtn.focus();
+    }
+  });
+}
+if (ideasSearchClear) {
+  ideasSearchClear.addEventListener('click', () => {
+    ideasSearchQuery = '';
+    if (ideasSearchInput) ideasSearchInput.value = '';
+    ideasSearchClear.classList.add('hidden');
+    if (ideasSearchInput) ideasSearchInput.focus();
+    renderIdeas();
+  });
+}
+
 // Editor interactions
 content.addEventListener('input', () => {
   // Live-update the line kind so headings/lists/etc. grow/shrink as you type their prefix
@@ -5028,9 +5227,23 @@ function applyInlineFormat(act) {
     case 'h2':         setLineBlockType('h2'); break;
     case 'h3':         setLineBlockType('h3'); break;
     case 'quote':      setLineBlockType('quote'); break;
+    case 'addidea':    addSelectionToIdeas(); break;
   }
   // Re-position the toolbar over the (possibly shifted) selection
   setTimeout(showSelectionToolbar, 30);
+}
+
+// Adds the selected text to the currently open ideas theme.
+async function addSelectionToIdeas() {
+  const theme = activeTheme();
+  if (!theme) {
+    themedAlert(__('alert.no_theme'));
+    return;
+  }
+  const sel = window.getSelection();
+  const text = sel ? sel.toString().trim() : '';
+  if (!text) return;
+  await addIdea(theme.id, text);
 }
 
 async function insertLinkAroundSelection() {
@@ -5312,6 +5525,23 @@ function updateBlockDragPosition() {
   blockDragBtn.classList.add('visible');
 }
 
+// True when the pointer is over the ideas panel: a drag landing there adds
+// the dragged text as an idea instead of deleting or moving the block.
+function isOverIdeasPanel(x, y) {
+  if (!ideasPanel) return false;
+  const r = ideasPanel.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
+async function addBlockTextToIdeas(text) {
+  const theme = activeTheme();
+  if (!theme) {
+    themedAlert(__('alert.no_theme'));
+    return;
+  }
+  await addIdea(theme.id, text);
+}
+
 function startBlockDrag(line, e) {
   if (!line || !content.contains(line)) return;
 
@@ -5372,7 +5602,8 @@ function onBlockDragMove(e) {
   }
 
   updateDeleteZoneVisibility(e.clientX, wrapRect);
-  const deleteEdge = getDeleteEdge(e.clientX, wrapRect);
+  // Over the ideas panel the drop means "add as an idea", never a delete.
+  const deleteEdge = isOverIdeasPanel(e.clientX, e.clientY) ? null : getDeleteEdge(e.clientX, wrapRect);
   updateDeleteZoneHighlight(deleteEdge);
   if (deleteEdge) {
     blockDragGhostEl.classList.add('delete-mode');
@@ -5530,6 +5761,14 @@ function onBlockDragEnd(e) {
 
   if (draggedLineNode) {
     draggedLineNode.classList.remove('dragging-line');
+
+    // Dropping a block onto the ideas panel adds its text as an idea.
+    if (isOverIdeasPanel(e.clientX, e.clientY)) {
+      const text = (draggedLineNode.textContent || '').trim();
+      draggedLineNode.classList.remove('delete-mode');
+      if (text) addBlockTextToIdeas(text);
+      return;
+    }
 
     const isDeleteZone = !!getDeleteEdge(e.clientX, editorWrap.getBoundingClientRect());
 
@@ -5993,9 +6232,28 @@ content.addEventListener('paste', (e) => {
 
 // Same reasoning for drag-and-dropped text inside the editor. Image files
 // dropped here are saved and inserted as markdown instead.
+// Let text and ideas be dropped onto the editor (a drop is only offered when
+// a dragover has been allowed).
+content.addEventListener('dragover', (e) => {
+  const types = e.dataTransfer && e.dataTransfer.types;
+  if (types && (types.indexOf('text/plain') !== -1 || draggedIdea)) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+});
+
 content.addEventListener('drop', (e) => {
   const dt = e.dataTransfer;
   if (!dt) return;
+  // An idea dragged from the panel lands at the drop point in the editor.
+  if (draggedIdea) {
+    e.preventDefault();
+    e.stopPropagation();
+    const draggedText = draggedIdea.text;
+    draggedIdea = null;
+    insertIdeaAtDropPoint(draggedText, e.clientX, e.clientY);
+    return;
+  }
   const imageFiles = Array.from(dt.files || []).filter(f => f.type && f.type.indexOf('image/') === 0);
   if (imageFiles.length) {
     e.preventDefault();

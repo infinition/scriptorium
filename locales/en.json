@@ -101,6 +101,9 @@
   "ideas.empty_active": "No ideas \u2014 add one.",
   "ideas.empty_archived": "No archived ideas.",
   "ideas.import_theme_title": "Import .md theme",
+  "ideas.search_title": "Search ideas",
+  "ideas.search_placeholder": "Search ideas...",
+  "ideas.search_clear": "Clear",
   "ideas.insert_title": "Insert at cursor",
   "ideas.edit_title": "Edit",
   "ideas.archive_title": "Archive",
@@ -278,6 +281,7 @@
   "editor.selection_heading2_title": "Heading 2",
   "editor.selection_heading3_title": "Heading 3",
   "editor.selection_quote_title": "Quote",
+  "editor.selection_add_idea_title": "Add to ideas",
   "editor.selection_toolbar_aria": "Formatting",
 
   "multi.block_count": "{count} block",

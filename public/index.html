@@ -253,6 +253,9 @@
       <button class="icon-btn ideas-only" id="importIdeasBtn" data-i18n-title="ideas.import_theme_title">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
       </button>
+      <button class="icon-btn ideas-only" id="ideasSearchBtn" data-i18n-title="ideas.search_title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </button>
     </div>
     </div>
 
@@ -263,6 +266,12 @@
       <div class="ideas-toolbar">
         <button class="pill-btn active" id="activeTab" data-mode="active"><span data-i18n="ideas.pill_active">Actives</span> <span id="activeCount" style="opacity: 0.6"></span></button>
         <button class="pill-btn" id="archiveTab" data-mode="archived"><span data-i18n="ideas.pill_archived">Archive</span> <span id="archivedCount" style="opacity: 0.6"></span></button>
+      </div>
+
+      <div class="ideas-search hidden" id="ideasSearch">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="text" id="ideasSearchInput" data-i18n-placeholder="ideas.search_placeholder" placeholder="Search ideas..." autocomplete="off" spellcheck="false" />
+        <button class="ideas-search-clear hidden" id="ideasSearchClear" data-i18n-title="ideas.search_clear" type="button" aria-label="Clear">&times;</button>
       </div>
 
       <div class="ideas-list" id="ideasList"></div>
@@ -526,6 +535,10 @@
   <button class="sel-btn sel-btn-text" data-act="h3" title="Titre 3">H3</button>
   <button class="sel-btn" data-act="quote" title="Citation">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+  </button>
+  <span class="sel-sep"></span>
+  <button class="sel-btn sel-btn-add-idea" data-act="addidea" data-i18n-title="editor.selection_add_idea_title" title="Add to ideas">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
 </div>
 

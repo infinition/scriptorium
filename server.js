@@ -1712,6 +1712,46 @@ app.post('/api/ideas/edit', guarded((req, res) => {
 }));
 
 // Delete an idea entirely from a theme file
+// Reorder the ideas of a theme: `order` lists the idea texts in the new
+// order. The theme file is rewritten, preserving each line's checkbox state.
+app.post('/api/ideas/reorder', guarded((req, res) => {
+  const { themeId, order } = req.body || {};
+  if (!themeId || !Array.isArray(order)) {
+    return res.status(400).json({ error: 'themeId and order are required' });
+  }
+  const themeFile = resolveThemeFile(themeId, req);
+  if (!fs.existsSync(themeFile)) {
+    return res.status(404).json({ error: 'Theme file not found' });
+  }
+  const text = fs.readFileSync(themeFile, 'utf8');
+  const lines = text.split('\n');
+  const ideaLines = [];
+  const otherLines = [];
+  for (const line of lines) {
+    if (/^\s*[-*+]\s+/.test(line)) ideaLines.push(line);
+    else otherLines.push(line);
+  }
+  const byText = new Map();
+  ideaLines.forEach(line => {
+    const t = line.replace(/^\s*[-*+]\s+\[[ xX]\]\s+/, '').replace(/^\s*[-*+]\s+/, '').trim();
+    if (t && !byText.has(t)) byText.set(t, line);
+  });
+  const ordered = [];
+  const used = new Set();
+  order.forEach(t => {
+    if (byText.has(t) && !used.has(t)) {
+      ordered.push(byText.get(t));
+      used.add(t);
+    }
+  });
+  ideaLines.forEach(line => {
+    const t = line.replace(/^\s*[-*+]\s+\[[ xX]\]\s+/, '').replace(/^\s*[-*+]\s+/, '').trim();
+    if (!used.has(t)) ordered.push(line);
+  });
+  fs.writeFileSync(themeFile, [...otherLines, ...ordered].join('\n'), 'utf8');
+  res.json({ success: true });
+}));
+
 app.post('/api/ideas/delete', guarded((req, res) => {
   const { themeId, ideaText } = req.body;
   if (!themeId || !ideaText) {
