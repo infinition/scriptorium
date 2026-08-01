@@ -2811,21 +2811,30 @@ function removeAbandonedEmptyLine(line) {
   return true;
 }
 
+// Set while a right-click is in progress. The browser fires selectionchange
+// when the caret moves on right-click; re-rendering the block to raw text at
+// that moment destroys the DOM node the native spellcheck menu is about to
+// target, so the correction suggestions vanish. Skipping activation keeps the
+// rendered block untouched until the context menu is done.
+let suppressLineActivation = false;
+let suppressLineActivationTimer = null;
+
 function updateActiveLine() {
   if (readingModeState) return;
+  if (suppressLineActivation) return;
   const sel = window.getSelection();
   if (!sel.rangeCount) return;
-  
+
   const range = sel.getRangeAt(0);
   let node = range.startContainer;
-  
+
   while (node && node !== content) {
     if (node.parentNode === content) {
       break;
     }
     node = node.parentNode;
   }
-  
+
   if (node && node.parentNode === content) {
     if (node !== activeLineNode) {
       hideBlockTrashBtnNow();
@@ -7873,6 +7882,19 @@ async function themedPrompt(message, defaultValue, title) {
 }
 
 document.addEventListener('selectionchange', updateActiveLine);
+
+// Right-click must not switch the block to raw edit mode: the browser then
+// loses the misspelled word the native spellcheck menu was about to act on.
+content.addEventListener('mousedown', (e) => {
+  if (e.button !== 2) return;
+  suppressLineActivation = true;
+  clearTimeout(suppressLineActivationTimer);
+  suppressLineActivationTimer = setTimeout(() => { suppressLineActivation = false; }, 600);
+});
+content.addEventListener('contextmenu', () => {
+  clearTimeout(suppressLineActivationTimer);
+  suppressLineActivation = false;
+}, { capture: true });
 
 // ============ GUTTER CLICK-TO-INSERT ============
 // Clicking in the empty space before the first block, between two blocks, or
