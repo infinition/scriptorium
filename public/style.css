@@ -449,6 +449,12 @@ button { font: inherit; color: inherit; }
   font-size: 10px;
   color: var(--text-faint);
   flex-shrink: 0;
+  /* Date is a detail: hidden by default so the title spans the full row width,
+     revealed on hover like the delete button. */
+  display: none;
+}
+.nav-item:hover .meta {
+  display: inline;
 }
 .nav-item .delete-doc {
   opacity: 0;
@@ -818,19 +824,6 @@ button { font: inherit; color: inherit; }
   font-family: var(--mono);
   letter-spacing: 0.3px;
   flex-wrap: wrap;
-  /* Dates are a detail: hidden by default so the title stays prominent, and
-     revealed while hovering or editing the title (or the meta itself). */
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  pointer-events: none;
-}
-.editor-pane:has(.title-input:hover) .doc-meta,
-.editor-pane:has(.title-input:focus) .doc-meta,
-.editor-pane:has(.subtitle-input:hover) .doc-meta,
-.editor-pane:has(.subtitle-input:focus) .doc-meta,
-.doc-meta:hover {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .title-input {
