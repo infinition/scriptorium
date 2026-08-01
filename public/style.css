@@ -1856,7 +1856,7 @@ mark.idea-hl {
   border-radius: 5px;
   padding: 8px 10px;
   color: var(--text);
-  font-family: var(--mono);
+  font-family: var(--sans);
   font-size: 12px;
 }
 .custom-theme-editor .text-input:focus {
@@ -1975,6 +1975,18 @@ mark.idea-hl {
 .text-select option {
   background: var(--bg-elevated);
   color: var(--text);
+}
+
+/* Browser form fields do not inherit the page font by default, so they were
+   rendering in a mismatched typeface. Every UI text field follows the UI font
+   (--sans). The document title/subtitle keep their serif: their class rules
+   outrank this element-level selector. */
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="url"],
+textarea {
+  font-family: var(--sans);
 }
 
 .font-size-preview {
