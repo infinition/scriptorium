@@ -6539,21 +6539,11 @@ function hideDeleteZones() {
   if (deleteZoneRightEl) deleteZoneRightEl.style.display = 'none';
 }
 
-// The block the drag handle applies to: the active line when one is being
-// edited, otherwise the hovered block so a freshly opened document (no active
-// line) can still drag any block, e.g. onto the ideas panel.
-function getBlockHandleTarget() {
-  if (activeLineNode && content.contains(activeLineNode)) return activeLineNode;
-  if (hoveredLineNode && content.contains(hoveredLineNode)) return hoveredLineNode;
-  return null;
-}
-
 function updateBlockDragPosition() {
   if (!blockDragBtn) return;
   if (isDraggingBlock) return; // Keep visible while dragging
 
-  const target = getBlockHandleTarget();
-  if (!target) {
+  if (!activeLineNode || !content.contains(activeLineNode)) {
     blockDragBtn.classList.remove('visible');
     return;
   }
@@ -6563,7 +6553,7 @@ function updateBlockDragPosition() {
     return;
   }
 
-  const rect = target.getBoundingClientRect();
+  const rect = activeLineNode.getBoundingClientRect();
   const editorRect = editorWrap.getBoundingClientRect();
   // Hide if the line is scrolled off the editor's visible viewport
   if (rect.bottom < editorRect.top + 20 || rect.top > editorRect.bottom - 20) {
@@ -6922,9 +6912,8 @@ if (blockDragBtn) {
     if (e.button !== 0) return; // left button only — a right-click here must not start a drag
     e.preventDefault();
     e.stopPropagation();
-    const target = getBlockHandleTarget();
-    if (target) {
-      startBlockDrag(target, e);
+    if (activeLineNode) {
+      startBlockDrag(activeLineNode, e);
     }
   });
 }
@@ -9242,9 +9231,6 @@ function setHoveredLine(line) {
   if (hoveredLineNode) hoveredLineNode.classList.remove('line-hover-outline');
   hoveredLineNode = line;
   if (hoveredLineNode) hoveredLineNode.classList.add('line-hover-outline');
-  // No active line yet (fresh document): the drag handle follows the hover so
-  // any block can be dragged without activating it first.
-  if (!activeLineNode) updateBlockDragPosition();
 }
 
 // Hover previews the mode on a mouse. The whole editor is watched now, not
