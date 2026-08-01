@@ -1272,9 +1272,8 @@ mark.idea-hl {
   overflow-y: auto;
   padding: 16px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
-  align-content: flex-start;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -1296,8 +1295,9 @@ mark.idea-hl {
   line-height: 1.3;
   user-select: none;
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  width: 100%;
 }
 .idea-chip:hover, .idea-chip:focus, .idea-chip:focus-within {
   color: var(--text);
