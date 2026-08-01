@@ -4491,6 +4491,8 @@ ideasPanel.addEventListener('dragover', (e) => {
   // An idea being reordered or moved handles its own chip/tab highlight; the
   // whole-panel target state is only for external drops.
   if (draggedIdea) return;
+  // The TOC / snapshots views have no ideas list to drop into.
+  if (!isIdeasViewActive()) return;
 
   const hasText = e.dataTransfer.types.includes('text/plain');
   const hasFiles = e.dataTransfer.types.includes('Files');
@@ -4527,6 +4529,9 @@ ideasPanel.addEventListener('drop', async (e) => {
     addBtn.classList.remove('drag-target-active');
     addBtn.textContent = __('ideas.add_button');
   }
+
+  // TOC / snapshots views have no ideas list: nothing to add there.
+  if (!isIdeasViewActive()) return;
 
   // An idea dropped on empty panel space is not an external add: the chip
   // handlers already dealt with reorders, so this only cancels the drag.
@@ -6062,10 +6067,17 @@ function updateBlockDragPosition() {
   blockDragBtn.classList.add('visible');
 }
 
-// True when the pointer is over the ideas panel: a drag landing there adds
-// the dragged text as an idea instead of deleting or moving the block.
+// True when the right panel is showing the Ideas view (not TOC / snapshots).
+function isIdeasViewActive() {
+  return !!ideasPanel && !ideasPanel.classList.contains('view-toc-mode') && !ideasPanel.classList.contains('view-snapshots-mode');
+}
+
+// True when the pointer is over the ideas panel AND it is showing the Ideas
+// view: a drag landing there adds the dragged text as an idea instead of
+// deleting or moving the block. The TOC / snapshots views have no ideas list.
 function isOverIdeasPanel(x, y) {
   if (!ideasPanel) return false;
+  if (!isIdeasViewActive()) return false;
   const r = ideasPanel.getBoundingClientRect();
   return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 }
