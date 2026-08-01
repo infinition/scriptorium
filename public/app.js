@@ -9197,6 +9197,37 @@ content.addEventListener('pointerdown', (e) => {
   pressGutterHit = resolved.mode === 'insert' ? resolved.hit : null;
 });
 
+// Clicking the checkbox of a task list toggles it between [ ] and [x], in
+// reading and editing modes alike.
+content.addEventListener('click', (e) => {
+  const box = e.target.closest ? e.target.closest('.task-box') : null;
+  if (!box) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const line = getLineForNode(box);
+  if (line && content.contains(line)) toggleTaskBox(line);
+});
+
+function toggleTaskBox(line) {
+  const raw = line.dataset.raw !== undefined ? line.dataset.raw : line.textContent;
+  const m = raw.match(/^([\s]*[-*+]\s+)\[([ xX])\]/);
+  if (!m) return;
+  const check = m[2].toLowerCase() === 'x' ? ' ' : 'x';
+  const newRaw = raw.slice(0, m.index) + m[1] + '[' + check + ']' + raw.slice(m.index + m[0].length);
+  line.dataset.raw = newRaw;
+  if (line === activeLineNode) {
+    line.textContent = newRaw;
+    applyLineKind(line, newRaw);
+  } else {
+    applyLineKind(line, newRaw);
+    line.innerHTML = newRaw.trim() === '' ? '<br>' : renderMarkdownLine(newRaw);
+  }
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
+}
+
 content.addEventListener('click', (e) => {
   const hit = pressGutterHit;
   pressGutterHit = null;
