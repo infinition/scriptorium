@@ -1969,6 +1969,21 @@ mark.idea-hl {
   cursor: pointer;
   flex-shrink: 0;
 }
+/* Alpha slider next to each colour swatch, for transparent colours */
+.color-field .color-alpha {
+  flex: 1;
+  min-width: 0;
+  max-width: 90px;
+  accent-color: var(--accent);
+}
+.color-field .color-alpha-value {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
 
 .font-size-rows { margin-top: 10px; }
 .font-size-row {
@@ -2044,6 +2059,77 @@ mark.idea-hl {
   background: var(--bg-elevated);
   color: var(--text);
 }
+
+/* Imported background media: a picker list with thumbnails and delete crosses */
+.app-bg-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+.app-bg-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  transition: border-color 0.15s ease;
+}
+.app-bg-item:hover { border-color: var(--border-strong); }
+.app-bg-item.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.app-bg-thumb {
+  height: 48px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+}
+.app-bg-thumb img,
+.app-bg-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.app-bg-thumb.none::after { content: '∅'; }
+.app-bg-name {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+.app-bg-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.app-bg-item:hover .app-bg-delete { opacity: 1; }
+.app-bg-delete:hover { background: var(--danger); }
 
 /* Browser form fields do not inherit the page font by default, so they were
    rendering in a mismatched typeface. Every UI text field follows the UI font

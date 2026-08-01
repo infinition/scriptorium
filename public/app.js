@@ -3568,17 +3568,52 @@ async function loadColorThemes() {
   }
 }
 
-function toHexColor(v) {
-  if (v && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim())) return v.trim();
+// Parses a colour as { r, g, b, a } — accepts #RGB, #RRGGBB, #RRGGBBAA and
+// rgb()/rgba(). Returns null for anything else (e.g. "transparent").
+function parseHexColor(v) {
+  const s = String(v || '').trim();
+  let m = s.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+  if (m) {
+    let hex = m[1];
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    return {
+      r: parseInt(hex.slice(0, 2), 16),
+      g: parseInt(hex.slice(2, 4), 16),
+      b: parseInt(hex.slice(4, 6), 16),
+      a: hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1
+    };
+  }
+  m = s.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)$/i);
+  if (m) {
+    const clamp = n => Math.max(0, Math.min(255, Math.round(Number(n))));
+    let a = 1;
+    if (m[4] != null) {
+      a = m[4].endsWith('%') ? Number(m[4].slice(0, -1)) / 100 : Number(m[4]);
+      a = Math.max(0, Math.min(1, a));
+    }
+    return { r: clamp(m[1]), g: clamp(m[2]), b: clamp(m[3]), a };
+  }
   return null;
 }
 
+// The RGB part as a #RRGGBB string (for <input type="color">).
+function toHexColor(v) {
+  const c = parseHexColor(v);
+  return c ? '#' + [c.r, c.g, c.b].map(n => n.toString(16).padStart(2, '0')).join('') : null;
+}
+
+// Serialises back to CSS: 8-digit hex keeps the alpha when it is not opaque,
+// so a transparent border stays transparent.
+function colorToCss(c) {
+  const hex = [c.r, c.g, c.b].map(n => n.toString(16).padStart(2, '0')).join('');
+  if (c.a >= 1) return '#' + hex;
+  return '#' + hex + Math.round(c.a * 255).toString(16).padStart(2, '0');
+}
+
 function deriveAccentSoft(hex) {
-  const m = /^#([0-9a-f]{6})$/i.exec((hex || '').trim());
-  if (!m) return null;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  return `rgba(${r}, ${g}, ${b}, 0.15)`;
+  const c = parseHexColor(hex);
+  if (!c) return null;
+  return `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a * 0.15).toFixed(3)})`;
 }
 
 // Reads the CSS-declared values for a built-in theme without leaving a visible
@@ -3665,6 +3700,7 @@ function selectColorTheme(id) {
   renderColorThemeSwatches();
   applyThemeFonts();
   populateFontSelects();
+  applyThemeBackground();
   const editor = $('customThemeEditor');
   const isCustom = isCustomThemeId(id);
   if (editor) editor.classList.toggle('hidden', !isCustom);
@@ -3697,6 +3733,23 @@ function buildColorFieldGrid(containerId, fields) {
     input.dataset.varKey = f.key;
     input.addEventListener('input', onCustomColorInput);
     row.appendChild(input);
+    // Alpha slider so a colour can be transparent (e.g. a border).
+    const alpha = document.createElement('input');
+    alpha.type = 'range';
+    alpha.min = 0;
+    alpha.max = 100;
+    alpha.step = 1;
+    alpha.value = 100;
+    alpha.className = 'color-alpha';
+    alpha.dataset.alphaKey = f.key;
+    alpha.title = __('settings.color_alpha_title');
+    alpha.addEventListener('input', onCustomColorInput);
+    row.appendChild(alpha);
+    const value = document.createElement('span');
+    value.className = 'color-alpha-value';
+    value.id = 'colorAlphaValue' + f.key;
+    value.textContent = '100';
+    row.appendChild(value);
     container.appendChild(row);
   });
 }
@@ -3706,10 +3759,7 @@ function populateCustomThemeFields() {
   colorThemeState.customVars = vars;
 
   buildColorFieldGrid('customThemeBaseFields', COLOR_THEME_FIELD_GROUPS.base);
-  COLOR_THEME_FIELD_GROUPS.base.forEach(f => {
-    const input = $('colorField' + f.key);
-    if (input) input.value = toHexColor(vars[f.key]) || '#000000';
-  });
+  COLOR_THEME_FIELD_GROUPS.base.forEach(f => syncColorFieldUI(f.key, vars[f.key]));
 
   const syntaxTitle = $('customThemeSyntaxTitle');
   const syntaxFields = $('customThemeSyntaxFields');
@@ -3718,16 +3768,31 @@ function populateCustomThemeFields() {
   if (syntaxFields) syntaxFields.classList.toggle('hidden', !showSyntax);
   if (showSyntax) {
     buildColorFieldGrid('customThemeSyntaxFields', COLOR_THEME_FIELD_GROUPS.syntax);
-    COLOR_THEME_FIELD_GROUPS.syntax.forEach(f => {
-      const input = $('colorField' + f.key);
-      if (input) input.value = toHexColor(vars[f.key]) || '#000000';
-    });
+    COLOR_THEME_FIELD_GROUPS.syntax.forEach(f => syncColorFieldUI(f.key, vars[f.key]));
   }
 }
 
+// Fills a color field's swatch and alpha slider from the stored CSS value.
+function syncColorFieldUI(key, value) {
+  const input = $('colorField' + key);
+  const alpha = $('colorAlpha' + key);
+  const label = $('colorAlphaValue' + key);
+  const c = parseHexColor(value);
+  if (input) input.value = c ? toHexColor(value) : '#000000';
+  const a = c ? Math.round(c.a * 100) : 100;
+  if (alpha) alpha.value = a;
+  if (label) label.textContent = a;
+}
+
 function onCustomColorInput(e) {
-  const key = e.target.dataset.varKey;
-  const value = e.target.value;
+  const key = e.target.dataset.varKey || e.target.dataset.alphaKey;
+  const input = $('colorField' + key);
+  const alpha = $('colorAlpha' + key);
+  const label = $('colorAlphaValue' + key);
+  const rgb = parseHexColor(input && input.value) || { r: 0, g: 0, b: 0, a: 1 };
+  const a = alpha ? Math.max(0, Math.min(100, parseInt(alpha.value, 10) || 0)) / 100 : 1;
+  const value = colorToCss({ r: rgb.r, g: rgb.g, b: rgb.b, a });
+  if (label) label.textContent = Math.round(a * 100);
   colorThemeState.customVars = colorThemeState.customVars || {};
   colorThemeState.customVars[key] = value;
   document.documentElement.style.setProperty(key, value);
@@ -4102,22 +4167,23 @@ $('fontImportInput')?.addEventListener('change', (e) => {
 // A full-window layer behind the whole app: image (cover or seamless mosaic)
 // or video (loop: repeat or ping-pong reverse), with an opacity slider.
 
-function loadAppBackground() {
+// The background is per-theme (like fonts): a map keyed by theme id in
+// localStorage. appBackgroundState is the current theme's background.
+function loadThemeBackgrounds() {
   try {
-    const raw = localStorage.getItem('scriptoriumAppBackground');
-    if (!raw) return null;
-    const bg = JSON.parse(raw);
-    return (bg && bg.src) ? bg : null;
-  } catch (e) { return null; }
+    const map = JSON.parse(localStorage.getItem('scriptoriumThemeBackground')) || {};
+    return typeof map === 'object' && map ? map : {};
+  } catch (e) { return {}; }
 }
-function saveAppBackground(bg) {
-  try {
-    if (bg && bg.src) localStorage.setItem('scriptoriumAppBackground', JSON.stringify(bg));
-    else localStorage.removeItem('scriptoriumAppBackground');
-  } catch (e) {}
+function saveThemeBackgrounds(map) {
+  try { localStorage.setItem('scriptoriumThemeBackground', JSON.stringify(map)); } catch (e) {}
+}
+function getThemeBackground(themeId) {
+  const entry = loadThemeBackgrounds()[themeId];
+  return (entry && entry.src) ? entry : null;
 }
 
-let appBackgroundState = loadAppBackground();
+let appBackgroundState = null; // the current theme's background
 let appMediaFiles = []; // { id, name, url, type } from <workspace>/.media/
 
 async function loadAppMedia() {
@@ -4126,55 +4192,6 @@ async function loadAppMedia() {
     const data = await res.json();
     appMediaFiles = (data && Array.isArray(data.media)) ? data.media : [];
   } catch (e) { appMediaFiles = []; }
-}
-
-// Video ping-pong: play forward, reverse at the end, forward again at 0.
-// Prefers a negative playbackRate (native, smooth reverse); falls back to
-// manual currentTime stepping where the engine clamps it. A rAF loop watches
-// both ends so the direction flips reliably.
-function setupVideoLoop(video, mode) {
-  if (mode !== 'reverse') {
-    video.loop = true;
-    video.playbackRate = 1;
-    return;
-  }
-  video.loop = false;
-
-  // Detect whether the engine actually honours a negative playback rate.
-  video.playbackRate = -1;
-  const supportsReverse = video.playbackRate < 0;
-  video.playbackRate = 1;
-
-  let dir = 1; // 1 forward, -1 reverse
-
-  const tick = () => {
-    if (!video.isConnected) return; // background changed: stop the loop
-    requestAnimationFrame(tick);
-    if (!video.duration) return;
-
-    if (dir === 1) {
-      if (video.currentTime >= video.duration - 0.05) {
-        dir = -1;
-        if (supportsReverse) {
-          video.playbackRate = -1;
-        } else {
-          video.pause();
-        }
-      }
-    } else if (video.currentTime <= 0.05) {
-      dir = 1;
-      if (supportsReverse) {
-        video.playbackRate = 1;
-      } else {
-        video.currentTime = 0;
-        video.play().catch(() => {});
-      }
-    } else if (!supportsReverse) {
-      // Manual backward stepping (jankier, but always works).
-      video.currentTime = video.currentTime - (1 / 60);
-    }
-  };
-  requestAnimationFrame(tick);
 }
 
 function applyAppBackground(bg) {
@@ -4204,23 +4221,34 @@ function applyAppBackground(bg) {
     video.src = bg.src;
     video.muted = true;
     video.autoplay = true;
-    video.loop = false;
+    video.loop = true;
     video.playsInline = true;
     video.setAttribute('playsinline', '');
     layer.appendChild(video);
     const play = () => { video.play().catch(() => {}); };
     video.addEventListener('canplay', play);
     play();
-    setupVideoLoop(video, bg.videoMode || 'repeat');
   }
   layer.style.opacity = String(opacity);
 }
 
-function setAppBackground(bg) {
-  appBackgroundState = (bg && bg.src) ? bg : null;
-  saveAppBackground(appBackgroundState);
+// Loads and applies the current theme's background.
+function applyThemeBackground() {
+  appBackgroundState = getThemeBackground(colorThemeState.id);
   applyAppBackground(appBackgroundState);
   syncAppBackgroundUI();
+}
+
+// Persists the background for the current theme only.
+function setThemeBackground(bg) {
+  const map = loadThemeBackgrounds();
+  if (bg && bg.src) {
+    map[colorThemeState.id] = { src: bg.src, type: bg.type, opacity: bg.opacity, mosaic: bg.mosaic };
+  } else {
+    delete map[colorThemeState.id];
+  }
+  saveThemeBackgrounds(map);
+  applyThemeBackground();
 }
 
 async function importAppMediaFiles(files) {
@@ -4248,28 +4276,49 @@ async function importAppMediaFiles(files) {
 }
 
 function syncAppBackgroundUI() {
-  const select = $('appBgSelect');
-  if (!select) return;
+  const list = $('appBgList');
+  if (!list) return;
   const bg = appBackgroundState;
+  list.innerHTML = '';
 
-  const opts = [{ id: '', name: __('settings.bg_none') }].concat(
-    appMediaFiles.map(m => ({ id: m.id, name: m.name }))
-  );
-  select.innerHTML = opts.map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)}</option>`).join('');
-  select.value = bg ? bg.src.split('/').pop() : '';
+  // "None" item: no background.
+  const noneItem = document.createElement('div');
+  noneItem.className = 'app-bg-item' + (!bg ? ' active' : '');
+  noneItem.innerHTML = `<span class="app-bg-thumb none"></span><span class="app-bg-name">${escapeHtml(__('settings.bg_none'))}</span>`;
+  noneItem.addEventListener('click', () => setThemeBackground(null));
+  list.appendChild(noneItem);
 
-  const isVideo = !!(bg && bg.type === 'video');
+  // Imported media, each with a thumbnail and a delete cross.
+  appMediaFiles.forEach(media => {
+    const item = document.createElement('div');
+    item.className = 'app-bg-item' + (bg && bg.src === media.url ? ' active' : '');
+    const thumb = media.type === 'video'
+      ? `<video src="${media.url}" muted playsinline preload="metadata"></video>`
+      : `<img src="${media.url}" alt="" />`;
+    item.innerHTML = `<span class="app-bg-thumb">${thumb}</span><span class="app-bg-name">${escapeHtml(media.name)}</span>`;
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'app-bg-delete';
+    del.title = __('settings.bg_delete_title');
+    del.textContent = '×';
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteAppMedia(media);
+    });
+    item.appendChild(del);
+    item.addEventListener('click', () => {
+      setThemeBackground({
+        src: media.url,
+        type: media.type,
+        opacity: bg ? bg.opacity : 0.25,
+        mosaic: (bg && bg.mosaic) || false
+      });
+    });
+    list.appendChild(item);
+  });
+
   const isImage = !!(bg && bg.type === 'image');
-  $('appBgVideoModeRow')?.classList.toggle('hidden', !isVideo);
   $('appBgMosaicRow')?.classList.toggle('hidden', !isImage);
-
-  const videoMode = $('appBgVideoMode');
-  if (videoMode) {
-    videoMode.innerHTML = `
-      <option value="repeat">${escapeHtml(__('settings.bg_video_repeat'))}</option>
-      <option value="reverse">${escapeHtml(__('settings.bg_video_reverse'))}</option>`;
-    videoMode.value = (bg && bg.videoMode) || 'repeat';
-  }
 
   const mosaic = $('appBgMosaic');
   if (mosaic) mosaic.checked = !!(bg && bg.mosaic);
@@ -4281,49 +4330,62 @@ function syncAppBackgroundUI() {
   if (valueEl) valueEl.textContent = Math.round(op * 100) + '%';
 }
 
+async function deleteAppMedia(media) {
+  const ok = await themedConfirm(__('confirm.bg_delete', { name: media.name }));
+  if (!ok) return;
+  try {
+    const res = await fetch('/api/media/' + encodeURIComponent(media.id), { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      // Drop the deleted media from every theme that used it.
+      const map = loadThemeBackgrounds();
+      let changed = false;
+      for (const key of Object.keys(map)) {
+        if (map[key] && map[key].src === media.url) { delete map[key]; changed = true; }
+      }
+      if (changed) {
+        saveThemeBackgrounds(map);
+        applyThemeBackground();
+      }
+      await loadAppMedia();
+      syncAppBackgroundUI();
+      showToast('toast.media_deleted');
+    }
+  } catch (err) {
+    console.error('delete media error', err);
+  }
+}
+
 async function initAppBackgroundControl() {
-  applyAppBackground(appBackgroundState);
+  applyThemeBackground();
   await loadAppMedia();
   syncAppBackgroundUI();
-
-  $('appBgSelect')?.addEventListener('change', (e) => {
-    const media = appMediaFiles.find(m => m.id === e.target.value);
-    if (!media) { setAppBackground(null); return; }
-    setAppBackground({
-      src: media.url,
-      type: media.type,
-      opacity: appBackgroundState ? appBackgroundState.opacity : 0.25,
-      videoMode: (appBackgroundState && appBackgroundState.videoMode) || 'repeat',
-      mosaic: (appBackgroundState && appBackgroundState.mosaic) || false
-    });
-  });
 
   $('appBgOpacitySlider')?.addEventListener('input', (e) => {
     const op = parseInt(e.target.value, 10) / 100;
     const valueEl = $('appBgOpacityValue');
     if (valueEl) valueEl.textContent = Math.round(op * 100) + '%';
     if (appBackgroundState) {
-      appBackgroundState.opacity = op;
-      saveAppBackground(appBackgroundState);
-      applyAppBackground(appBackgroundState);
+      setThemeBackground({
+        src: appBackgroundState.src,
+        type: appBackgroundState.type,
+        opacity: op,
+        mosaic: appBackgroundState.mosaic || false
+      });
     }
-  });
-
-  $('appBgVideoMode')?.addEventListener('change', (e) => {
-    if (!appBackgroundState) return;
-    appBackgroundState.videoMode = e.target.value;
-    saveAppBackground(appBackgroundState);
-    applyAppBackground(appBackgroundState);
   });
 
   $('appBgMosaic')?.addEventListener('change', (e) => {
     if (!appBackgroundState) return;
-    appBackgroundState.mosaic = e.target.checked;
-    saveAppBackground(appBackgroundState);
-    applyAppBackground(appBackgroundState);
+    setThemeBackground({
+      src: appBackgroundState.src,
+      type: appBackgroundState.type,
+      opacity: appBackgroundState.opacity,
+      mosaic: e.target.checked
+    });
   });
 
-  $('appBgClearBtn')?.addEventListener('click', () => setAppBackground(null));
+  $('appBgClearBtn')?.addEventListener('click', () => setThemeBackground(null));
 }
 
 $('appBgImportBtn')?.addEventListener('click', () => $('appBgImportInput')?.click());

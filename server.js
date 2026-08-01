@@ -1203,6 +1203,27 @@ app.use('/media', (req, res, next) => {
   express.static(dir, { maxAge: '30d', immutable: true })(req, res, next);
 });
 
+app.delete('/api/media/:id', guarded((req, res) => {
+  const id = req.params.id;
+  const dir = getMediaDir();
+  const file = path.join(dir, id);
+  // Reject anything that is not a plain filename inside the media dir.
+  if (!id || path.basename(file) !== id || path.extname(id).toLowerCase() === '') {
+    return res.status(400).json({ error: 'Invalid media id' });
+  }
+  try {
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Media not found' });
+    }
+  } catch (err) {
+    console.error('Error deleting media:', err);
+    res.status(500).json({ error: 'Failed to delete media' });
+  }
+}));
+
 // Snapshots (revision history) — persisted on disk in the workspace, one JSON
 // file per document, under <workspace>/.snapshots/
 function snapshotsDir() {
