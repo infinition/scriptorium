@@ -154,6 +154,31 @@ function listMediaFiles() {
   return items;
 }
 
+// Custom UI icons the user imports into <workspace>/.icons/ (SVG, or raster
+// like PNG/WebP/ICO displayed as-is), replaceable per theme.
+const ICON_EXTENSIONS = ['.svg', '.png', '.webp', '.ico', '.jpg', '.jpeg'];
+
+function getIconsDir() {
+  return path.join(workspaceDir, '.icons');
+}
+
+function listIconFiles() {
+  const dir = getIconsDir();
+  const items = [];
+  if (!fs.existsSync(dir)) return items;
+  for (const file of fs.readdirSync(dir)) {
+    const ext = path.extname(file).toLowerCase();
+    if (!ICON_EXTENSIONS.includes(ext)) continue;
+    items.push({
+      id: file,
+      name: path.basename(file, ext).replace(/[_-]+/g, ' ').trim() || file,
+      url: '/icons/' + encodeURIComponent(file),
+      svg: ext === '.svg'
+    });
+  }
+  return items;
+}
+
 // Custom fonts the user drops into <workspace>/.fonts/, offered alongside the
 // built-in font choices for the UI and the editor.
 const FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2'];
@@ -550,7 +575,7 @@ Shortcuts: \`Ctrl+G\` or \`Ctrl+B\` bold, \`Ctrl+I\` italic, \`Ctrl+K\` then \`C
 The gear at the top left opens the settings.
 
 - **Folders**: workspace path and ideas folder, with a browse button.
-- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, a UI font and an editor font per theme (custom fonts you drop into \`.fonts\` are offered too), a background image or video behind the whole app (repeat or ping-pong loop, optional seamless mosaic, opacity slider), text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
+- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, a UI font and an editor font per theme (custom fonts you drop into \`.fonts\` are offered too), custom UI icons per theme (import SVG, PNG, WebP or ICO into \`.icons\` and replace each one), a background image or video behind the whole app (repeat loop, optional seamless mosaic, opacity slider), text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
 - **Language**: Français or English.
 
 ## Keyboard shortcuts
@@ -715,7 +740,7 @@ Raccourcis : \`Ctrl+G\` ou \`Ctrl+B\` gras, \`Ctrl+I\` italique, \`Ctrl+K\` puis
 L'engrenage en haut à gauche ouvre les paramètres.
 
 - **Dossiers** : chemin du dossier de travail et du dossier d'idées, avec bouton pour parcourir.
-- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, une police d'interface et une police d'éditeur par thème (les polices personnalisées déposées dans \`.fonts\` sont aussi proposées), une image ou vidéo de fond derrière toute l'application (boucle répétée ou aller-retour, mosaïque seamless optionnelle, curseur d'opacité), tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
+- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, une police d'interface et une police d'éditeur par thème (les polices personnalisées déposées dans \`.fonts\` sont aussi proposées), des icônes d'interface personnalisées par thème (importez SVG, PNG, WebP ou ICO dans \`.icons\` et remplacez chacune), une image ou vidéo de fond derrière toute l'application (boucle répétée, mosaïque seamless optionnelle, curseur d'opacité), tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
 - **Langue** : Français ou English.
 
 ## Raccourcis clavier
@@ -1199,6 +1224,63 @@ app.post('/api/media', guarded((req, res) => {
 // Serve the workspace's background media (runtime dir, like /assets).
 app.use('/media', (req, res, next) => {
   const dir = getMediaDir();
+  if (!fs.existsSync(dir)) return res.status(404).end();
+  express.static(dir, { maxAge: '30d', immutable: true })(req, res, next);
+});
+
+// Custom UI icons from <workspace>/.icons/
+app.get('/api/icons', (req, res) => {
+  res.json({ icons: listIconFiles() });
+});
+
+// Accepts several files at once: { files: [{ filename, dataBase64 }, ...] }
+app.post('/api/icons', guarded((req, res) => {
+  const files = (req.body && Array.isArray(req.body.files)) ? req.body.files : [];
+  if (!files.length) return res.status(400).json({ error: 'No files' });
+  const dir = getIconsDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const saved = [];
+  for (const f of files) {
+    const filename = String(f.filename || '');
+    const ext = path.extname(filename).toLowerCase();
+    if (!ICON_EXTENSIONS.includes(ext) || typeof f.dataBase64 !== 'string') continue;
+    const stem = path.basename(filename, ext);
+    let safeStem = 'icon';
+    try { safeStem = assertSegment(stem, 'Icon'); } catch (e) { /* skip invalid names */ }
+    let safeName = `${safeStem}${ext}`;
+    let counter = 1;
+    while (fs.existsSync(path.join(dir, safeName))) {
+      safeName = `${safeStem}-${counter}${ext}`;
+      counter++;
+    }
+    fs.writeFileSync(path.join(dir, safeName), Buffer.from(f.dataBase64, 'base64'));
+    saved.push(safeName);
+  }
+  res.json({ success: true, files: saved });
+}));
+
+app.delete('/api/icons/:id', guarded((req, res) => {
+  const id = req.params.id;
+  const dir = getIconsDir();
+  const file = path.join(dir, id);
+  if (!id || path.basename(file) !== id) {
+    return res.status(400).json({ error: 'Invalid icon id' });
+  }
+  try {
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Icon not found' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete icon' });
+  }
+}));
+
+// Serve the workspace's custom icons (runtime dir, like /assets).
+app.use('/icons', (req, res, next) => {
+  const dir = getIconsDir();
   if (!fs.existsSync(dir)) return res.status(404).end();
   express.static(dir, { maxAge: '30d', immutable: true })(req, res, next);
 });

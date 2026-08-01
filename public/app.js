@@ -8529,9 +8529,171 @@ document.addEventListener('input', (e) => {
   }
 });
 
+// ============ CUSTOM UI ICONS (per theme) ============
+// Every UI icon has a stable key and a default SVG. A theme may override any
+// key with an imported icon (SVG inline, or PNG/WebP/ICO as an <img>). The
+// defaults below stay as the built-in look.
+
+const UI_ICONS = {
+  'topbar-mobile-menu': '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
+  'topbar-clear': '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  'topbar-preview': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  'topbar-typewriter': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>',
+  'topbar-focus-line': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M7 6h10M7 18h10"/></svg>',
+  'topbar-reading': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+  'topbar-focus': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+  'topbar-export': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>',
+  'topbar-mobile-ideas': '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="1.5"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="19" r="1.5"/></svg>',
+  'header-search': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  'header-settings': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  'header-folder': '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+  'status-undo': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>',
+  'status-redo': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  'status-remove-empty': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 3v5M9.5 5.5 12 8l2.5-2.5"/><path d="M12 21v-5M9.5 18.5 12 16l2.5 2.5"/></svg>',
+  'status-justify': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>',
+  'status-line-length': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><path d="M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>',
+  'status-spellcheck': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 3-8 3 8"/><path d="M7 13h4"/><path d="m16 8 2 3-2 3"/><path d="M14 16.5 16 18.5 22 12.5"/></svg>',
+  'status-autoscroll': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  'status-find': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  'sidebar-import': '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
+  'nav-new-doc': '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+  'nav-add-section': '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+  'ideas-panel-cycle': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>',
+  'ideas-import-theme': '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
+  'ideas-search': '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'
+};
+
+// Per-theme icon overrides: localStorage map { [themeId]: { [iconKey]: url } }
+function loadThemeIcons() {
+  try {
+    const map = JSON.parse(localStorage.getItem('scriptoriumThemeIcons')) || {};
+    return typeof map === 'object' && map ? map : {};
+  } catch (e) { return {}; }
+}
+function saveThemeIcons(map) {
+  try { localStorage.setItem('scriptoriumThemeIcons', JSON.stringify(map)); } catch (e) {}
+}
+function getThemeIconOverrides() {
+  return loadThemeIcons()[colorThemeState.id] || {};
+}
+
+// The SVG/HTML to render for a key in the current theme (override or default).
+function iconSvg(key) {
+  const override = getThemeIconOverrides()[key];
+  if (override) return `<img class="ui-icon-img" src="${override}" alt="" draggable="false" />`;
+  return UI_ICONS[key] || '';
+}
+
+// Fills every [data-icon] element with the current theme's rendering.
+function renderAllIcons() {
+  document.querySelectorAll('[data-icon]').forEach(el => {
+    const key = el.getAttribute('data-icon');
+    if (key) el.innerHTML = iconSvg(key);
+  });
+}
+
+// Imported icons from <workspace>/.icons/
+let appIconFiles = [];
+async function loadAppIcons() {
+  try {
+    const res = await fetch('/api/icons');
+    const data = await res.json();
+    appIconFiles = (data && Array.isArray(data.icons)) ? data.icons : [];
+  } catch (e) { appIconFiles = []; }
+}
+
+async function importIconFiles(files) {
+  const payload = [];
+  for (const file of Array.from(files || [])) {
+    const dataBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        resolve(result.indexOf(',') !== -1 ? result.slice(result.indexOf(',') + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    payload.push({ filename: file.name, dataBase64 });
+  }
+  if (!payload.length) return;
+  try {
+    await fetch('/api/icons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: payload })
+    });
+    await loadAppIcons();
+    syncIconsUI();
+    showToast('toast.icons_imported');
+  } catch (err) {
+    console.error('import icons error', err);
+  }
+}
+
+// Settings UI: a collapsible list of every icon with its current rendering.
+function syncIconsUI() {
+  const list = $('iconEditList');
+  if (!list) return;
+  const q = ($('iconSearchInput') ? $('iconSearchInput').value : '').trim().toLowerCase();
+  const overrides = getThemeIconOverrides();
+  const keys = Object.keys(UI_ICONS).filter(k => !q || k.toLowerCase().includes(q));
+  list.innerHTML = '';
+  keys.forEach(key => {
+    const row = document.createElement('div');
+    row.className = 'icon-edit-row';
+    const preview = document.createElement('span');
+    preview.className = 'icon-edit-preview';
+    preview.innerHTML = iconSvg(key);
+    row.appendChild(preview);
+    const label = document.createElement('span');
+    label.className = 'icon-edit-name';
+    label.textContent = key;
+    row.appendChild(label);
+    const select = document.createElement('select');
+    select.className = 'text-select icon-edit-select';
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = __('settings.icon_default');
+    select.appendChild(noneOpt);
+    appIconFiles.forEach(ic => {
+      const opt = document.createElement('option');
+      opt.value = ic.url;
+      opt.textContent = ic.name;
+      select.appendChild(opt);
+    });
+    select.value = overrides[key] || '';
+    select.addEventListener('change', () => {
+      const map = loadThemeIcons();
+      const themeOverrides = map[colorThemeState.id] || {};
+      if (select.value) themeOverrides[key] = select.value;
+      else delete themeOverrides[key];
+      map[colorThemeState.id] = themeOverrides;
+      saveThemeIcons(map);
+      renderAllIcons();
+      syncIconsUI();
+    });
+    row.appendChild(select);
+    list.appendChild(row);
+  });
+}
+
+async function initIconControl() {
+  await loadAppIcons();
+  renderAllIcons();
+  syncIconsUI();
+  $('iconSearchInput')?.addEventListener('input', () => syncIconsUI());
+  $('iconImportBtn')?.addEventListener('click', () => $('iconImportInput')?.click());
+  $('iconImportInput')?.addEventListener('change', (e) => { importIconFiles(e.target.files); e.target.value = ''; });
+  $('iconCollapseToggle')?.addEventListener('click', () => {
+    $('iconEditSection')?.classList.toggle('hidden');
+  });
+}
+
 // Start
 fetchWorkspace();
 initColorTheme();
+initIconControl();
 initFontSizeControls();
 initBlockGapControl();
 initLineHeightControl();

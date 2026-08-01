@@ -91,10 +91,10 @@
           Scriptorium<span class="brand-dot">.</span>
         </button>
         <div class="header-actions" id="headerActions">
-        <button class="icon-btn" id="searchBtn" data-i18n-title="header.search_title">
+        <button class="icon-btn" id="searchBtn" data-icon="header-search" data-i18n-title="header.search_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </button>
-        <button class="icon-btn" id="openSettingsBtn" data-i18n-title="header.settings_title">
+        <button class="icon-btn" id="openSettingsBtn" data-icon="header-settings" data-i18n-title="header.settings_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
         <button class="icon-btn" id="lockToggleBtn" data-i18n-title="header.lock_title">
@@ -107,7 +107,7 @@
             <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </button>
-        <button class="icon-btn" id="openFolderBtn" data-i18n-title="header.open_folder_title">
+        <button class="icon-btn" id="openFolderBtn" data-icon="header-folder" data-i18n-title="header.open_folder_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
         </button>
         <button class="icon-btn" id="sortDocsBtn" data-i18n-title="sort.by_alpha_tooltip" aria-label="Tri A à Z — cliquer pour trier par date">
@@ -136,7 +136,7 @@
       <span class="dot"></span>
       <span class="workspace-label" id="workspaceLabel" data-i18n-title="nav.workspace_tooltip">Local</span>
       <span class="spacer"></span>
-      <button class="icon-btn" id="importBtn" data-i18n-title="nav.import_title">
+      <button class="icon-btn" id="importBtn" data-icon="sidebar-import" data-i18n-title="nav.import_title">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
       </button>
     </div>
@@ -146,7 +146,7 @@
   <main class="main">
 
     <div class="topbar" id="topbar">
-      <button class="icon-btn mobile-menu" id="mobileMenuBtn">
+      <button class="icon-btn mobile-menu" id="mobileMenuBtn" data-icon="topbar-mobile-menu">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
 
@@ -165,31 +165,31 @@
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
 
-        <button class="icon-btn hidden" id="previewToggle" data-i18n-title="topbar.preview_title">
+        <button class="icon-btn hidden" id="previewToggle" data-icon="topbar-preview" data-i18n-title="topbar.preview_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
 
-        <button class="icon-btn" id="typewriterToggle" data-i18n-title="topbar.typewriter_title">
+        <button class="icon-btn" id="typewriterToggle" data-icon="topbar-typewriter" data-i18n-title="topbar.typewriter_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
         </button>
 
-        <button class="icon-btn" id="focusLineBtn" data-i18n-title="topbar.focus_line_title" type="button">
+        <button class="icon-btn" id="focusLineBtn" data-icon="topbar-focus-line" data-i18n-title="topbar.focus_line_title" type="button">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h20M7 6h10M7 18h10"/></svg>
         </button>
 
-        <button class="icon-btn" id="readingToggle" data-i18n-title="topbar.reading_title">
+        <button class="icon-btn" id="readingToggle" data-icon="topbar-reading" data-i18n-title="topbar.reading_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         </button>
 
-        <button class="icon-btn" id="focusToggle" data-i18n-title="topbar.focus_title">
+        <button class="icon-btn" id="focusToggle" data-icon="topbar-focus" data-i18n-title="topbar.focus_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         </button>
 
-        <button class="icon-btn" id="exportBtn" data-i18n-title="topbar.export_title">
+        <button class="icon-btn" id="exportBtn" data-icon="topbar-export" data-i18n-title="topbar.export_title">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
         </button>
 
-        <button class="icon-btn mobile-ideas" id="mobileIdeasBtn">
+        <button class="icon-btn mobile-ideas" id="mobileIdeasBtn" data-icon="topbar-mobile-ideas">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="1.5"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="19" r="1.5"/></svg>
         </button>
       </div>
@@ -226,30 +226,30 @@
       <div class="stat"><strong id="rt">0 min</strong></div>
       <div class="chord-indicator" id="chordIndicator">Ctrl+K…</div>
       <div class="statusbar-center">
-        <button class="icon-btn statusbar-btn" id="undoBtn" type="button" data-i18n-title="statusbar.undo_title" data-i18n-aria-label="statusbar.undo_title" aria-label="Undo">
+        <button class="icon-btn statusbar-btn" id="undoBtn" data-icon="status-undo" type="button" data-i18n-title="statusbar.undo_title" data-i18n-aria-label="statusbar.undo_title" aria-label="Undo">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn" id="redoBtn" type="button" data-i18n-title="statusbar.redo_title" data-i18n-aria-label="statusbar.redo_title" aria-label="Redo">
+        <button class="icon-btn statusbar-btn" id="redoBtn" data-icon="status-redo" type="button" data-i18n-title="statusbar.redo_title" data-i18n-aria-label="statusbar.redo_title" aria-label="Redo">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         </button>
       </div>
       <div class="right">
-        <button class="icon-btn statusbar-btn" id="removeEmptyLinesBtn" data-i18n-title="statusbar.remove_empty_title" type="button">
+        <button class="icon-btn statusbar-btn" id="removeEmptyLinesBtn" data-icon="status-remove-empty" data-i18n-title="statusbar.remove_empty_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><path d="M12 3v5M9.5 5.5 12 8l2.5-2.5"/><path d="M12 21v-5M9.5 18.5 12 16l2.5 2.5"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn" id="justifyBtn" data-i18n-title="statusbar.justify_title" type="button">
+        <button class="icon-btn statusbar-btn" id="justifyBtn" data-icon="status-justify" data-i18n-title="statusbar.justify_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn" id="lineLengthBtn" data-i18n-title="statusbar.line_length_title" type="button">
+        <button class="icon-btn statusbar-btn" id="lineLengthBtn" data-icon="status-line-length" data-i18n-title="statusbar.line_length_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><path d="M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn" id="spellcheckBtn" data-i18n-title="statusbar.spellcheck_title" type="button">
+        <button class="icon-btn statusbar-btn" id="spellcheckBtn" data-icon="status-spellcheck" data-i18n-title="statusbar.spellcheck_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 3-8 3 8"/><path d="M7 13h4"/><path d="m16 8 2 3-2 3"/><path d="M14 16.5 16 18.5 22 12.5"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn reading-only" id="autoScrollBtn" data-i18n-title="statusbar.autoscroll_title" type="button">
+        <button class="icon-btn statusbar-btn reading-only" id="autoScrollBtn" data-icon="status-autoscroll" data-i18n-title="statusbar.autoscroll_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
-        <button class="icon-btn statusbar-btn" id="findReplaceBtn" data-i18n-title="statusbar.find_replace_title" type="button">
+        <button class="icon-btn statusbar-btn" id="findReplaceBtn" data-icon="status-find" data-i18n-title="statusbar.find_replace_title" type="button">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </button>
       </div>
@@ -264,10 +264,10 @@
         <svg class="cycle-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
         <span class="panel-cycle-label" id="panelCycleLabel">Ideas</span>
       </button>
-      <button class="icon-btn ideas-only" id="importIdeasBtn" data-i18n-title="ideas.import_theme_title">
+      <button class="icon-btn ideas-only" id="importIdeasBtn" data-icon="ideas-import-theme" data-i18n-title="ideas.import_theme_title">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
       </button>
-      <button class="icon-btn ideas-only" id="ideasSearchBtn" data-i18n-title="ideas.search_title">
+      <button class="icon-btn ideas-only" id="ideasSearchBtn" data-icon="ideas-search" data-i18n-title="ideas.search_title">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       </button>
     </div>
@@ -555,6 +555,21 @@
           <label for="readingFadeSlider"><span data-i18n="settings.reading_fade_label">Taille du fondu</span></label>
           <input type="range" id="readingFadeSlider" min="5" max="35" step="1" value="18" />
           <span class="font-size-value" id="readingFadeValue">18%</span>
+        </div>
+
+        <div class="icons-section" style="margin-top: 18px;">
+          <button type="button" class="btn btn-secondary" id="iconCollapseToggle" data-i18n="settings.icons_title">Icônes de l'interface</button>
+          <div id="iconEditSection" class="hidden" style="margin-top: 10px;">
+            <p class="modal-desc"><span data-i18n="settings.icons_desc">Personnalise les icônes de l'interface pour ce thème : importe tes propres icônes (SVG, PNG, WebP, ICO) et remplace chacune.</span></p>
+            <div class="icon-edit-search">
+              <input type="text" id="iconSearchInput" data-i18n-placeholder="settings.icons_search" placeholder="Rechercher une icône…" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="font-size-row" style="margin-top: 8px; gap: 8px;">
+              <button type="button" class="btn btn-secondary" id="iconImportBtn" data-i18n="settings.icons_import_btn">Importer des icônes…</button>
+            </div>
+            <input type="file" id="iconImportInput" accept=".svg,.png,.webp,.ico,.jpg,.jpeg" multiple class="hidden" />
+            <div class="icon-edit-list" id="iconEditList"></div>
+          </div>
         </div>
       </div>
 

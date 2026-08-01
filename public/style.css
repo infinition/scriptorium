@@ -1990,6 +1990,68 @@ mark.idea-hl {
   object-fit: cover;
   display: block;
 }
+
+/* An overridden UI icon rendered as an image */
+.ui-icon-img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Custom UI icons editor (collapsible, bottom of Appearance) */
+.icons-section .btn { width: 100%; }
+.icon-edit-search input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12.5px;
+}
+.icon-edit-search input:focus { outline: none; border-color: var(--accent); }
+.icon-edit-list {
+  margin-top: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.icon-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.icon-edit-preview {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.icon-edit-preview svg,
+.icon-edit-preview .ui-icon-img { width: 15px; height: 15px; }
+.icon-edit-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.icon-edit-select { flex: 1; max-width: 160px; }
 .color-theme-swatch-label {
   font-size: 11.5px;
   color: var(--text-muted);
