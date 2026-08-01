@@ -5523,8 +5523,11 @@ let dragStartX = null;
 
 const DELETE_ZONE_PX = 36;    // this close to the edge = releasing here deletes the block
 const DELETE_APPROACH_PX = 110; // this close to the edge = start showing the zone at all
-const MIN_DELETE_DRAG_PX = 30;   // must also have dragged the block this far *toward* that edge
-const MIN_APPROACH_DRAG_PX = 18; // (smaller threshold — the preview can appear a bit earlier)
+// Same threshold as the approach preview: once the red zone is visible, dropping
+// inside it must delete. A stricter threshold made the zone appear while a drop
+// silently did nothing, which read as "delete is broken".
+const MIN_DELETE_DRAG_PX = 18;   // must also have dragged the block this far *toward* that edge
+const MIN_APPROACH_DRAG_PX = 18; // the preview appears at the same moment deletion is armed
 let deleteZoneLeftEl = null;
 let deleteZoneRightEl = null;
 
@@ -5904,7 +5907,16 @@ function onBlockDragEnd(e) {
       const text = (draggedLineNode.textContent || '').trim();
       draggedLineNode.classList.remove('delete-mode');
       hideIdeasDropIndicator();
-      if (text) {
+      // The ideas panel starts right at the editor's right edge, where the red
+      // delete zone sits. Aiming at that zone, a release a few px into the
+      // panel is still a delete attempt, not an idea add.
+      const dropRect = editorWrap.getBoundingClientRect();
+      const overshotDelete = text &&
+        e.clientY >= dropRect.top && e.clientY <= dropRect.bottom &&
+        e.clientX >= dropRect.right - DELETE_ZONE_PX && e.clientX <= dropRect.right + 14;
+      if (overshotDelete) {
+        softDeleteLine(draggedLineNode);
+      } else if (text) {
         if (blockIdeaDrop && blockIdeaDrop.themeId && blockIdeaDrop.beforeText) {
           addBlockTextToIdeasAt(text, blockIdeaDrop.themeId, blockIdeaDrop.beforeText, blockIdeaDrop.after);
         } else {
