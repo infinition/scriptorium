@@ -4708,6 +4708,16 @@ $('openAppDirBtn')?.addEventListener('click', async () => {
   }
 });
 
+// Resets every preference (the app's localStorage) and reloads. This is the
+// cross-platform equivalent of clearing the WebView browser data: it does not
+// touch documents, themes or the workspace itself.
+$('resetAppBtn')?.addEventListener('click', async () => {
+  const ok = await themedConfirm(__('confirm.reset_app'));
+  if (!ok) return;
+  try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+  location.reload();
+});
+
 settingsModal.addEventListener('click', (e) => {
   if (e.target === settingsModal) {
     saveAndCloseSettings();

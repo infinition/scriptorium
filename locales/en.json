@@ -65,6 +65,7 @@
   "confirm.theme_delete": "Delete ideas theme \"{name}\"?",
   "confirm.theme_delete_custom": "Delete the colour theme \"{name}\"?",
   "confirm.bg_delete": "Delete the background \"{name}\"?",
+  "confirm.reset_app": "Reset all preferences? Language, themes, fonts, backgrounds and icons will return to their defaults. Your documents are not affected.",
   "confirm.conflict_keep": "This document was modified elsewhere since you opened it (other tab, phone, or external editor).\n\nOK \u2014 keep YOUR version and overwrite the disk\nCancel \u2014 reload the disk version (your unsaved changes are preserved in Ctrl+Z history)",
   "confirm.restore_snapshot": "Restore snapshot \"{name}\"?\n\nThe current version will take its place in the list: click Restore again to go back.",
 
@@ -204,6 +205,8 @@
   "settings.icons_import_btn": "Import icons…",
   "settings.icon_default": "Default",
   "settings.icons_empty": "No custom icons yet — import some above.",
+  "settings.reset_app_desc": "Resets every preference to its default: language, themes, fonts, backgrounds, icons and other settings go back to defaults. Your documents are not touched.",
+  "settings.reset_app_btn": "Reset application",
   "settings.font_sizes_desc": "Text size \u2014 each level is independently adjustable.",
   "settings.font_doc_title_label": "Doc title",
   "settings.font_doc_subtitle_label": "Doc subtitle",
