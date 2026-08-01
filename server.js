@@ -1420,14 +1420,61 @@ app.post('/api/open-doc', guarded((req, res) => {
 
 // Pick folder via native Windows FolderBrowserDialog
 app.post('/api/pick-folder', (req, res) => {
-  if (process.platform !== 'win32') {
-    return res.status(501).json({ error: 'Le sélecteur natif n\'est disponible que sur Windows — saisissez le chemin à la main.' });
-  }
   const { currentPath } = req.body || {};
   let initial = '';
   if (currentPath && typeof currentPath === 'string' && fs.existsSync(currentPath)) {
     initial = path.resolve(currentPath);
   }
+
+  // macOS: native dialog through osascript.
+  if (process.platform === 'darwin') {
+    let script = 'POSIX path of (choose folder';
+    if (initial) script += ` default location "${initial.replace(/"/g, '\\"')}"`;
+    script += ')';
+    execFile('osascript', ['-e', script], { timeout: 60000 }, (err, stdout) => {
+      if (err) {
+        console.error('Folder picker error:', err);
+        return res.status(500).json({ error: 'Impossible d\'ouvrir le sélecteur de dossier' });
+      }
+      const selectedPath = String(stdout || '').trim();
+      if (selectedPath) res.json({ success: true, path: selectedPath });
+      else res.json({ success: false, cancelled: true });
+    });
+    return;
+  }
+
+  // Linux: prefer zenity, fall back to kdialog.
+  if (process.platform === 'linux') {
+    const runZenity = () => {
+      const args = ['--file-selection', '--directory'];
+      if (initial) args.push('--filename', initial + path.sep);
+      execFile('zenity', args, { timeout: 60000 }, (err, stdout) => {
+        if (err) {
+          runKdialog();
+          return;
+        }
+        const selectedPath = String(stdout || '').trim();
+        if (selectedPath) res.json({ success: true, path: selectedPath });
+        else res.json({ success: false, cancelled: true });
+      });
+    };
+    const runKdialog = () => {
+      const args = ['--getexistingdirectory'];
+      if (initial) args.push(initial);
+      execFile('kdialog', args, { timeout: 60000 }, (err, stdout) => {
+        if (err) {
+          return res.status(500).json({ error: 'Impossible d\'ouvrir le sélecteur de dossier' });
+        }
+        const selectedPath = String(stdout || '').trim();
+        if (selectedPath) res.json({ success: true, path: selectedPath });
+        else res.json({ success: false, cancelled: true });
+      });
+    };
+    runZenity();
+    return;
+  }
+
+  // Windows: PowerShell FolderBrowserDialog (kept below).
 
   const psScript = `
     Add-Type -AssemblyName System.Windows.Forms
