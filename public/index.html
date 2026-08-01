@@ -540,6 +540,10 @@
           <input type="range" id="readingFadeSlider" min="5" max="35" step="1" value="18" />
           <span class="font-size-value" id="readingFadeValue">18%</span>
         </div>
+        <div class="fade-preview hidden" id="fadePreview" aria-hidden="true">
+          <span>Le fondu s'intensifie en haut et en bas, le centre reste net.</span>
+          <span>Un exemple de ligne au centre du bloc de texte.</span>
+        </div>
 
         <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.block_gap_desc">Espacement entre les blocs : la taille du retour à la ligne entre deux paragraphes.</span></p>
         <div class="font-size-row">
@@ -553,6 +557,11 @@
           <label for="lineHeightSlider"><span data-i18n="settings.line_height_label">Hauteur de ligne</span></label>
           <input type="range" id="lineHeightSlider" min="1.2" max="2.4" step="0.05" value="1.8" />
           <span class="font-size-value" id="lineHeightValue"></span>
+        </div>
+        <div class="spacing-preview" id="spacingPreview" aria-hidden="true">
+          <div class="sp-preview-line">Le retour à la ligne entre chaque paragraphe…</div>
+          <div class="sp-preview-line">…et la hauteur de ligne de chaque bloc…</div>
+          <div class="sp-preview-line">…s'affichent ici en temps réel.</div>
         </div>
       </div>
 

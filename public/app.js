@@ -4688,13 +4688,21 @@ function initReadingFadeSlider() {
     applyReadingFade(v);
     valueEl.textContent = v + '%';
     localStorage.setItem('scriptoriumReadingFade', String(v));
+    // Show the fade preview only while dragging.
+    var prev = $('fadePreview');
+    if (prev) prev.classList.remove('hidden');
+  });
+  slider.addEventListener('change', function () {
+    var prev = $('fadePreview');
+    if (prev) prev.classList.add('hidden');
   });
 }
 
 function applyReadingFade(pct) {
-  if (editorWrap) {
-    editorWrap.style.setProperty('--fade-pct', pct + '%');
-  }
+  var val = pct + '%';
+  if (editorWrap) editorWrap.style.setProperty('--fade-pct', val);
+  // Shared on the root so the settings preview uses the same value.
+  document.documentElement.style.setProperty('--fade-pct', val);
 }
 
 async function handlePickFolder(inputEl, btnEl) {

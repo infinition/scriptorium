@@ -2153,6 +2153,55 @@ textarea {
   color: var(--text);
   overflow: hidden;
 }
+
+/* Live preview for the block-gap / line-height sliders: the lines reuse the
+   same CSS variables as the editor, so they update as you drag. */
+.spacing-preview {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--serif);
+  font-size: 13px;
+  color: var(--text);
+}
+.sp-preview-line {
+  margin-bottom: var(--block-gap, 0.62em);
+  line-height: var(--line-height, 1.8);
+}
+.sp-preview-line:last-child { margin-bottom: 0; }
+
+/* Fade preview shown only while dragging the reading-fade slider. */
+.fade-preview {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--serif);
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  --fade-pct: 18%;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 var(--fade-pct),
+    #000 calc(100% - var(--fade-pct)),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 var(--fade-pct),
+    #000 calc(100% - var(--fade-pct)),
+    transparent 100%
+  );
+}
 .fsp-doc-title { font-size: var(--fs-doc-title); font-weight: 400; line-height: 1.25; margin-bottom: 4px; letter-spacing: -0.01em; }
 .fsp-doc-subtitle { font-size: var(--fs-doc-subtitle); font-style: italic; font-weight: 300; color: var(--text-muted); margin-bottom: 12px; }
 .fsp-h1 { font-size: var(--fs-h1); font-weight: 500; line-height: 1.3; margin-bottom: 6px; }
