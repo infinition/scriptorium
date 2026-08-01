@@ -194,6 +194,8 @@
   "settings.bg_clear_btn": "Aucun fond",
   "settings.bg_delete_title": "Supprimer ce fond",
   "settings.color_alpha_title": "Opacité (transparence)",
+  "emoji.search_placeholder": "Rechercher un émoji…",
+  "emoji.no_results": "Aucun émoji trouvé",
   "settings.font_sizes_desc": "Taille du texte \u2014 chaque niveau est r\u00e9glable ind\u00e9pendamment.",
   "settings.font_doc_title_label": "Titre document",
   "settings.font_doc_subtitle_label": "Sous-titre doc",
@@ -434,6 +436,7 @@
   "font_preview.h6": "Titre H6",
   "font_preview.quote": "Une citation d\u2019exemple pour l\u2019aper\u00e7u du style",
   "font_preview.body": "Texte normal avec du <strong>gras</strong>, de l\u2019<em>italique</em>, du <code>code</code>, un <a href=\"#\">lien</a> et du <del>barr\u00e9</del>.",
+  "font_preview.body_gap": "Un second paragraphe pour voir l'espace entre les blocs.",
 
   "toast.doc_saved": "Document enregistr\u00e9",
   "toast.doc_created": "Document cr\u00e9\u00e9",

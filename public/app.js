@@ -3675,13 +3675,13 @@ function renderColorThemeSwatches() {
   if (!container) return;
   container.innerHTML = '';
   var themes = getBuiltinColorThemes();
-  var all = themes.concat(colorThemeState.customThemes.map(t => ({ id: 'custom:' + t.id, name: t.name, custom: true })));
+  var all = themes.concat(colorThemeState.customThemes.map(t => ({ id: 'custom:' + t.id, name: t.name, custom: true, theme: t })));
   all.forEach(t => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'color-theme-swatch' + (colorThemeState.id === t.id ? ' active' : '');
     const preview = t.custom
-      ? `<span class="color-theme-swatch-preview custom-preview">🎨</span>`
+      ? buildCustomThemeSwatchPreview(t.theme)
       : `<span class="color-theme-swatch-preview" style="background:${t.bg}"><span style="background:${t.dot}"></span></span>`;
     btn.innerHTML = `${preview}<span class="color-theme-swatch-label">${escapeHtml(t.name)}</span>`;
     btn.addEventListener('click', () => selectColorTheme(t.id));
@@ -3693,6 +3693,24 @@ function renderColorThemeSwatches() {
   addBtn.innerHTML = `<span class="color-theme-swatch-preview custom-preview">＋</span><span class="color-theme-swatch-label">${escapeHtml(__('settings.new_theme_btn'))}</span>`;
   addBtn.addEventListener('click', createNewColorTheme);
   container.appendChild(addBtn);
+}
+
+// Swatch preview for a custom theme: shows its background media (image/video)
+// when one is set, otherwise its background colour with a text-colour dot.
+function buildCustomThemeSwatchPreview(theme) {
+  const vars = theme.vars || {};
+  const bg = toHexColor(vars['--bg']) || '#0d0d0e';
+  const text = toHexColor(vars['--text']) || '#d8d4cc';
+  const bgSetting = getThemeBackground('custom:' + theme.id);
+  // Text-colour dot, also shown on top of an image/video thumbnail.
+  const dot = `<span style="background:${text}"></span>`;
+  if (bgSetting && bgSetting.src) {
+    if (bgSetting.type === 'video') {
+      return `<span class="color-theme-swatch-preview media"><video src="${bgSetting.src}" muted playsinline preload="metadata"></video>${dot}</span>`;
+    }
+    return `<span class="color-theme-swatch-preview media" style="background-image:url('${bgSetting.src}')">${dot}</span>`;
+  }
+  return `<span class="color-theme-swatch-preview" style="background:${bg}">${dot}</span>`;
 }
 
 function selectColorTheme(id) {
@@ -8364,6 +8382,149 @@ function renderAll() {
   renderIdeas();
   loadActiveDoc();
 }
+
+// ============ EMOJI PICKER (@@ trigger) ============
+const EMOJI_CATEGORIES = [
+  { name: 'Smileys', emojis: [
+    {e:'😀',n:'grinning face'},{e:'😁',n:'beaming face'},{e:'😂',n:'joy'},{e:'🤣',n:'rofl'},{e:'😊',n:'smile'},{e:'😍',n:'heart eyes'},{e:'😘',n:'kiss'},{e:'😎',n:'cool'},{e:'😉',n:'wink'},{e:'🤔',n:'thinking'},{e:'🤨',n:'raised eyebrow'},{e:'😐',n:'neutral'},{e:'😏',n:'smirk'},{e:'😒',n:'unamused'},{e:'🙄',n:'eye roll'},{e:'😬',n:'grimace'},{e:'🤥',n:'lying'},{e:'😌',n:'relieved'},{e:'😔',n:'pensive'},{e:'😪',n:'sleepy'},{e:'🤤',n:'drooling'},{e:'😴',n:'sleeping'},{e:'😷',n:'mask'},{e:'🤒',n:'thermometer'},{e:'🤢',n:'nauseated'},{e:'🤮',n:'vomiting'},{e:'🥵',n:'hot'},{e:'🥶',n:'cold'},{e:'😳',n:'flushed'},{e:'🥺',n:'pleading'},{e:'😢',n:'crying'},{e:'😭',n:'loudly crying'},{e:'😱',n:'scream'},{e:'😖',n:'anguished'},{e:'😣',n:'persevering'},{e:'😫',n:'tired'},{e:'🥱',n:'yawning'},{e:'😡',n:'angry'},{e:'😠',n:'mad'},{e:'🤬',n:'cursing'},{e:'😈',n:'devil'},{e:'👿',n:'angry devil'},{e:'💀',n:'skull'},{e:'👻',n:'ghost'},{e:'👽',n:'alien'},{e:'🤖',n:'robot'},{e:'😺',n:'cat grin'},{e:'💩',n:'poop'}
+  ]},
+  { name: 'People', emojis: [
+    {e:'👋',n:'wave'},{e:'✋',n:'stop hand'},{e:'👌',n:'ok hand'},{e:'✌️',n:'victory'},{e:'🤞',n:'crossed fingers'},{e:'🤟',n:'love you'},{e:'👍',n:'thumbs up'},{e:'👎',n:'thumbs down'},{e:'👊',n:'fist'},{e:'✊',n:'raised fist'},{e:'👏',n:'clap'},{e:'🙌',n:'raised hands'},{e:'👐',n:'open hands'},{e:'🤝',n:'handshake'},{e:'🙏',n:'pray'},{e:'💪',n:'muscle'},{e:'🦵',n:'leg'},{e:'🦶',n:'foot'},{e:'👂',n:'ear'},{e:'👃',n:'nose'},{e:'🧠',n:'brain'},{e:'🦷',n:'tooth'},{e:'👀',n:'eyes'},{e:'👤',n:'bust'},{e:'🧔',n:'beard'},{e:'👩',n:'woman'},{e:'👨',n:'man'},{e:'🧑',n:'person'},{e:'👶',n:'baby'},{e:'👧',n:'girl'},{e:'👦',n:'boy'},{e:'👵',n:'old woman'},{e:'👴',n:'old man'},{e:'🧓',n:'older person'},{e:'👳',n:'turban'},{e:'🧕',n:'hijab'},{e:'👮',n:'police'},{e:'🕵️',n:'detective'},{e:'👷',n:'worker'},{e:'👸',n:'princess'}
+  ]},
+  { name: 'Animals & Nature', emojis: [
+    {e:'🐶',n:'dog'},{e:'🐱',n:'cat'},{e:'🐭',n:'mouse'},{e:'🐹',n:'hamster'},{e:'🐰',n:'rabbit'},{e:'🦊',n:'fox'},{e:'🐻',n:'bear'},{e:'🐼',n:'panda'},{e:'🐨',n:'koala'},{e:'🐯',n:'tiger'},{e:'🦁',n:'lion'},{e:'🐮',n:'cow'},{e:'🐷',n:'pig'},{e:'🐸',n:'frog'},{e:'🐵',n:'monkey face'},{e:'🐔',n:'chicken'},{e:'🐧',n:'penguin'},{e:'🐦',n:'bird'},{e:'🐤',n:'chick'},{e:'🦆',n:'duck'},{e:'🦅',n:'eagle'},{e:'🦉',n:'owl'},{e:'🦄',n:'unicorn'},{e:'🐝',n:'bee'},{e:'🐛',n:'bug'},{e:'🦋',n:'butterfly'},{e:'🐌',n:'snail'},{e:'🐞',n:'ladybug'},{e:'🐢',n:'turtle'},{e:'🐍',n:'snake'},{e:'🦎',n:'lizard'},{e:'🐙',n:'octopus'},{e:'🐬',n:'dolphin'},{e:'🐳',n:'whale'},{e:'🐊',n:'crocodile'},{e:'🦈',n:'shark'},{e:'🐟',n:'fish'},{e:'🐴',n:'horse'},{e:'🦌',n:'deer'},{e:'🐘',n:'elephant'},{e:'🦒',n:'giraffe'},{e:'🐒',n:'monkey'},{e:'🦇',n:'bat'},{e:'🐺',n:'wolf'},{e:'🌸',n:'cherry blossom'},{e:'🌹',n:'rose'},{e:'🌺',n:'hibiscus'},{e:'🌻',n:'sunflower'},{e:'🌼',n:'blossom'},{e:'🌷',n:'tulip'},{e:'🌱',n:'sprout'},{e:'🌲',n:'pine'},{e:'🌳',n:'tree'},{e:'🍀',n:'four leaf clover'}
+  ]},
+  { name: 'Food & Drink', emojis: [
+    {e:'🍏',n:'green apple'},{e:'🍎',n:'apple'},{e:'🍐',n:'pear'},{e:'🍊',n:'orange'},{e:'🍋',n:'lemon'},{e:'🍌',n:'banana'},{e:'🍉',n:'watermelon'},{e:'🍇',n:'grapes'},{e:'🍓',n:'strawberry'},{e:'🍒',n:'cherry'},{e:'🍑',n:'peach'},{e:'🥭',n:'mango'},{e:'🍍',n:'pineapple'},{e:'🥥',n:'coconut'},{e:'🥝',n:'kiwi'},{e:'🍅',n:'tomato'},{e:'🥑',n:'avocado'},{e:'🥦',n:'broccoli'},{e:'🥒',n:'cucumber'},{e:'🌽',n:'corn'},{e:'🥕',n:'carrot'},{e:'🥔',n:'potato'},{e:'🍞',n:'bread'},{e:'🥐',n:'croissant'},{e:'🧀',n:'cheese'},{e:'🍖',n:'meat'},{e:'🍗',n:'drumstick'},{e:'🥩',n:'steak'},{e:'🍔',n:'burger'},{e:'🍟',n:'fries'},{e:'🍕',n:'pizza'},{e:'🌭',n:'hot dog'},{e:'🥪',n:'sandwich'},{e:'🌮',n:'taco'},{e:'🌯',n:'burrito'},{e:'🥗',n:'salad'},{e:'🍜',n:'noodles'},{e:'🍝',n:'pasta'},{e:'🍣',n:'sushi'},{e:'🍤',n:'shrimp'},{e:'🍚',n:'rice'},{e:'🍦',n:'ice cream'},{e:'🍨',n:'ice cream bowl'},{e:'🍩',n:'donut'},{e:'🍪',n:'cookie'},{e:'🎂',n:'cake'},{e:'🍰',n:'shortcake'},{e:'🧁',n:'cupcake'},{e:'🍫',n:'chocolate'},{e:'🍬',n:'candy'},{e:'🍭',n:'lollipop'},{e:'☕',n:'coffee'},{e:'🍵',n:'tea'},{e:'🥤',n:'cup'},{e:'🍺',n:'beer'},{e:'🍻',n:'beers'},{e:'🥂',n:'champagne'},{e:'🍷',n:'wine'},{e:'🥃',n:'whiskey'}
+  ]},
+  { name: 'Activities', emojis: [
+    {e:'⚽',n:'soccer'},{e:'🏀',n:'basketball'},{e:'🏈',n:'football'},{e:'⚾',n:'baseball'},{e:'🎾',n:'tennis'},{e:'🏐',n:'volleyball'},{e:'🏉',n:'rugby'},{e:'🎱',n:'billiards'},{e:'🏓',n:'ping pong'},{e:'🏸',n:'badminton'},{e:'🏒',n:'hockey'},{e:'⛳',n:'golf'},{e:'🏄',n:'surf'},{e:'🏊',n:'swim'},{e:'🚴',n:'bike'},{e:'🏋️',n:'weight lifting'},{e:'🤸',n:'cartwheel'},{e:'🎿',n:'ski'},{e:'🎯',n:'target'},{e:'🎮',n:'video game'},{e:'🎲',n:'dice'},{e:'♟️',n:'chess'},{e:'🎭',n:'theater'},{e:'🎨',n:'art'},{e:'🎬',n:'movie'},{e:'🎤',n:'mic'},{e:'🎧',n:'headphones'},{e:'🎼',n:'music'},{e:'🎹',n:'piano'},{e:'🥁',n:'drum'},{e:'🎸',n:'guitar'},{e:'🎻',n:'violin'},{e:'🏆',n:'trophy'},{e:'🥇',n:'gold medal'},{e:'🥈',n:'silver medal'},{e:'🥉',n:'bronze medal'},{e:'🏅',n:'medal'},{e:'🎫',n:'ticket'},{e:'🎪',n:'circus'}
+  ]},
+  { name: 'Travel & Places', emojis: [
+    {e:'🚗',n:'car'},{e:'🚕',n:'taxi'},{e:'🚙',n:'suv'},{e:'🚌',n:'bus'},{e:'🏎️',n:'race car'},{e:'🚓',n:'police car'},{e:'🚑',n:'ambulance'},{e:'🚒',n:'fire truck'},{e:'🚚',n:'truck'},{e:'🚜',n:'tractor'},{e:'🛴',n:'scooter'},{e:'🚲',n:'bicycle'},{e:'🏍️',n:'motorcycle'},{e:'✈️',n:'airplane'},{e:'🚀',n:'rocket'},{e:'🛸',n:'ufo'},{e:'🚁',n:'helicopter'},{e:'⛵',n:'sailboat'},{e:'🚤',n:'speedboat'},{e:'🛳️',n:'ship'},{e:'🚉',n:'station'},{e:'🚄',n:'train'},{e:'🚇',n:'metro'},{e:'🚧',n:'construction'},{e:'🏠',n:'house'},{e:'🏡',n:'house garden'},{e:'🏢',n:'office'},{e:'🏫',n:'school'},{e:'🏥',n:'hospital'},{e:'🏨',n:'hotel'},{e:'🏔️',n:'mountain'},{e:'🌋',n:'volcano'},{e:'🗻',n:'fuji'},{e:'🏖️',n:'beach'},{e:'🏜️',n:'desert'},{e:'🏝️',n:'island'},{e:'🌊',n:'ocean'},{e:'🌅',n:'sunrise'},{e:'🌠',n:'shooting star'},{e:'🌃',n:'night'},{e:'🌉',n:'bridge'},{e:'🗼',n:'tower'},{e:'🗽',n:'statue'}
+  ]},
+  { name: 'Objects', emojis: [
+    {e:'⌚',n:'watch'},{e:'📱',n:'phone'},{e:'💻',n:'laptop'},{e:'⌨️',n:'keyboard'},{e:'🖥️',n:'computer'},{e:'🖨️',n:'printer'},{e:'📷',n:'camera'},{e:'📹',n:'video camera'},{e:'🎥',n:'movie camera'},{e:'📺',n:'tv'},{e:'📻',n:'radio'},{e:'🎙️',n:'microphone'},{e:'⏰',n:'alarm'},{e:'⏳',n:'hourglass'},{e:'📅',n:'calendar'},{e:'📁',n:'folder'},{e:'📂',n:'open folder'},{e:'📝',n:'memo'},{e:'✏️',n:'pencil'},{e:'🖊️',n:'pen'},{e:'📌',n:'pin'},{e:'📍',n:'round pin'},{e:'📎',n:'paperclip'},{e:'✂️',n:'scissors'},{e:'🔑',n:'key'},{e:'🔒',n:'locked'},{e:'🔓',n:'unlocked'},{e:'🔨',n:'hammer'},{e:'🔧',n:'wrench'},{e:'🔪',n:'knife'},{e:'💡',n:'light bulb'},{e:'🔦',n:'flashlight'},{e:'📚',n:'books'},{e:'📖',n:'book'},{e:'🎒',n:'backpack'},{e:'💼',n:'briefcase'},{e:'📦',n:'package'},{e:'🔋',n:'battery'}
+  ]},
+  { name: 'Symbols', emojis: [
+    {e:'❤️',n:'heart'},{e:'🧡',n:'orange heart'},{e:'💛',n:'yellow heart'},{e:'💚',n:'green heart'},{e:'💙',n:'blue heart'},{e:'💜',n:'purple heart'},{e:'🖤',n:'black heart'},{e:'🤍',n:'white heart'},{e:'💔',n:'broken heart'},{e:'💕',n:'two hearts'},{e:'💞',n:'revolving hearts'},{e:'💓',n:'beating heart'},{e:'💗',n:'growing heart'},{e:'💖',n:'sparkling heart'},{e:'💘',n:'cupid'},{e:'💝',n:'gift heart'},{e:'⭐',n:'star'},{e:'🌟',n:'glowing star'},{e:'✨',n:'sparkles'},{e:'⚡',n:'lightning'},{e:'🔥',n:'fire'},{e:'💥',n:'collision'},{e:'💫',n:'dizzy'},{e:'💦',n:'sweat droplets'},{e:'💨',n:'dash'},{e:'💬',n:'speech bubble'},{e:'💭',n:'thought'},{e:'❗',n:'exclamation'},{e:'❓',n:'question'},{e:'💯',n:'hundred'},{e:'🔴',n:'red circle'},{e:'🟠',n:'orange circle'},{e:'🟡',n:'yellow circle'},{e:'🟢',n:'green circle'},{e:'🔵',n:'blue circle'},{e:'⚫',n:'black circle'},{e:'⚪',n:'white circle'},{e:'✅',n:'check'},{e:'❌',n:'cross'},{e:'➡️',n:'arrow right'},{e:'⬅️',n:'arrow left'},{e:'⬆️',n:'arrow up'},{e:'⬇️',n:'arrow down'},{e:'🔔',n:'bell'},{e:'📣',n:'megaphone'}
+  ]},
+];
+
+let emojiPickerTarget = null; // { el, isContentEditable, replaceStart, replaceEnd, range }
+
+function openEmojiPicker(ctx) {
+  emojiPickerTarget = ctx;
+  const search = $('emojiSearch');
+  if (search) search.value = '';
+  renderEmojiGrid('');
+  const modal = $('emojiModal');
+  if (modal) modal.classList.add('active');
+  if (search) search.focus();
+}
+function closeEmojiPicker() {
+  const modal = $('emojiModal');
+  if (modal) modal.classList.remove('active');
+  emojiPickerTarget = null;
+}
+function renderEmojiGrid(query) {
+  const grid = $('emojiGrid');
+  if (!grid) return;
+  const q = (query || '').trim().toLowerCase();
+  grid.innerHTML = '';
+  let shown = 0;
+  EMOJI_CATEGORIES.forEach(cat => {
+    const items = q ? cat.emojis.filter(e => e.n.toLowerCase().includes(q)) : cat.emojis;
+    if (!items.length) return;
+    if (!q) {
+      const title = document.createElement('div');
+      title.className = 'emoji-cat-title';
+      title.textContent = cat.name;
+      grid.appendChild(title);
+    }
+    items.forEach(e => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'emoji-item';
+      btn.textContent = e.e;
+      btn.title = e.n;
+      btn.addEventListener('click', () => insertEmoji(e.e));
+      grid.appendChild(btn);
+      shown++;
+    });
+  });
+  if (!shown) {
+    const empty = document.createElement('div');
+    empty.className = 'emoji-cat-title';
+    empty.textContent = __('emoji.no_results');
+    grid.appendChild(empty);
+  }
+}
+function insertEmoji(emoji) {
+  const ctx = emojiPickerTarget;
+  closeEmojiPicker();
+  if (!ctx) return;
+  if (ctx.isContentEditable) {
+    if (ctx.range) {
+      const node = ctx.range.startContainer;
+      const off = ctx.range.startOffset;
+      if (node.nodeType === Node.TEXT_NODE && node.nodeValue && node.nodeValue.slice(off - 2, off) === '@@') {
+        node.nodeValue = node.nodeValue.slice(0, off - 2) + emoji + node.nodeValue.slice(off);
+        const r = document.createRange();
+        r.setStart(node, off - 2 + emoji.length);
+        r.collapse(true);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+      } else {
+        ctx.range.insertNode(document.createTextNode(emoji));
+      }
+    }
+    if (content) content.dispatchEvent(new Event('input', { bubbles: true }));
+  } else {
+    const el = ctx.el;
+    if (!el) return;
+    const v = el.value || '';
+    const start = typeof ctx.replaceStart === 'number' ? ctx.replaceStart : 0;
+    const end = typeof ctx.replaceEnd === 'number' ? ctx.replaceEnd : v.length;
+    el.value = v.slice(0, start) + emoji + v.slice(end);
+    const pos = start + emoji.length;
+    el.selectionStart = el.selectionEnd = pos;
+    el.focus();
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+$('emojiCloseBtn')?.addEventListener('click', closeEmojiPicker);
+$('emojiSearch')?.addEventListener('input', (e) => renderEmojiGrid(e.target.value));
+$('emojiModal')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEmojiPicker(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmojiPicker(); });
+
+// Typing @@ in any text field opens the picker, remembering where to insert.
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (!el) return;
+  if (el.closest && el.closest('#emojiModal')) return; // the picker's own search
+  if (e.isComposing || emojiPickerTarget) return;
+
+  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+    const v = el.value || '';
+    const pos = el.selectionStart;
+    if (typeof pos === 'number' && v.slice(pos - 2, pos) === '@@') {
+      openEmojiPicker({ el, isContentEditable: false, replaceStart: pos - 2, replaceEnd: pos });
+    }
+  } else if (el.isContentEditable) {
+    const sel = window.getSelection();
+    if (sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      const node = range.startContainer;
+      const off = range.startOffset;
+      if (node.nodeType === Node.TEXT_NODE && node.nodeValue && node.nodeValue.slice(off - 2, off) === '@@') {
+        openEmojiPicker({ el, isContentEditable: true, range: range.cloneRange() });
+      }
+    }
+  }
+});
 
 // Start
 fetchWorkspace();

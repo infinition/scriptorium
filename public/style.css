@@ -1582,6 +1582,67 @@ mark.idea-hl {
   animation: modalIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
+/* Emoji picker (triggered by @@) */
+.emoji-modal-inner {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  width: 90%;
+  max-width: 480px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  animation: modalIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.emoji-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.emoji-modal-header input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+.emoji-modal-header input:focus { outline: none; border-color: var(--accent); }
+.emoji-grid {
+  overflow-y: auto;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
+  gap: 2px;
+  align-content: start;
+}
+.emoji-cat-title {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 8px 2px 4px;
+}
+.emoji-item {
+  background: none;
+  border: none;
+  border-radius: 5px;
+  font-size: 22px;
+  line-height: 1;
+  padding: 6px 2px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+.emoji-item:hover { background: var(--bg-hover); }
+.emoji-item:active { transform: scale(0.9); }
+
 @keyframes modalIn {
   from { transform: scale(0.95); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -1917,6 +1978,18 @@ mark.idea-hl {
   padding: 0;
   background: conic-gradient(from 180deg, #c9a96a, #6ea8c9, #8fbf8a, #c97a6a, #c9a96a);
 }
+/* Custom-theme swatch backed by a background image or a video frame */
+.color-theme-swatch-preview.media {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.color-theme-swatch-preview.media video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .color-theme-swatch-label {
   font-size: 11.5px;
   color: var(--text-muted);
@@ -2166,24 +2239,6 @@ textarea {
   overflow: hidden;
 }
 
-/* Live preview for the block-gap / line-height sliders: the lines reuse the
-   same CSS variables as the editor, so they update as you drag. */
-.spacing-preview {
-  margin-top: 10px;
-  padding: 14px 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: var(--serif);
-  font-size: 13px;
-  color: var(--text);
-}
-.sp-preview-line {
-  margin-bottom: var(--block-gap, 0.62em);
-  line-height: var(--line-height, 1.8);
-}
-.sp-preview-line:last-child { margin-bottom: 0; }
-
 /* Fade preview shown only while dragging the reading-fade slider. */
 .fade-preview {
   margin-top: 10px;
@@ -2223,7 +2278,11 @@ textarea {
 .fsp-h5 { font-size: var(--fs-h5); text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 6px; }
 .fsp-h6 { font-size: var(--fs-h6); color: var(--text-muted); margin-bottom: 8px; }
 .fsp-quote blockquote { border-left: 2px solid var(--accent); padding-left: 12px; margin: 8px 0; color: var(--text-muted); font-style: italic; }
-.fsp-p { font-size: var(--fs-base); line-height: 1.7; }
+.fsp-p {
+  font-size: var(--fs-base);
+  line-height: var(--line-height, 1.7);
+  margin-bottom: var(--block-gap, 0.62em);
+}
 
 /* Dynamic syntax coloring inside the settings preview box when md-color-on is active */
 .md-color-on .fsp-h1 { color: var(--syn-h1); }

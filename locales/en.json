@@ -194,6 +194,8 @@
   "settings.bg_clear_btn": "No background",
   "settings.bg_delete_title": "Delete this background",
   "settings.color_alpha_title": "Opacity (transparency)",
+  "emoji.search_placeholder": "Search emoji…",
+  "emoji.no_results": "No emoji found",
   "settings.font_sizes_desc": "Text size \u2014 each level is independently adjustable.",
   "settings.font_doc_title_label": "Doc title",
   "settings.font_doc_subtitle_label": "Doc subtitle",
@@ -437,6 +439,7 @@
   "font_preview.h6": "Heading H6",
   "font_preview.quote": "An example quote for the style preview",
   "font_preview.body": "Body text with <strong>bold</strong>, <em>italic</em>, <code>code</code>, a <a href=\"#\">link</a> and <del>strikethrough</del>.",
+  "font_preview.body_gap": "A second paragraph to see the space between blocks.",
 
   "toast.doc_saved": "Document saved",
   "toast.doc_created": "Document created",

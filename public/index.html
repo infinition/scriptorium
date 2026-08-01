@@ -518,6 +518,20 @@
           </div>
         </div>
 
+        <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.block_gap_desc">Espacement entre les blocs : la taille du retour à la ligne entre deux paragraphes.</span></p>
+        <div class="font-size-row">
+          <label for="blockGapSlider"><span data-i18n="settings.block_gap_label">Espace entre les blocs</span></label>
+          <input type="range" id="blockGapSlider" min="0" max="1.5" step="0.05" value="0.62" />
+          <span class="font-size-value" id="blockGapValue"></span>
+        </div>
+
+        <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.line_height_desc">Hauteur de ligne des blocs : l'espace au-dessus et en dessous du texte à l'intérieur d'un bloc.</span></p>
+        <div class="font-size-row">
+          <label for="lineHeightSlider"><span data-i18n="settings.line_height_label">Hauteur de ligne</span></label>
+          <input type="range" id="lineHeightSlider" min="1.2" max="2.4" step="0.05" value="1.8" />
+          <span class="font-size-value" id="lineHeightValue"></span>
+        </div>
+
         <div class="font-size-preview" id="fontSizePreview">
           <div class="fsp-doc-title"><span data-i18n="font_preview.doc_title">Titre du document</span></div>
           <div class="fsp-doc-subtitle"><span data-i18n="font_preview.doc_subtitle">Sous-titre ou description du document</span></div>
@@ -529,6 +543,7 @@
           <div class="fsp-h6"><span data-i18n="font_preview.h6">Titre H6</span></div>
           <div class="fsp-quote"><blockquote><span data-i18n="font_preview.quote">Une citation d'exemple pour l'aperçu du style</span></blockquote></div>
           <div class="fsp-p"><span data-i18n-html="font_preview.body">Texte normal avec du <strong>gras</strong></span></strong>, de l'<em>italique</em>, du <code>code</code>, un <a href="#">lien</a> et du <del>barré</del>.</div>
+          <div class="fsp-p"><span data-i18n="font_preview.body_gap">Un second paragraphe pour voir l'espace entre les blocs.</span></div>
         </div>
 
         <div class="modal-actions" style="margin-top: 12px; justify-content: flex-start;">
@@ -544,25 +559,6 @@
         <div class="fade-preview hidden" id="fadePreview" aria-hidden="true">
           <span>Le fondu s'intensifie en haut et en bas, le centre reste net.</span>
           <span>Un exemple de ligne au centre du bloc de texte.</span>
-        </div>
-
-        <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.block_gap_desc">Espacement entre les blocs : la taille du retour à la ligne entre deux paragraphes.</span></p>
-        <div class="font-size-row">
-          <label for="blockGapSlider"><span data-i18n="settings.block_gap_label">Espace entre les blocs</span></label>
-          <input type="range" id="blockGapSlider" min="0" max="1.5" step="0.05" value="0.62" />
-          <span class="font-size-value" id="blockGapValue"></span>
-        </div>
-
-        <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.line_height_desc">Hauteur de ligne des blocs : l'espace au-dessus et en dessous du texte à l'intérieur d'un bloc.</span></p>
-        <div class="font-size-row">
-          <label for="lineHeightSlider"><span data-i18n="settings.line_height_label">Hauteur de ligne</span></label>
-          <input type="range" id="lineHeightSlider" min="1.2" max="2.4" step="0.05" value="1.8" />
-          <span class="font-size-value" id="lineHeightValue"></span>
-        </div>
-        <div class="spacing-preview" id="spacingPreview" aria-hidden="true">
-          <div class="sp-preview-line">Le retour à la ligne entre chaque paragraphe…</div>
-          <div class="sp-preview-line">…et la hauteur de ligne de chaque bloc…</div>
-          <div class="sp-preview-line">…s'affichent ici en temps réel.</div>
         </div>
       </div>
 
@@ -751,6 +747,17 @@
       <button class="btn btn-secondary" id="dialogCancelBtn" type="button"></button>
       <button class="btn btn-primary" id="dialogOkBtn" type="button"></button>
     </div>
+  </div>
+</div>
+
+<!-- EMOJI PICKER (trigger: @@) -->
+<div class="modal-overlay emoji-modal" id="emojiModal">
+  <div class="emoji-modal-inner">
+    <div class="emoji-modal-header">
+      <input type="text" id="emojiSearch" data-i18n-placeholder="emoji.search_placeholder" placeholder="Rechercher un émoji…" autocomplete="off" spellcheck="false" />
+      <button class="close-btn" id="emojiCloseBtn" type="button" data-i18n-aria-label="dialog.close" aria-label="Close">&times;</button>
+    </div>
+    <div class="emoji-grid" id="emojiGrid"></div>
   </div>
 </div>
 
