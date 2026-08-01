@@ -60,6 +60,12 @@
         });
       }
     }
+    var afRaw = localStorage.getItem('scriptoriumActiveFonts');
+    if (afRaw) {
+      var af = JSON.parse(afRaw);
+      if (af && af.ui) document.documentElement.style.setProperty('--sans', af.ui);
+      if (af && af.editor) document.documentElement.style.setProperty('--serif', af.editor);
+    }
     var fsRaw = localStorage.getItem('scriptoriumFontSizes');
     if (fsRaw) {
       var sizes = JSON.parse(fsRaw);
@@ -393,6 +399,23 @@
       <div class="settings-panel hidden" data-panel="appearance">
         <p class="modal-desc"><span data-i18n="settings.appearance_desc">Choisissez un thème visuel. Le changement s'applique immédiatement.</span></p>
         <div class="color-theme-swatches" id="colorThemeSwatches"></div>
+
+        <div style="margin-top: 18px;">
+          <p class="modal-desc"><span data-i18n="settings.font_choice_desc">Polices de ce thème : une pour l'interface, une pour l'éditeur.</span></p>
+          <div class="font-size-row">
+            <label for="uiFontSelect"><span data-i18n="settings.ui_font_label">Police interface</span></label>
+            <select id="uiFontSelect" class="text-select"></select>
+          </div>
+          <div class="font-size-row">
+            <label for="editorFontSelect"><span data-i18n="settings.editor_font_label">Police éditeur</span></label>
+            <select id="editorFontSelect" class="text-select"></select>
+          </div>
+          <div class="font-size-row">
+            <label for="fontImportBtn"><span data-i18n="settings.import_font_label">Polices personnalisées</span></label>
+            <button type="button" class="btn btn-secondary" id="fontImportBtn" data-i18n="settings.import_font_btn">Importer… (.fonts)</button>
+            <input type="file" id="fontImportInput" accept=".ttf,.otf,.woff,.woff2" multiple class="hidden" />
+          </div>
+        </div>
 
         <label class="checkbox-row" style="margin-top: 18px;">
           <input type="checkbox" id="mdColorToggle" />

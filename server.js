@@ -95,7 +95,12 @@ function listColorThemes() {
     try {
       const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
       if (data && typeof data === 'object' && data.vars) {
-        themes.push({ id, name: (typeof data.name === 'string' && data.name.trim()) ? data.name : id, vars: data.vars });
+        themes.push({
+          id,
+          name: (typeof data.name === 'string' && data.name.trim()) ? data.name : id,
+          vars: data.vars,
+          fonts: (data.fonts && typeof data.fonts === 'object') ? data.fonts : null
+        });
       }
     } catch (err) {
       console.error('Error reading theme', file, err);
@@ -125,6 +130,27 @@ function migrateLegacyCustomTheme() {
 function slugifyThemeName(name) {
   return String(name || 'theme').trim().toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'theme';
+}
+
+// Custom fonts the user drops into <workspace>/.fonts/, offered alongside the
+// built-in font choices for the UI and the editor.
+const FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2'];
+
+function getFontsDir() {
+  return path.join(workspaceDir, '.fonts');
+}
+
+function listCustomFonts() {
+  const dir = getFontsDir();
+  const fonts = [];
+  if (!fs.existsSync(dir)) return fonts;
+  for (const file of fs.readdirSync(dir)) {
+    const ext = path.extname(file).toLowerCase();
+    if (!FONT_EXTENSIONS.includes(ext)) continue;
+    const name = path.basename(file, ext).replace(/[_-]+/g, ' ').trim() || file;
+    fonts.push({ id: file, name, url: '/fonts/' + encodeURIComponent(file), ext });
+  }
+  return fonts;
 }
 
 function getIdeasDir() {
@@ -502,7 +528,7 @@ Shortcuts: \`Ctrl+G\` or \`Ctrl+B\` bold, \`Ctrl+I\` italic, \`Ctrl+K\` then \`C
 The gear at the top left opens the settings.
 
 - **Folders**: workspace path and ideas folder, with a browse button.
-- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
+- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, a UI font and an editor font per theme (custom fonts you drop into \`.fonts\` are offered too), text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
 - **Language**: Français or English.
 
 ## Keyboard shortcuts
@@ -667,7 +693,7 @@ Raccourcis : \`Ctrl+G\` ou \`Ctrl+B\` gras, \`Ctrl+I\` italique, \`Ctrl+K\` puis
 L'engrenage en haut à gauche ouvre les paramètres.
 
 - **Dossiers** : chemin du dossier de travail et du dossier d'idées, avec bouton pour parcourir.
-- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
+- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, une police d'interface et une police d'éditeur par thème (les polices personnalisées déposées dans \`.fonts\` sont aussi proposées), tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
 - **Langue** : Français ou English.
 
 ## Raccourcis clavier
@@ -1038,7 +1064,7 @@ app.get('/api/color-themes', (req, res) => {
 });
 
 app.post('/api/color-themes', (req, res) => {
-  const { id, name, vars } = req.body || {};
+  const { id, name, vars, fonts } = req.body || {};
   if (!vars || typeof vars !== 'object' || Array.isArray(vars)) {
     return res.status(400).json({ error: 'Invalid theme payload' });
   }
@@ -1054,8 +1080,10 @@ app.post('/api/color-themes', (req, res) => {
     themeId = themeId + n;
   }
   const themeName = (typeof name === 'string' && name.trim()) ? name.trim() : themeId;
+  const payload = { name: themeName, vars };
+  if (fonts && typeof fonts === 'object') payload.fonts = fonts;
   try {
-    fs.writeFileSync(path.join(dir, themeId + '.json'), JSON.stringify({ name: themeName, vars }, null, 2), 'utf8');
+    fs.writeFileSync(path.join(dir, themeId + '.json'), JSON.stringify(payload, null, 2), 'utf8');
     res.json({ success: true, id: themeId, name: themeName });
   } catch (err) {
     console.error('Error saving theme:', err);
@@ -1080,6 +1108,42 @@ app.delete('/api/color-themes/:id', (req, res) => {
     console.error('Error deleting theme:', err);
     res.status(500).json({ error: 'Failed to delete theme' });
   }
+});
+
+// Custom fonts from <workspace>/.fonts/
+app.get('/api/fonts', (req, res) => {
+  res.json({ fonts: listCustomFonts() });
+});
+
+app.post('/api/fonts', guarded((req, res) => {
+  const { filename, dataBase64 } = req.body || {};
+  if (!filename || typeof dataBase64 !== 'string' || !dataBase64) {
+    return res.status(400).json({ error: 'filename and data are required' });
+  }
+  const ext = path.extname(String(filename)).toLowerCase();
+  if (!FONT_EXTENSIONS.includes(ext)) {
+    return res.status(400).json({ error: 'Unsupported font type' });
+  }
+  const stem = path.basename(String(filename), ext);
+  const safeStem = assertSegment(stem, 'Font') || 'font';
+  const fontsDir = getFontsDir();
+  fs.mkdirSync(fontsDir, { recursive: true });
+  let safeName = `${safeStem}${ext}`;
+  let counter = 1;
+  while (fs.existsSync(path.join(fontsDir, safeName))) {
+    safeName = `${safeStem}-${counter}${ext}`;
+    counter++;
+  }
+  const buf = Buffer.from(dataBase64, 'base64');
+  fs.writeFileSync(path.join(fontsDir, safeName), buf);
+  res.json({ success: true, file: safeName });
+}));
+
+// Serve the workspace's custom fonts (runtime dir, like /assets).
+app.use('/fonts', (req, res, next) => {
+  const fontsDir = getFontsDir();
+  if (!fs.existsSync(fontsDir)) return res.status(404).end();
+  express.static(fontsDir, { maxAge: '30d', immutable: true })(req, res, next);
 });
 
 // Snapshots (revision history) — persisted on disk in the workspace, one JSON

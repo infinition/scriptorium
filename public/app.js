@@ -3663,6 +3663,8 @@ function renderColorThemeSwatches() {
 function selectColorTheme(id) {
   applyColorTheme(id);
   renderColorThemeSwatches();
+  applyThemeFonts();
+  populateFontSelects();
   const editor = $('customThemeEditor');
   const isCustom = isCustomThemeId(id);
   if (editor) editor.classList.toggle('hidden', !isCustom);
@@ -3757,7 +3759,7 @@ $('saveCustomThemeBtn')?.addEventListener('click', async () => {
   const current = getCustomThemeById(colorThemeState.id);
   const name = (nameInput && nameInput.value.trim()) || (current && current.name) || id;
   try {
-    const payload = { id, name, vars: colorThemeState.customVars || {} };
+    const payload = { id, name, vars: colorThemeState.customVars || {}, fonts: (current && current.fonts) || null };
     const res = await fetch('/api/color-themes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3894,6 +3896,9 @@ async function initColorTheme() {
   }
 
   renderColorThemeSwatches();
+  await loadCustomFonts();
+  applyThemeFonts();
+  populateFontSelects();
   if (isCustomThemeId(colorThemeState.id)) {
     const theme = getCustomThemeById(colorThemeState.id);
     colorThemeState.customVars = (theme && theme.vars) || colorThemeState.customVars || getComputedThemeVars('default');
@@ -3904,6 +3909,194 @@ async function initColorTheme() {
     populateCustomThemeFields();
   }
 }
+
+// ============ FONTS (Settings > Apparence) ============
+// Per-theme font choice: one family for the UI (--sans) and one for the editor
+// (--serif), each a cross-platform stack. Custom fonts imported into
+// <workspace>/.fonts/ are offered on top of these built-ins.
+
+const FONT_UI_OPTIONS = [
+  { id: 'system', name: 'System default', stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" },
+  { id: 'inter', name: 'Inter', stack: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" },
+  { id: 'segoe', name: 'Segoe UI', stack: "'Segoe UI', 'Segoe UI Variable', Roboto, 'Helvetica Neue', Arial, sans-serif" },
+  { id: 'sfpro', name: 'SF Pro', stack: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif" },
+  { id: 'roboto', name: 'Roboto', stack: "'Roboto', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif" },
+  { id: 'opensans', name: 'Open Sans', stack: "'Open Sans', 'Segoe UI', Roboto, Arial, sans-serif" },
+  { id: 'notosans', name: 'Noto Sans', stack: "'Noto Sans', 'Segoe UI', Roboto, Arial, sans-serif" },
+];
+
+const FONT_EDITOR_OPTIONS = [
+  { id: 'newsreader', name: 'Newsreader', stack: "'Newsreader', Georgia, serif" },
+  { id: 'serif-system', name: 'System serif', stack: "Georgia, 'Times New Roman', 'Droid Serif', serif" },
+  { id: 'georgia', name: 'Georgia', stack: "Georgia, 'Times New Roman', serif" },
+  { id: 'merriweather', name: 'Merriweather', stack: "'Merriweather', Georgia, 'Times New Roman', serif" },
+  { id: 'lora', name: 'Lora', stack: "'Lora', Georgia, serif" },
+  { id: 'sourceserif', name: 'Source Serif', stack: "'Source Serif 4', 'Source Serif Pro', Georgia, serif" },
+  { id: 'sans-system', name: 'System sans', stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif" },
+  { id: 'mono-system', name: 'System mono', stack: "'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace" },
+];
+
+// { id, name, url, ext } loaded from <workspace>/.fonts/ via /api/fonts.
+let customFontState = [];
+
+function customFontFamily(f) {
+  return 'ScriptoriumFont ' + String(f.name).replace(/['"\\]/g, '');
+}
+
+function getAllUiFonts() {
+  return FONT_UI_OPTIONS.concat(customFontState.map(f => ({
+    id: 'custom:' + f.id,
+    name: f.name,
+    stack: `'${customFontFamily(f)}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+  })));
+}
+function getAllEditorFonts() {
+  return FONT_EDITOR_OPTIONS.concat(customFontState.map(f => ({
+    id: 'custom:' + f.id,
+    name: f.name,
+    stack: `'${customFontFamily(f)}', Georgia, serif`
+  })));
+}
+function getFontStack(type, id) {
+  const list = type === 'ui' ? getAllUiFonts() : getAllEditorFonts();
+  const f = list.find(x => x.id === id);
+  return f ? f.stack : null;
+}
+
+function registerCustomFontFace(f) {
+  const existing = document.getElementById('fontface-' + f.id);
+  if (existing) return;
+  const style = document.createElement('style');
+  style.id = 'fontface-' + f.id;
+  const ext = (f.ext || '').toLowerCase();
+  const format = ext === '.woff2' ? " format('woff2')"
+    : ext === '.woff' ? " format('woff')"
+    : ext === '.otf' ? " format('opentype')"
+    : ext === '.ttf' ? " format('truetype')"
+    : '';
+  style.textContent = `@font-face { font-family: '${customFontFamily(f)}'; src: url('${f.url}')${format}; font-display: swap; }`;
+  document.head.appendChild(style);
+}
+
+async function loadCustomFonts() {
+  try {
+    const res = await fetch('/api/fonts');
+    const data = await res.json();
+    customFontState = (data && Array.isArray(data.fonts)) ? data.fonts : [];
+  } catch (e) {
+    customFontState = [];
+  }
+  customFontState.forEach(registerCustomFontFace);
+}
+
+// Per-theme font choice. Built-in themes: a localStorage map keyed by theme id.
+// Custom themes: stored in their .themes/<id>.json file (portable).
+function loadBuiltinThemeFonts() {
+  try {
+    return JSON.parse(localStorage.getItem('scriptoriumThemeFonts')) || {};
+  } catch (e) { return {}; }
+}
+
+function getThemeFonts(themeId) {
+  if (isCustomThemeId(themeId)) {
+    const t = getCustomThemeById(themeId);
+    return (t && t.fonts) || null;
+  }
+  return loadBuiltinThemeFonts()[themeId] || null;
+}
+
+// Applies the current theme's font choice to --sans (UI) and --serif (editor).
+function applyThemeFonts() {
+  const fonts = getThemeFonts(colorThemeState.id);
+  const root = document.documentElement;
+  let uiStack = null, edStack = null;
+  if (fonts) {
+    uiStack = getFontStack('ui', fonts.ui);
+    edStack = getFontStack('editor', fonts.editor);
+    if (uiStack) root.style.setProperty('--sans', uiStack);
+    if (edStack) root.style.setProperty('--serif', edStack);
+  } else {
+    root.style.removeProperty('--sans');
+    root.style.removeProperty('--serif');
+  }
+  // Cache the resolved stacks so the pre-paint script restores them instantly.
+  try { localStorage.setItem('scriptoriumActiveFonts', JSON.stringify({ ui: uiStack, editor: edStack })); } catch (e) {}
+}
+
+async function setThemeFonts(fonts) {
+  const themeId = colorThemeState.id;
+  if (isCustomThemeId(themeId)) {
+    const id = customThemeKey(themeId);
+    const t = getCustomThemeById(themeId);
+    try {
+      await fetch('/api/color-themes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name: (t && t.name) || id, vars: colorThemeState.customVars || {}, fonts })
+      });
+      await loadColorThemes();
+    } catch (err) { console.error('save theme fonts error', err); }
+  } else {
+    const map = loadBuiltinThemeFonts();
+    map[themeId] = fonts;
+    localStorage.setItem('scriptoriumThemeFonts', JSON.stringify(map));
+  }
+  applyThemeFonts();
+  populateFontSelects();
+}
+
+function populateFontSelects() {
+  const uiSelect = $('uiFontSelect');
+  const edSelect = $('editorFontSelect');
+  if (!uiSelect || !edSelect) return;
+  const current = getThemeFonts(colorThemeState.id) || {};
+  const uiList = getAllUiFonts();
+  uiSelect.innerHTML = uiList.map(f => `<option value="${escapeHtml(f.id)}">${escapeHtml(f.name)}</option>`).join('');
+  uiSelect.value = current.ui || 'inter';
+  const edList = getAllEditorFonts();
+  edSelect.innerHTML = edList.map(f => `<option value="${escapeHtml(f.id)}">${escapeHtml(f.name)}</option>`).join('');
+  edSelect.value = current.editor || 'newsreader';
+}
+
+$('uiFontSelect')?.addEventListener('change', (e) => {
+  const current = getThemeFonts(colorThemeState.id) || {};
+  setThemeFonts({ ui: e.target.value, editor: current.editor || 'newsreader' });
+});
+$('editorFontSelect')?.addEventListener('change', (e) => {
+  const current = getThemeFonts(colorThemeState.id) || {};
+  setThemeFonts({ ui: current.ui || 'inter', editor: e.target.value });
+});
+
+async function importFontFiles(files) {
+  for (const file of Array.from(files || [])) {
+    const dataBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        resolve(result.indexOf(',') !== -1 ? result.slice(result.indexOf(',') + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    try {
+      await fetch('/api/fonts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, dataBase64 })
+      });
+    } catch (err) { console.error('import font error', err); }
+  }
+  await loadCustomFonts();
+  populateFontSelects();
+  applyThemeFonts();
+  showToast('toast.font_imported');
+}
+
+$('fontImportBtn')?.addEventListener('click', () => $('fontImportInput')?.click());
+$('fontImportInput')?.addEventListener('change', (e) => {
+  importFontFiles(e.target.files);
+  e.target.value = '';
+});
 
 // ============ FONT SIZES (Settings > Apparence) ============
 // Independent sliders per heading level + body text, each an absolute px
