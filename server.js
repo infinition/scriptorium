@@ -68,6 +68,65 @@ function loadCustomTheme() {
   return null;
 }
 
+// Named custom colour themes, one JSON file per theme in <workspace>/.themes/.
+// Each file holds { name, vars } where vars maps CSS variable -> hex colour.
+function getThemesDir() {
+  return path.join(workspaceDir, '.themes');
+}
+
+function ensureThemesDir() {
+  const dir = getThemesDir();
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  } catch (err) {
+    console.error('Error creating themes dir:', err);
+    return null;
+  }
+}
+
+function listColorThemes() {
+  const dir = getThemesDir();
+  const themes = [];
+  if (!fs.existsSync(dir)) return themes;
+  for (const file of fs.readdirSync(dir)) {
+    if (!file.endsWith('.json')) continue;
+    const id = file.slice(0, -5);
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+      if (data && typeof data === 'object' && data.vars) {
+        themes.push({ id, name: (typeof data.name === 'string' && data.name.trim()) ? data.name : id, vars: data.vars });
+      }
+    } catch (err) {
+      console.error('Error reading theme', file, err);
+    }
+  }
+  return themes;
+}
+
+// The pre-2.x single custom theme (theme.custom.json) becomes a theme named
+// "Custom" in the new .themes folder, so nothing the user built is lost.
+function migrateLegacyCustomTheme() {
+  if (!fs.existsSync(CUSTOM_THEME_FILE)) return;
+  const dir = ensureThemesDir();
+  if (!dir) return;
+  const target = path.join(dir, 'custom.json');
+  if (fs.existsSync(target)) return;
+  try {
+    const vars = JSON.parse(fs.readFileSync(CUSTOM_THEME_FILE, 'utf8'));
+    if (vars && typeof vars === 'object') {
+      fs.writeFileSync(target, JSON.stringify({ name: 'Custom', vars }, null, 2), 'utf8');
+    }
+  } catch (err) {
+    console.error('Error migrating legacy custom theme:', err);
+  }
+}
+
+function slugifyThemeName(name) {
+  return String(name || 'theme').trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'theme';
+}
+
 function getIdeasDir() {
   if (ideasDirSetting && ideasDirSetting.trim() !== '') {
     return path.resolve(ideasDirSetting.trim());
@@ -443,7 +502,7 @@ Shortcuts: \`Ctrl+G\` or \`Ctrl+B\` bold, \`Ctrl+I\` italic, \`Ctrl+K\` then \`C
 The gear at the top left opens the settings.
 
 - **Folders**: workspace path and ideas folder, with a browse button.
-- **Appearance**: colour themes (Default, Ivory, Polaire, Custom), text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
+- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
 - **Language**: Français or English.
 
 ## Keyboard shortcuts
@@ -608,7 +667,7 @@ Raccourcis : \`Ctrl+G\` ou \`Ctrl+B\` gras, \`Ctrl+I\` italique, \`Ctrl+K\` puis
 L'engrenage en haut à gauche ouvre les paramètres.
 
 - **Dossiers** : chemin du dossier de travail et du dossier d'idées, avec bouton pour parcourir.
-- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire, Personnalisé), tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
+- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
 - **Langue** : Français ou English.
 
 ## Raccourcis clavier
@@ -680,19 +739,48 @@ Bonne écriture.
 
 // Ensure default workspace structure exists
 function ensureWorkspaceDirs() {
-  // Nothing to seed until the user has chosen a workspace.
+  // Creates the folder skeleton only. Demo content (welcome docs, idea themes)
+  // is seeded once, by seedNewWorkspace(), when a new empty workspace is picked
+  // — never at every startup or workspace fetch.
   if (!workspaceConfigured) return;
   try {
     if (!fs.existsSync(workspaceDir)) {
       fs.mkdirSync(workspaceDir, { recursive: true });
     }
+    const ideasDir = getIdeasDir();
+    if (!fs.existsSync(ideasDir)) {
+      fs.mkdirSync(ideasDir, { recursive: true });
+    }
+    setupWorkspaceWatcher();
+  } catch (err) {
+    console.error('Error ensuring workspace directories:', err);
+  }
+}
+
+// Fills a freshly chosen empty workspace with the bilingual welcome docs and
+// the two default idea themes. Only called when the user selects a new
+// workspace (POST /api/config) and only when that folder has no content.
+function seedNewWorkspace() {
+  try {
+    const items = fs.readdirSync(workspaceDir);
+    const resolvedIdeasDir = path.resolve(getIdeasDir());
+    const subdirs = items.filter(item => {
+      const p = path.resolve(workspaceDir, item);
+      let isDir = false;
+      try { isDir = fs.statSync(p).isDirectory(); } catch (e) {}
+      return isDir && !['.git', 'node_modules', '.themes', '.snapshots'].includes(item) && p !== resolvedIdeasDir && item !== 'ideas';
+    });
+    // A folder that already contains documents must not be polluted with demos.
+    if (subdirs.length > 0) return;
+
+    const welcomeEn = path.join(workspaceDir, 'Welcome.md');
+    const welcomeFr = path.join(workspaceDir, 'Bienvenue.md');
+    if (!fs.existsSync(welcomeEn)) fs.writeFileSync(welcomeEn, WELCOME_DEMO_EN, 'utf8');
+    if (!fs.existsSync(welcomeFr)) fs.writeFileSync(welcomeFr, WELCOME_DEMO_FR, 'utf8');
 
     const ideasDir = getIdeasDir();
     if (!fs.existsSync(ideasDir)) {
       fs.mkdirSync(ideasDir, { recursive: true });
-      
-      // Two general themes, one per language, so a fresh install starts
-      // with examples that fit any audience.
       const defaultThemes = {
         'general': {
           name: 'General ideas',
@@ -717,32 +805,13 @@ function ensureWorkspaceDirs() {
           ]
         }
       };
-
       for (const [id, theme] of Object.entries(defaultThemes)) {
         const fileContent = `# ${theme.name}\n\n` + theme.ideas.map(idea => `- [ ] ${idea}`).join('\n') + '\n';
         fs.writeFileSync(path.join(ideasDir, `${id}.md`), fileContent, 'utf8');
       }
     }
-
-    // If there are no subdirectories (excluding ideas and git), create default ones
-    const items = fs.readdirSync(workspaceDir);
-    const resolvedIdeasDir = path.resolve(ideasDir);
-    const subdirs = items.filter(item => {
-      const p = path.resolve(workspaceDir, item);
-      return fs.statSync(p).isDirectory() && !['.git', 'node_modules'].includes(item) && p !== resolvedIdeasDir && item !== 'ideas';
-    });
-
-    if (subdirs.length === 0) {
-      // Write the demo only once: never overwrite a file the user kept or
-      // edited after the first launch.
-      const welcomeEn = path.join(workspaceDir, 'Welcome.md');
-      const welcomeFr = path.join(workspaceDir, 'Bienvenue.md');
-      if (!fs.existsSync(welcomeEn)) fs.writeFileSync(welcomeEn, WELCOME_DEMO_EN, 'utf8');
-      if (!fs.existsSync(welcomeFr)) fs.writeFileSync(welcomeFr, WELCOME_DEMO_FR, 'utf8');
-    }
-    setupWorkspaceWatcher();
   } catch (err) {
-    console.error('Error ensuring workspace directories:', err);
+    console.error('Error seeding new workspace:', err);
   }
 }
 
@@ -931,6 +1000,8 @@ app.post('/api/config', (req, res) => {
   workspaceConfigured = true;
   saveConfig();
   ensureWorkspaceDirs();
+  // Demo content is only for a brand-new, empty workspace the user just picked.
+  seedNewWorkspace();
 
   res.json({
     success: true,
@@ -957,6 +1028,57 @@ app.post('/api/color-theme', (req, res) => {
   } catch (err) {
     console.error('Error saving custom theme:', err);
     res.status(500).json({ error: 'Failed to save theme' });
+  }
+});
+
+// Named custom themes, saved under <workspace>/.themes/<id>.json
+app.get('/api/color-themes', (req, res) => {
+  migrateLegacyCustomTheme();
+  res.json({ themes: listColorThemes() });
+});
+
+app.post('/api/color-themes', (req, res) => {
+  const { id, name, vars } = req.body || {};
+  if (!vars || typeof vars !== 'object' || Array.isArray(vars)) {
+    return res.status(400).json({ error: 'Invalid theme payload' });
+  }
+  const dir = ensureThemesDir();
+  if (!dir) return res.status(500).json({ error: 'Failed to save theme' });
+
+  let themeId = (typeof id === 'string' && id.trim()) ? id.trim() : slugifyThemeName(name);
+  if (!/^[A-Za-z0-9._-]+$/.test(themeId)) themeId = slugifyThemeName(name);
+  // Auto-generated ids must not overwrite an existing theme.
+  if (!(typeof id === 'string' && id.trim()) && fs.existsSync(path.join(dir, themeId + '.json'))) {
+    let n = 2;
+    while (fs.existsSync(path.join(dir, themeId + n + '.json'))) n++;
+    themeId = themeId + n;
+  }
+  const themeName = (typeof name === 'string' && name.trim()) ? name.trim() : themeId;
+  try {
+    fs.writeFileSync(path.join(dir, themeId + '.json'), JSON.stringify({ name: themeName, vars }, null, 2), 'utf8');
+    res.json({ success: true, id: themeId, name: themeName });
+  } catch (err) {
+    console.error('Error saving theme:', err);
+    res.status(500).json({ error: 'Failed to save theme' });
+  }
+});
+
+app.delete('/api/color-themes/:id', (req, res) => {
+  const id = req.params.id;
+  if (!/^[A-Za-z0-9._-]+$/.test(id)) {
+    return res.status(400).json({ error: 'Invalid theme id' });
+  }
+  const file = path.join(getThemesDir(), id + '.json');
+  try {
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Theme not found' });
+    }
+  } catch (err) {
+    console.error('Error deleting theme:', err);
+    res.status(500).json({ error: 'Failed to delete theme' });
   }
 });
 

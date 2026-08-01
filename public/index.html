@@ -40,6 +40,10 @@
 (function () {
   try {
     var id = localStorage.getItem('scriptoriumColorTheme') || 'default';
+    // Custom themes are stored server-side; only their id is in localStorage.
+    // Paint under data-theme="custom" (the CSS the app uses for custom vars)
+    // and restore the cached vars so a reload does not flash the default theme.
+    if (id && id.indexOf('custom:') === 0) id = 'custom';
     document.documentElement.setAttribute('data-theme', id);
     if (localStorage.getItem('scriptoriumMdColor') === '1') {
       document.documentElement.classList.add('md-color-on');
@@ -401,14 +405,19 @@
         </label>
 
         <div class="custom-theme-editor hidden" id="customThemeEditor">
-          <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.custom_theme_desc">Thème personnalisé &mdash; enregistré dans</span> <code>theme.custom.json</code> à la racine du projet Scriptorium.
+          <p class="modal-desc" style="margin-top: 18px;"><span data-i18n="settings.custom_theme_desc">Thème personnalisé &mdash; enregistré dans le dossier</span> <code>.themes</code> <span data-i18n="settings.custom_theme_desc_2">de votre espace de travail.</span>
           </p>
+          <div class="font-size-row" style="margin-top: 12px;">
+            <label for="customThemeName"><span data-i18n="settings.theme_name_label">Nom du thème</span></label>
+            <input type="text" id="customThemeName" class="text-input" data-i18n-placeholder="settings.theme_name_placeholder" placeholder="Mon thème" />
+          </div>
           <div class="color-field-grid" id="customThemeBaseFields"></div>
           <div class="color-field-grid-title hidden" id="customThemeSyntaxTitle"><span data-i18n="settings.syntax_colors_title">Couleurs des éléments markdown</span></div>
           <div class="color-field-grid hidden" id="customThemeSyntaxFields"></div>
           <div class="modal-actions" style="margin-top: 16px; justify-content: flex-start;">
-            <button class="btn btn-secondary" id="resetCustomThemeBtn" type="button"></button>
-            <button class="btn btn-primary" id="saveCustomThemeBtn" type="button"></button>
+            <button class="btn btn-secondary" id="resetCustomThemeBtn" type="button" data-i18n="settings.reset_theme_btn">Réinitialiser</button>
+            <button class="btn btn-primary" id="saveCustomThemeBtn" type="button" data-i18n="settings.save_theme_btn">Enregistrer</button>
+            <button class="btn btn-secondary" id="deleteCustomThemeBtn" type="button" data-i18n="settings.delete_theme_btn">Supprimer</button>
             <span class="field-hint" id="customThemeSaveStatus"></span>
           </div>
         </div>

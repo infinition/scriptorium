@@ -3533,7 +3533,31 @@ let colorThemeState = {
   id: localStorage.getItem('scriptoriumColorTheme') || 'default',
   mdColor: localStorage.getItem('scriptoriumMdColor') === '1',
   customVars: null,
+  // Named custom themes loaded from <workspace>/.themes/ ({ id, name, vars }).
+  customThemes: [],
 };
+
+// A custom theme id is "custom:<themeId>"; built-in ids are plain ('default',
+// 'ivoire', 'polaire').
+function isCustomThemeId(id) {
+  return typeof id === 'string' && id.startsWith('custom:');
+}
+function customThemeKey(id) {
+  return isCustomThemeId(id) ? id.slice('custom:'.length) : id;
+}
+function getCustomThemeById(id) {
+  const key = customThemeKey(id);
+  return colorThemeState.customThemes.find(t => t.id === key) || null;
+}
+async function loadColorThemes() {
+  try {
+    const res = await fetch('/api/color-themes');
+    const data = await res.json();
+    colorThemeState.customThemes = (data && Array.isArray(data.themes)) ? data.themes : [];
+  } catch (e) {
+    colorThemeState.customThemes = [];
+  }
+}
 
 function toHexColor(v) {
   if (v && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim())) return v.trim();
@@ -3565,20 +3589,31 @@ function getComputedThemeVars(themeId) {
   return out;
 }
 
-function applyColorTheme(id, opts = {}) {
-  colorThemeState.id = id;
+// Paints the given vars onto the "custom" data-theme and derives --accent-soft.
+function applyCustomThemeVars(vars) {
   const root = document.documentElement;
   COLOR_THEME_ALL_VARS.forEach(v => root.style.removeProperty(v));
   root.style.removeProperty('--accent-soft');
+  root.setAttribute('data-theme', 'custom');
+  COLOR_THEME_ALL_VARS.forEach(v => { if (vars && vars[v]) root.style.setProperty(v, vars[v]); });
+  const soft = vars ? deriveAccentSoft(vars['--accent']) : null;
+  if (soft) root.style.setProperty('--accent-soft', soft);
+}
 
-  if (id === 'custom') {
-    const vars = colorThemeState.customVars || getComputedThemeVars('default');
+function applyColorTheme(id, opts = {}) {
+  colorThemeState.id = id;
+  const root = document.documentElement;
+
+  if (isCustomThemeId(id)) {
+    const theme = getCustomThemeById(id);
+    const vars = (theme && theme.vars) || colorThemeState.customVars || getComputedThemeVars('default');
     colorThemeState.customVars = vars;
-    root.setAttribute('data-theme', 'custom');
-    COLOR_THEME_ALL_VARS.forEach(v => { if (vars[v]) root.style.setProperty(v, vars[v]); });
-    const soft = deriveAccentSoft(vars['--accent']);
-    if (soft) root.style.setProperty('--accent-soft', soft);
+    applyCustomThemeVars(vars);
+    // Cache for the pre-paint script so a reload paints the theme directly.
+    localStorage.setItem('scriptoriumCustomThemeVars', JSON.stringify(vars));
   } else {
+    COLOR_THEME_ALL_VARS.forEach(v => root.style.removeProperty(v));
+    root.style.removeProperty('--accent-soft');
     root.setAttribute('data-theme', id);
   }
 
@@ -3596,7 +3631,7 @@ function renderColorThemeSwatches() {
   if (!container) return;
   container.innerHTML = '';
   var themes = getBuiltinColorThemes();
-  var all = themes.concat([{ id: 'custom', name: __('appearance.theme_custom'), custom: true }]);
+  var all = themes.concat(colorThemeState.customThemes.map(t => ({ id: 'custom:' + t.id, name: t.name, custom: true })));
   all.forEach(t => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -3604,20 +3639,36 @@ function renderColorThemeSwatches() {
     const preview = t.custom
       ? `<span class="color-theme-swatch-preview custom-preview">🎨</span>`
       : `<span class="color-theme-swatch-preview" style="background:${t.bg}"><span style="background:${t.dot}"></span></span>`;
-    btn.innerHTML = `${preview}<span class="color-theme-swatch-label">${t.name}</span>`;
+    btn.innerHTML = `${preview}<span class="color-theme-swatch-label">${escapeHtml(t.name)}</span>`;
     btn.addEventListener('click', () => selectColorTheme(t.id));
     container.appendChild(btn);
   });
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'color-theme-swatch add';
+  addBtn.innerHTML = `<span class="color-theme-swatch-preview custom-preview">＋</span><span class="color-theme-swatch-label">${escapeHtml(__('settings.new_theme_btn'))}</span>`;
+  addBtn.addEventListener('click', createNewColorTheme);
+  container.appendChild(addBtn);
 }
 
 function selectColorTheme(id) {
   applyColorTheme(id);
   renderColorThemeSwatches();
   const editor = $('customThemeEditor');
-  if (editor) {
-    editor.classList.toggle('hidden', id !== 'custom');
-    if (id === 'custom') populateCustomThemeFields();
+  const isCustom = isCustomThemeId(id);
+  if (editor) editor.classList.toggle('hidden', !isCustom);
+  const nameInput = $('customThemeName');
+  if (nameInput) {
+    if (isCustom) {
+      const theme = getCustomThemeById(id);
+      nameInput.value = (theme && theme.name) || '';
+      nameInput.disabled = false;
+    } else {
+      nameInput.value = '';
+      nameInput.disabled = true;
+    }
   }
+  if (isCustom) populateCustomThemeFields();
 }
 
 function buildColorFieldGrid(containerId, fields) {
@@ -3682,24 +3733,34 @@ function onCustomColorInput(e) {
 
 $('resetCustomThemeBtn')?.addEventListener('click', () => {
   colorThemeState.customVars = getComputedThemeVars('default');
-  applyColorTheme('custom');
+  applyCustomThemeVars(colorThemeState.customVars);
   populateCustomThemeFields();
   const status = $('customThemeSaveStatus');
-  if (status) status.textContent = '';
+  if (status) status.textContent = __('save.unsaved');
 });
 
+// Persists the currently edited custom theme (name + colours) to .themes/.
 $('saveCustomThemeBtn')?.addEventListener('click', async () => {
+  if (!isCustomThemeId(colorThemeState.id)) return;
   const status = $('customThemeSaveStatus');
+  const nameInput = $('customThemeName');
+  const id = customThemeKey(colorThemeState.id);
+  const current = getCustomThemeById(colorThemeState.id);
+  const name = (nameInput && nameInput.value.trim()) || (current && current.name) || id;
   try {
-    const payload = colorThemeState.customVars || {};
-    const res = await fetch('/api/color-theme', {
+    const payload = { id, name, vars: colorThemeState.customVars || {} };
+    const res = await fetch('/api/color-themes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (data.success) {
-      localStorage.setItem('scriptoriumCustomThemeVars', JSON.stringify(payload));
+      await loadColorThemes();
+      colorThemeState.id = 'custom:' + data.id;
+      localStorage.setItem('scriptoriumColorTheme', colorThemeState.id);
+      renderColorThemeSwatches();
+      if (nameInput) nameInput.value = data.name;
       showToast('toast.custom_theme_saved');
       if (status) {
         status.textContent = __('save.saved_ok');
@@ -3713,9 +3774,63 @@ $('saveCustomThemeBtn')?.addEventListener('click', async () => {
   }
 });
 
+// Starts a brand-new named theme from the current colours.
+async function createNewColorTheme() {
+  const name = await themedPrompt(__('prompt.color_theme_name'));
+  if (!name || !name.trim()) return;
+  const base = isCustomThemeId(colorThemeState.id) ? 'default' : colorThemeState.id;
+  const vars = colorThemeState.customVars || getComputedThemeVars(base);
+  try {
+    const res = await fetch('/api/color-themes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: null, name: name.trim(), vars })
+    });
+    const data = await res.json();
+    if (data.success) {
+      await loadColorThemes();
+      colorThemeState.id = 'custom:' + data.id;
+      colorThemeState.customVars = vars;
+      localStorage.setItem('scriptoriumColorTheme', colorThemeState.id);
+      applyColorTheme(colorThemeState.id, { skipPersist: true });
+      renderColorThemeSwatches();
+      $('customThemeEditor')?.classList.remove('hidden');
+      const nameInput = $('customThemeName');
+      if (nameInput) { nameInput.value = data.name; nameInput.disabled = false; }
+      populateCustomThemeFields();
+      showToast('toast.custom_theme_saved');
+    }
+  } catch (err) {
+    console.error('create theme error', err);
+  }
+}
+
+$('deleteCustomThemeBtn')?.addEventListener('click', async () => {
+  if (!isCustomThemeId(colorThemeState.id)) return;
+  const id = customThemeKey(colorThemeState.id);
+  const theme = getCustomThemeById(colorThemeState.id);
+  const ok = await themedConfirm(__('confirm.theme_delete_custom', { name: theme ? theme.name : id }));
+  if (!ok) return;
+  try {
+    const res = await fetch('/api/color-themes/' + encodeURIComponent(id), { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      await loadColorThemes();
+      colorThemeState.id = 'default';
+      localStorage.setItem('scriptoriumColorTheme', 'default');
+      applyColorTheme('default', { skipPersist: true });
+      renderColorThemeSwatches();
+      $('customThemeEditor')?.classList.add('hidden');
+      showToast('toast.theme_deleted');
+    }
+  } catch (err) {
+    console.error('delete theme error', err);
+  }
+});
+
 $('mdColorToggle')?.addEventListener('change', (e) => {
   applyMdColor(e.target.checked);
-  if (colorThemeState.id === 'custom') populateCustomThemeFields();
+  if (isCustomThemeId(colorThemeState.id)) populateCustomThemeFields();
 });
 
 // Obsidian frontmatter visibility (Settings > Apparence)
@@ -3756,29 +3871,29 @@ async function initColorTheme() {
   if (mdToggle) mdToggle.checked = colorThemeState.mdColor;
   document.documentElement.classList.toggle('md-color-on', colorThemeState.mdColor);
 
-  try {
-    const cached = localStorage.getItem('scriptoriumCustomThemeVars');
-    if (cached) colorThemeState.customVars = JSON.parse(cached);
-  } catch (e) {}
+  await loadColorThemes();
 
-  renderColorThemeSwatches();
+  // Legacy single-custom-theme selection points at the migrated theme.
   if (colorThemeState.id === 'custom') {
-    $('customThemeEditor')?.classList.remove('hidden');
+    colorThemeState.id = getCustomThemeById('custom:custom') ? 'custom:custom' : 'default';
+    localStorage.setItem('scriptoriumColorTheme', colorThemeState.id);
+  }
+  // A saved custom theme that no longer exists on disk falls back to default.
+  if (isCustomThemeId(colorThemeState.id) && !getCustomThemeById(colorThemeState.id)) {
+    colorThemeState.id = 'default';
+    localStorage.setItem('scriptoriumColorTheme', 'default');
   }
 
-  // Server file is the source of truth; refresh the local cache from it.
-  try {
-    const res = await fetch('/api/color-theme');
-    const data = await res.json();
-    if (data && data.theme) {
-      colorThemeState.customVars = data.theme;
-      localStorage.setItem('scriptoriumCustomThemeVars', JSON.stringify(data.theme));
-      if (colorThemeState.id === 'custom') applyColorTheme('custom');
-      if ($('customThemeEditor') && !$('customThemeEditor').classList.contains('hidden')) {
-        populateCustomThemeFields();
-      }
-    }
-  } catch (e) {}
+  renderColorThemeSwatches();
+  if (isCustomThemeId(colorThemeState.id)) {
+    const theme = getCustomThemeById(colorThemeState.id);
+    colorThemeState.customVars = (theme && theme.vars) || colorThemeState.customVars || getComputedThemeVars('default');
+    applyColorTheme(colorThemeState.id, { skipPersist: true });
+    $('customThemeEditor')?.classList.remove('hidden');
+    const nameInput = $('customThemeName');
+    if (nameInput) { nameInput.value = (theme && theme.name) || ''; nameInput.disabled = false; }
+    populateCustomThemeFields();
+  }
 }
 
 // ============ FONT SIZES (Settings > Apparence) ============

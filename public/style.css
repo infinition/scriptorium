@@ -1843,6 +1843,26 @@ mark.idea-hl {
   font-weight: 500;
 }
 .color-theme-swatch.active .color-theme-swatch-label { color: var(--text); }
+/* The "+ New theme" swatch is the create affordance. */
+.color-theme-swatch.add { border-style: dashed; }
+.color-theme-swatch.add:hover { border-color: var(--accent); }
+
+/* Theme name input inside the custom theme editor */
+.custom-theme-editor .text-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.custom-theme-editor .text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 
 .custom-theme-editor.hidden { display: none; }
 .color-field-grid {
