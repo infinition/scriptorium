@@ -4736,19 +4736,19 @@ function initReadingFadeSlider() {
   slider.value = fadePct;
   valueEl.textContent = fadePct + '%';
 
-  // Live input
+  // Live input: apply the fade to the shared preview while dragging.
   slider.addEventListener('input', function () {
     var v = parseInt(this.value, 10);
     applyReadingFade(v);
     valueEl.textContent = v + '%';
     localStorage.setItem('scriptoriumReadingFade', String(v));
-    // Show the fade preview only while dragging.
-    var prev = $('fadePreview');
-    if (prev) prev.classList.remove('hidden');
+    var prev = $('fontSizePreview');
+    if (prev) prev.classList.add('fade-previewing');
   });
+  // Released: the fade preview disappears.
   slider.addEventListener('change', function () {
-    var prev = $('fadePreview');
-    if (prev) prev.classList.add('hidden');
+    var prev = $('fontSizePreview');
+    if (prev) prev.classList.remove('fade-previewing');
   });
 }
 

@@ -2239,20 +2239,9 @@ textarea {
   overflow: hidden;
 }
 
-/* Fade preview shown only while dragging the reading-fade slider. */
-.fade-preview {
-  margin-top: 10px;
-  padding: 14px 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: var(--serif);
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.7;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* Reading-fade preview applied to the shared font-size preview while the fade
+   slider is dragged, removed on release. */
+.font-size-preview.fade-previewing {
   --fade-pct: 18%;
   mask-image: linear-gradient(
     to bottom,
