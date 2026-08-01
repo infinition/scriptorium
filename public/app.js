@@ -4370,6 +4370,17 @@ $('openFolderBtn').addEventListener('click', async () => {
   }
 });
 
+// Clicking the workspace label at the bottom of the sidebar opens that folder
+// in the OS file manager.
+workspaceLabel.addEventListener('click', async () => {
+  try {
+    await fetch('/api/open-folder', { method: 'POST' });
+  } catch (err) {
+    console.error(err);
+    showToast('toast.open_failed');
+  }
+});
+
 if (sortDocsBtn) {
   updateDocSortButton();
   sortDocsBtn.addEventListener('click', () => {
