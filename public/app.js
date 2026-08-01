@@ -8789,6 +8789,15 @@ function initWorkspaceSetupModal() {
   const browseBtn = $('workspaceSetupBrowseBtn');
   const confirmBtn = $('workspaceSetupConfirmBtn');
 
+  // Language choice on first launch, English by default.
+  const langSelect = $('workspaceSetupLanguage');
+  if (langSelect) {
+    langSelect.value = getLocale() === 'fr' ? 'fr' : 'en';
+    langSelect.addEventListener('change', () => {
+      if (typeof setLocale === 'function') setLocale(langSelect.value);
+    });
+  }
+
   if (browseBtn) {
     browseBtn.addEventListener('click', () => {
       handlePickFolder(pathInput, browseBtn);

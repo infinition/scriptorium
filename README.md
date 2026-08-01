@@ -48,11 +48,12 @@ macOS on every `v*` version tag. Binaries are on the releases page:
 ## First launch
 
 On first launch, when no working folder has been configured yet, the app asks
-you to pick an existing folder or create one. The choice is saved in
-`config.json`, next to `server.js`. Change it later from the gear icon in the
-sidebar, or edit `config.json` directly.
+you to pick an existing folder or create one, and to choose the interface
+language (English by default, French available). The choices are saved in
+`config.json`, next to `server.js`. Change the folder later from the gear icon
+in the sidebar, or edit `config.json` directly.
 
-A fresh workspace is seeded with a bilingual guide (French and English)
+A fresh empty workspace is seeded with a bilingual guide (French and English)
 describing every feature, plus two general ideas themes, one per language.
 
 ## Workspace layout
@@ -86,7 +87,17 @@ the file is renamed on save.
 - **Right panel**: the button at the top of the panel cycles between ideas,
   table of contents and snapshots.
 - **Ideas**: a sentence cloud grouped by theme. Click to archive, right-click
-  to insert into the text, hover to read.
+  to insert into the text, hover to read. Drag ideas to reorder them, drop
+  them on another theme's tab to move them, or drag them into the editor to
+  insert them as blocks. Search filters the current theme.
+- **Emoji picker**: type `@@` in any text field (editor, titles, ideas) to open
+  a searchable emoji palette.
+- **Custom UI icons**: import your own icons (SVG, PNG, WebP, ICO) into the
+  `.icons` folder and replace any UI icon, per theme.
+- **Themes**: built-in and named custom themes in `.themes`, with clone, reset
+  and per-color alpha. Each theme carries its own UI font, editor font (custom
+  fonts from `.fonts`) and a background image or video (opacity slider,
+  seamless mosaic). Adjustable space between blocks and line height.
 - **Table of contents**: the headings of the document. Click a heading to jump
   to the section.
 - **Snapshots**: a document's revision history. Take a snapshot before a big
@@ -95,14 +106,21 @@ the file is renamed on save.
 - **Breadcrumb**: click it to go back to the top of the document. Click the
   filename to copy it.
 - **Focus mode** (`F`), **typewriter** (`T`), **paragraph focus** (`P`),
-  **reading mode** (`R` or `Tab`), **auto-scroll** (`A`).
+  **reading mode** (`R` or `Tab`), **auto-scroll** (`A`), **readable line
+  length** (full-width toggle).
 - **Search** (`Ctrl+P`): full text across documents and ideas.
 - **Find / Replace** (`Ctrl+F`): on the raw markdown source.
 - **Export**: print / PDF, standalone HTML, Markdown.
 - **Paste or drop an image**: it is saved into the workspace `assets/` folder
   and inserted into the text.
+- **Spell check**: corrections are applied to the raw markdown, and a
+  right-click keeps the suggestion menu working.
+- **Language**: the interface is fully translated in English and French, and
+  the choice is offered on first launch.
 - **Safety**: paths coming from the client are confined to the workspace. A
   section or document name can only ever be a single path segment.
+
+A plugin API roadmap is drafted in `docs/plugin-api-roadmap.md`.
 
 ## Keyboard shortcuts
 
