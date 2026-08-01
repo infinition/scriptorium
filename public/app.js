@@ -5762,33 +5762,34 @@ function onBlockDragEnd(e) {
   if (draggedLineNode) {
     draggedLineNode.classList.remove('dragging-line');
 
-    // Dropping a block onto the ideas panel adds its text as an idea.
+    // Dropping a block onto the ideas panel adds its text as an idea instead
+    // of deleting or moving it. The cleanup below still runs so the gutter
+    // and drag handle come back to life after the drop.
     if (isOverIdeasPanel(e.clientX, e.clientY)) {
       const text = (draggedLineNode.textContent || '').trim();
       draggedLineNode.classList.remove('delete-mode');
       if (text) addBlockTextToIdeas(text);
-      return;
-    }
+    } else {
+      const isDeleteZone = !!getDeleteEdge(e.clientX, editorWrap.getBoundingClientRect());
 
-    const isDeleteZone = !!getDeleteEdge(e.clientX, editorWrap.getBoundingClientRect());
+      if (isDeleteZone) {
+        draggedLineNode.classList.remove('delete-mode');
+        softDeleteLine(draggedLineNode);
+      } else if (targetDropLine && targetDropLine !== draggedLineNode) {
+        saveHistory(state.activeDocId, true);
 
-    if (isDeleteZone) {
-      draggedLineNode.classList.remove('delete-mode');
-      softDeleteLine(draggedLineNode);
-    } else if (targetDropLine && targetDropLine !== draggedLineNode) {
-      saveHistory(state.activeDocId, true);
+        if (dropInsertBefore) {
+          content.insertBefore(draggedLineNode, targetDropLine);
+        } else {
+          content.insertBefore(draggedLineNode, targetDropLine.nextSibling);
+        }
 
-      if (dropInsertBefore) {
-        content.insertBefore(draggedLineNode, targetDropLine);
-      } else {
-        content.insertBefore(draggedLineNode, targetDropLine.nextSibling);
+        makeLineRawAndActive(draggedLineNode);
+        markDirty();
+        updateStats();
+        saveHistory(state.activeDocId, true);
+        debouncedRegenerateTOC();
       }
-
-      makeLineRawAndActive(draggedLineNode);
-      markDirty();
-      updateStats();
-      saveHistory(state.activeDocId, true);
-      debouncedRegenerateTOC();
     }
   }
 
