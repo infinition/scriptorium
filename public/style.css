@@ -609,7 +609,11 @@ button { font: inherit; color: inherit; }
 }
 
 .editor-line {
-  min-height: 1.8em;
+  /* The line's own height: the half-leading above and below each text line
+     reads as space inside the block. Adjustable in Settings > Appearance
+     (--line-height); min-height tracks it so a single-line block is exactly
+     one line box tall. */
+  min-height: calc(var(--line-height, 1.8) * 1em);
   /* This gap *is* the insert target, so it is sized to be aimable. It used to
      be 0.5em with the hover outline drawn 3px into it from each side, leaving
      about 8px to hit. The outline is a pseudo-element now (no hit area) and the
@@ -622,7 +626,7 @@ button { font: inherit; color: inherit; }
   transition: background-color 0.15s ease;
   font-family: var(--serif);
   font-size: var(--fs-base);
-  line-height: 1.8;
+  line-height: var(--line-height, 1.8);
   color: var(--text);
 }
 

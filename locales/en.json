@@ -184,6 +184,8 @@
   "settings.reading_fade_label": "Fade size",
   "settings.block_gap_desc": "Space between blocks: the size of the line break between two paragraphs.",
   "settings.block_gap_label": "Block spacing",
+  "settings.line_height_desc": "Line height of the blocks: the space above and below the text inside a block.",
+  "settings.line_height_label": "Line height",
   "settings.cancel_btn": "Cancel",
   "settings.save_btn": "Save",
   "settings.syntax_colors_title": "Markdown element colors",

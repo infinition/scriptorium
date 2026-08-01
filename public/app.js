@@ -3882,6 +3882,38 @@ function initBlockGapControl() {
   });
 }
 
+// Line height of the blocks: the half-leading above and below each text line is
+// what reads as space inside the block, even with the gap between blocks at 0.
+const LINE_HEIGHT_DEFAULT = 1.8;
+function loadLineHeight() {
+  const raw = parseFloat(localStorage.getItem('scriptoriumLineHeight'));
+  return isFinite(raw) && raw >= 1 ? raw : LINE_HEIGHT_DEFAULT;
+}
+let lineHeightState = loadLineHeight();
+function formatLineHeight(v) {
+  return (Number.isInteger(v) ? v : Math.round(v * 100) / 100) + '';
+}
+function applyLineHeight(v) {
+  lineHeightState = v;
+  document.documentElement.style.setProperty('--line-height', String(v));
+  localStorage.setItem('scriptoriumLineHeight', String(v));
+}
+function syncLineHeightSliderUI() {
+  const input = $('lineHeightSlider');
+  const valueEl = $('lineHeightValue');
+  if (input) input.value = lineHeightState;
+  if (valueEl) valueEl.textContent = formatLineHeight(lineHeightState);
+}
+function initLineHeightControl() {
+  applyLineHeight(lineHeightState);
+  syncLineHeightSliderUI();
+  $('lineHeightSlider')?.addEventListener('input', () => {
+    applyLineHeight(parseFloat($('lineHeightSlider').value));
+    const valueEl = $('lineHeightValue');
+    if (valueEl) valueEl.textContent = formatLineHeight(lineHeightState);
+  });
+}
+
 // Settings Modal Events
 async function saveAndCloseSettings() {
   const newPath = workspacePathInput ? workspacePathInput.value.trim() : '';
@@ -7541,6 +7573,7 @@ fetchWorkspace();
 initColorTheme();
 initFontSizeControls();
 initBlockGapControl();
+initLineHeightControl();
 initProWriterTools();
 initLanguageSettings();
 initReadingFadeSlider();
