@@ -42,8 +42,9 @@ fn find_project_root() -> Option<PathBuf> {
     }
     // Walking up from the executable covers a direct run of the dev binary
     // (src-tauri/target/debug/…), packaged or ad-hoc launches. In a bundled
-    // macOS app the server lives in Contents/Resources, so that folder is
-    // checked at each level too.
+    // app the server lives in the bundle's resource folder. Tauri rewrites the
+    // leading ".." of resources that sit outside src-tauri as "_up_", so both
+    // Resources/server.js and Resources/_up_/server.js are candidates.
     if let Ok(exe) = std::env::current_exe() {
         let mut dir = exe.parent().map(|p| p.to_path_buf()).unwrap_or_default();
         for _ in 0..6 {
@@ -53,6 +54,10 @@ fn find_project_root() -> Option<PathBuf> {
             let resources = dir.join("Resources");
             if resources.join("server.js").exists() {
                 return Some(resources);
+            }
+            let up = resources.join("_up_");
+            if up.join("server.js").exists() {
+                return Some(up);
             }
             if !dir.pop() {
                 break;
@@ -172,16 +177,27 @@ fn start_server(root: &Path) -> Result<ServerHandle, String> {
         }
     }
     for &port in &CANDIDATE_PORTS {
-        // Use a bundled node binary when present (portable Windows build or a
-        // macOS/Linux bundle), else the system node on PATH.
-        let candidates = [
-            root.join("node.exe"),
-            root.join("node"),
-            root.join("bundle-node").join("node.exe"),
-            root.join("bundle-node").join("node"),
-        ];
-        let node = candidates.iter().find(|p| p.exists()).cloned()
-            .unwrap_or_else(|| PathBuf::from("node"));
+        // Use a bundled node binary when present (portable Windows build, or a
+        // macOS/Linux bundle where node sits next to the _up_ server folder),
+        // else the system node on PATH.
+        let mut node = PathBuf::from("node");
+        let mut dir = root.to_path_buf();
+        for _ in 0..4 {
+            let bn = dir.join("bundle-node");
+            let found = [
+                dir.join("node.exe"),
+                dir.join("node"),
+                bn.join("node.exe"),
+                bn.join("node"),
+            ].iter().find(|p| p.exists()).cloned();
+            if let Some(f) = found {
+                node = f;
+                break;
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
         let mut child = spawn_node(&node, root, port)
             .map_err(|e| format!("Impossible de lancer node server.js : {e}"))?;
 
