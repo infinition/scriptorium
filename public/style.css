@@ -3428,6 +3428,19 @@ mark.find-match-mark.find-match-current {
   right: -5px;
 }
 
+/* Vertical caret showing the exact insertion point while dragging an idea
+   into the editor (the idea is inserted at a caret, not between blocks). */
+.idea-drop-cursor {
+  position: absolute;
+  width: 2px;
+  background: var(--accent, #6366f1);
+  border-radius: 1px;
+  box-shadow: 0 0 6px var(--accent, #6366f1);
+  pointer-events: none;
+  display: none;
+  z-index: 95;
+}
+
 /* ============ WORKSPACE LOCK MODE ============ */
 #lockToggleBtn.locked {
   color: var(--accent, #6366f1);

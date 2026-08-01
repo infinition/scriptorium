@@ -1299,12 +1299,13 @@ function renderIdeas() {
         draggedIdea = null;
         chip.classList.remove('dragging');
         hideIdeasDropIndicator();
+        hideIdeaDropCursor();
       });
       chip.addEventListener('dragover', (e) => {
         if (draggedIdea && draggedIdea.themeId === theme.id && idea.text !== draggedIdea.text) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
-          chip.classList.add('drag-over');
+          // No border highlight on the hovered chip: the line below is the cue.
           // Show where the idea will land: above or below the hovered chip.
           const rect = chip.getBoundingClientRect();
           const before = e.clientY < rect.top + rect.height / 2;
@@ -1521,6 +1522,47 @@ function positionIdeasDropIndicator(chip, before) {
 function hideIdeasDropIndicator() {
   const ind = $('ideasDropIndicator');
   if (ind) ind.style.display = 'none';
+}
+
+// Vertical caret shown in the editor while dragging an idea, so the exact
+// insertion point is visible before release. The idea lands at a caret
+// position inside a line (see insertIdeaAtDropPoint), so a line-wide caret is
+// the accurate cue, unlike the block drag's between-blocks line.
+function positionIdeaDropCursor(x, y) {
+  const cur = $('ideaDropCursor');
+  if (!cur || !editorWrap) return;
+  const pos = (document.caretPositionFromPoint && document.caretPositionFromPoint(x, y)) || null;
+  const line = pos ? getLineForNode(pos.offsetNode) : null;
+  if (!line || !content.contains(line)) {
+    cur.style.display = 'none';
+    return;
+  }
+  // Measure the pixel position of the caret inside the line's rendered text.
+  let left = line.getBoundingClientRect().left;
+  if (pos && pos.offsetNode) {
+    let r = document.createRange();
+    r.selectNodeContents(line);
+    try {
+      r.setEnd(pos.offsetNode, pos.offset);
+    } catch (err) {
+      r = null;
+    }
+    if (r) {
+      const rect = r.getBoundingClientRect();
+      if (rect && (rect.width > 0 || rect.height > 0)) left = rect.right;
+    }
+  }
+  const wrapRect = editorWrap.getBoundingClientRect();
+  const lineRect = line.getBoundingClientRect();
+  cur.style.top = (lineRect.top - wrapRect.top + editorWrap.scrollTop) + 'px';
+  cur.style.height = lineRect.height + 'px';
+  cur.style.left = (left - wrapRect.left + editorWrap.scrollLeft) + 'px';
+  cur.style.display = 'block';
+}
+
+function hideIdeaDropCursor() {
+  const cur = $('ideaDropCursor');
+  if (cur) cur.style.display = 'none';
 }
 
 // ============ EDIT IDEA (inline) ============
@@ -6291,6 +6333,16 @@ content.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   }
+  // While dragging an idea, show the exact caret position it will land at.
+  if (draggedIdea) {
+    positionIdeaDropCursor(e.clientX, e.clientY);
+  } else {
+    hideIdeaDropCursor();
+  }
+});
+
+content.addEventListener('dragleave', (e) => {
+  if (!content.contains(e.relatedTarget)) hideIdeaDropCursor();
 });
 
 content.addEventListener('drop', (e) => {
@@ -6300,6 +6352,7 @@ content.addEventListener('drop', (e) => {
   if (draggedIdea) {
     e.preventDefault();
     e.stopPropagation();
+    hideIdeaDropCursor();
     const draggedText = draggedIdea.text;
     draggedIdea = null;
     insertIdeaAtDropPoint(draggedText, e.clientX, e.clientY);
