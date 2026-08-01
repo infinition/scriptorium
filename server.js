@@ -851,36 +851,39 @@ function seedNewWorkspace() {
     if (!fs.existsSync(welcomeEn)) fs.writeFileSync(welcomeEn, WELCOME_DEMO_EN, 'utf8');
     if (!fs.existsSync(welcomeFr)) fs.writeFileSync(welcomeFr, WELCOME_DEMO_FR, 'utf8');
 
+    // Demo idea themes, one per language. Created per file so a workspace whose
+    // ideas folder already exists still gets them on a fresh empty workspace.
     const ideasDir = getIdeasDir();
-    if (!fs.existsSync(ideasDir)) {
-      fs.mkdirSync(ideasDir, { recursive: true });
-      const defaultThemes = {
-        'general': {
-          name: 'General ideas',
-          ideas: [
-            'Each line starting with a dash is an idea',
-            'Click an idea to archive it',
-            'Right-click to insert an idea into your text',
-            'Hover an idea to read it in full',
-            'Add your own ideas, one per line',
-            'An ideas theme is just a markdown file'
-          ]
-        },
-        'général': {
-          name: 'Idées générales',
-          ideas: [
-            'Chaque ligne commençant par un tiret est une idée',
-            'Cliquez sur une idée pour l\'archiver',
-            'Clic droit pour insérer une idée dans votre texte',
-            'Survolez une idée pour la lire en entier',
-            'Ajoutez vos propres idées, une par ligne',
-            'Un thème d\'idées est simplement un fichier markdown'
-          ]
-        }
-      };
-      for (const [id, theme] of Object.entries(defaultThemes)) {
+    fs.mkdirSync(ideasDir, { recursive: true });
+    const defaultThemes = {
+      'general': {
+        name: 'General ideas',
+        ideas: [
+          'Each line starting with a dash is an idea',
+          'Click an idea to archive it',
+          'Right-click to insert an idea into your text',
+          'Hover an idea to read it in full',
+          'Add your own ideas, one per line',
+          'An ideas theme is just a markdown file'
+        ]
+      },
+      'général': {
+        name: 'Idées générales',
+        ideas: [
+          'Chaque ligne commençant par un tiret est une idée',
+          'Cliquez sur une idée pour l\'archiver',
+          'Clic droit pour insérer une idée dans votre texte',
+          'Survolez une idée pour la lire en entier',
+          'Ajoutez vos propres idées, une par ligne',
+          'Un thème d\'idées est simplement un fichier markdown'
+        ]
+      }
+    };
+    for (const [id, theme] of Object.entries(defaultThemes)) {
+      const themeFile = path.join(ideasDir, `${id}.md`);
+      if (!fs.existsSync(themeFile)) {
         const fileContent = `# ${theme.name}\n\n` + theme.ideas.map(idea => `- [ ] ${idea}`).join('\n') + '\n';
-        fs.writeFileSync(path.join(ideasDir, `${id}.md`), fileContent, 'utf8');
+        fs.writeFileSync(themeFile, fileContent, 'utf8');
       }
     }
   } catch (err) {
