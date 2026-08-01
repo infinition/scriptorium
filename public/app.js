@@ -169,8 +169,10 @@ async function onWorkspaceChangedExternally() {
   }
   await fetchWorkspace();
   if (state.activeDocId) {
-    const doc = activeDoc();
-    if (doc) loadDocIntoEditor(doc);
+    // Reload the active document so an external edit shows up. fetchWorkspace
+    // already refreshed its content from disk, and loadActiveDoc clears the
+    // editor cleanly if the document was deleted elsewhere.
+    loadActiveDoc();
   }
 }
 

@@ -981,7 +981,7 @@ button { font: inherit; color: inherit; }
 .preview h4, .preview-content h4, .content-area h4 { font-size: var(--fs-h4); }
 .preview h5, .preview-content h5, .content-area h5 { font-size: var(--fs-h5); text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
 .preview h6, .preview-content h6, .content-area h6 { font-size: var(--fs-h6); color: var(--text-muted); }
-.preview p, .preview-content p, .content-area p { margin: 0 0 0.8em; }
+.preview p, .preview-content p { margin: 0 0 0.8em; }
 .preview strong, .preview-content strong, .content-area strong { color: var(--text); font-weight: 600; }
 .preview em, .preview-content em, .content-area em { font-style: italic; }
 .preview u, .preview-content u, .content-area u { text-decoration: underline; text-decoration-color: var(--text-muted); text-underline-offset: 3px; }

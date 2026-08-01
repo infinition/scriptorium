@@ -506,10 +506,15 @@ function setupWorkspaceWatcher() {
       if (!filename) return;
       const base = path.basename(filename);
       if (base.startsWith('.') || filename.includes('.trash') || filename.includes('.snapshots')) return;
+      // Only real document edits matter for an external-change reload. Everything
+      // else (assets, ideas, the app's own settings writes, and the many spurious
+      // events Windows recursive fs.watch emits) would re-fire workspace-changed
+      // on the app's own writes and disturb the caret while the user is clicking
+      // in the editor.
+      if (!/\.(md|markdown|txt)$/i.test(filename)) return;
       clearTimeout(watcherTimer);
       watcherTimer = setTimeout(() => {
-        // TEMP disabled to test the click-caret bug
-        // broadcastEvent('workspace-changed', { filename });
+        broadcastEvent('workspace-changed', { filename });
       }, 350);
     });
   } catch (err) {}
