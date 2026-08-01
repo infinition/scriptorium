@@ -293,6 +293,10 @@ pub fn run() {
                 .inner_size(1200.0, 800.0)
                 .min_inner_size(320.0, 480.0)
                 .resizable(true)
+                // Tauri's native drop handler intercepts drags before the DOM
+                // sees them: dragstart fires but dragover/drop never do. Off
+                // so the app's own HTML5 drag and drop (ideas, files) works.
+                .disable_drag_drop_handler()
                 .center()
                 .build()
             {

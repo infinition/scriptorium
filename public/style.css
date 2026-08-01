@@ -1018,6 +1018,20 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
   transition: opacity 0.2s ease;
   min-width: 0;
+  position: relative;
+}
+
+/* Horizontal line showing where an idea lands during a reorder drag. */
+.ideas-drop-indicator {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  display: none;
+  pointer-events: none;
+  z-index: 5;
 }
 
 .ideas-header {

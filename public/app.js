@@ -1298,23 +1298,35 @@ function renderIdeas() {
       chip.addEventListener('dragend', () => {
         draggedIdea = null;
         chip.classList.remove('dragging');
+        hideIdeasDropIndicator();
       });
       chip.addEventListener('dragover', (e) => {
         if (draggedIdea && draggedIdea.themeId === theme.id && idea.text !== draggedIdea.text) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
           chip.classList.add('drag-over');
+          // Show where the idea will land: above or below the hovered chip.
+          const rect = chip.getBoundingClientRect();
+          const before = e.clientY < rect.top + rect.height / 2;
+          chip.dataset.dropPos = before ? 'before' : 'after';
+          positionIdeasDropIndicator(chip, before);
         }
       });
-      chip.addEventListener('dragleave', () => chip.classList.remove('drag-over'));
+      chip.addEventListener('dragleave', () => {
+        chip.classList.remove('drag-over');
+        hideIdeasDropIndicator();
+      });
       chip.addEventListener('drop', (e) => {
         e.preventDefault();
         e.stopPropagation();
         chip.classList.remove('drag-over');
+        hideIdeasDropIndicator();
         if (draggedIdea && draggedIdea.themeId === theme.id && idea.text !== draggedIdea.text) {
           const draggedText = draggedIdea.text;
+          const after = chip.dataset.dropPos === 'after';
+          delete chip.dataset.dropPos;
           draggedIdea = null;
-          reorderIdeas(theme, draggedText, idea.text);
+          reorderIdeas(theme, draggedText, idea.text, after);
         }
       });
 
@@ -1435,13 +1447,20 @@ function insertIdeaAtDropPoint(text, x, y) {
 
 // Reorders the active ideas of a theme so `draggedText` sits just before
 // `beforeText`. Persisted by rewriting the theme file.
-async function reorderIdeas(theme, draggedText, beforeText) {
+async function reorderIdeas(theme, draggedText, beforeText, after) {
   const active = theme.ideas.filter(i => !i.archived);
   const dragged = active.find(i => i.text === draggedText);
   if (!dragged) return;
   const rest = active.filter(i => i.text !== draggedText);
-  const idx = beforeText ? rest.findIndex(i => i.text === beforeText) : rest.length;
-  const newActive = idx === -1 ? [...rest, dragged] : [...rest.slice(0, idx), dragged, ...rest.slice(idx)];
+  let idx;
+  if (beforeText) {
+    idx = rest.findIndex(i => i.text === beforeText);
+    if (idx !== -1 && after) idx += 1;
+  } else {
+    idx = after ? rest.length : 0;
+  }
+  if (idx < 0) idx = rest.length;
+  const newActive = [...rest.slice(0, idx), dragged, ...rest.slice(idx)];
   const order = newActive.map(i => i.text);
   try {
     const res = await fetch('/api/ideas/reorder', {
@@ -1483,6 +1502,25 @@ async function moveIdeaToTheme(dragged, targetTheme) {
   } catch (err) {
     console.error('move idea error', err);
   }
+}
+
+// The horizontal line shown between idea bubbles during a reorder drag, so the
+// drop position is visible before releasing (same cue as the editor's blocks).
+function positionIdeasDropIndicator(chip, before) {
+  const ind = $('ideasDropIndicator');
+  if (!ind || !ideasPanel) return;
+  const panelRect = ideasPanel.getBoundingClientRect();
+  const chipRect = chip.getBoundingClientRect();
+  const y = before ? chipRect.top : chipRect.bottom;
+  ind.style.top = (y - panelRect.top - 1) + 'px';
+  ind.style.left = '6px';
+  ind.style.width = (panelRect.width - 12) + 'px';
+  ind.style.display = 'block';
+}
+
+function hideIdeasDropIndicator() {
+  const ind = $('ideasDropIndicator');
+  if (ind) ind.style.display = 'none';
 }
 
 // ============ EDIT IDEA (inline) ============
@@ -4010,14 +4048,18 @@ function processDraggedText(text) {
 
 // Ideas Panel Drag and Drop (Text and Files)
 ideasPanel.addEventListener('dragover', (e) => {
+  // An idea being reordered or moved handles its own chip/tab highlight; the
+  // whole-panel target state is only for external drops.
+  if (draggedIdea) return;
+
   const hasText = e.dataTransfer.types.includes('text/plain');
   const hasFiles = e.dataTransfer.types.includes('Files');
-  
+
   if (hasText || hasFiles) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     ideasPanel.classList.add('drag-over');
-    
+
     // Highlight "+ ajouter une idée" button for text drag only
     if (hasText && !hasFiles) {
       const addBtn = ideasPanel.querySelector('.idea-add');
@@ -4045,7 +4087,15 @@ ideasPanel.addEventListener('drop', async (e) => {
     addBtn.classList.remove('drag-target-active');
     addBtn.textContent = __('ideas.add_button');
   }
-  
+
+  // An idea dropped on empty panel space is not an external add: the chip
+  // handlers already dealt with reorders, so this only cancels the drag.
+  if (draggedIdea) {
+    e.preventDefault();
+    draggedIdea = null;
+    return;
+  }
+
   if (e.dataTransfer.files.length > 0) {
     e.preventDefault();
     Array.from(e.dataTransfer.files).forEach(file => {
