@@ -2406,6 +2406,21 @@ function loadContentMarkdown(markdown) {
   activeLineNode = null;
   // Group multi-line constructs (code fences, callouts, tables) + syntax highlight
   postProcessRenderedLines();
+  // Activate the first block so a freshly opened document is immediately
+  // draggable: the block handle only exists on an active line, and without one
+  // the user had to click a block (or drag an idea in) before being able to
+  // drag any block, e.g. onto the ideas panel.
+  const first = content.firstElementChild;
+  if (first && first.classList.contains('editor-line')) {
+    activeLineNode = first;
+    activeLineNode.classList.add('active-line');
+    const rawText = activeLineNode.dataset.raw !== undefined ? activeLineNode.dataset.raw : activeLineNode.textContent;
+    activeLineNode.dataset.rawOnActivate = rawText;
+    activeLineNode.textContent = rawText;
+    applyLineKind(activeLineNode, rawText);
+    updateBlockAddPosition();
+    updateBlockDragPosition();
+  }
 }
 
 // ============ LINE KIND (visual stability between edit/rendered states) ============
