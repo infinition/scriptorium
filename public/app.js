@@ -6843,6 +6843,7 @@ let textJustifyState = localStorage.getItem('scriptoriumTextJustify') === 'true'
 let spellcheckState = localStorage.getItem('scriptoriumSpellcheck') !== 'false';
 let typewriterState = localStorage.getItem('scriptoriumTypewriter') === 'true';
 let focusLineState = localStorage.getItem('scriptoriumFocusLine') === 'true';
+let fullWidthState = localStorage.getItem('scriptoriumFullWidth') === 'true';
 let readingModeState = parseInt(localStorage.getItem('scriptoriumReading')) || 0;
 // 0 = off, 1 = reading, 2 = reading-typewriter
 let autoScrollState = 0; // 0=off, 1=slow, 2=medium, 3=normal
@@ -6859,6 +6860,15 @@ function applyTextJustify(enable) {
   if (btn) btn.classList.toggle('active', enable);
   localStorage.setItem('scriptoriumTextJustify', enable ? 'true' : 'false');
   showToast('toast.text_justified');
+}
+
+function applyFullWidth(enable) {
+  fullWidthState = enable;
+  document.documentElement.classList.toggle('full-line-length', enable);
+  const btn = $('lineLengthBtn');
+  if (btn) btn.classList.toggle('active', enable);
+  localStorage.setItem('scriptoriumFullWidth', enable ? 'true' : 'false');
+  showToast(enable ? 'toast.line_length_on' : 'toast.line_length_off');
 }
 
 function applySpellcheck(enable) {
@@ -7419,11 +7429,13 @@ function initProWriterTools() {
   applySpellcheck(spellcheckState);
   applyTypewriterMode(typewriterState);
   applyFocusLineMode(focusLineState);
+  applyFullWidth(fullWidthState);
   applyReadingMode(readingModeState);
 
   $('undoBtn')?.addEventListener('click', () => performUndo());
   $('redoBtn')?.addEventListener('click', () => performRedo());
   $('justifyBtn')?.addEventListener('click', () => applyTextJustify(!textJustifyState));
+  $('lineLengthBtn')?.addEventListener('click', () => applyFullWidth(!fullWidthState));
   $('spellcheckBtn')?.addEventListener('click', () => applySpellcheck(!spellcheckState));
   $('typewriterToggle')?.addEventListener('click', () => applyTypewriterMode(!typewriterState));
   $('focusLineBtn')?.addEventListener('click', () => applyFocusLineMode(!focusLineState));

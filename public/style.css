@@ -598,6 +598,10 @@ button { font: inherit; color: inherit; }
   padding: 40px 40px 40vh;
   transition: all 0.3s ease;
 }
+/* "Readable line length" toggle: off lets the text fill the whole editor column. */
+.full-line-length .editor-container {
+  max-width: none;
+}
 
 .editor-pane {
   min-width: 0;

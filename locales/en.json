@@ -297,6 +297,7 @@
 
   "statusbar.remove_empty_title": "Remove all empty lines from the document",
   "statusbar.justify_title": "Justify text (align left and right)",
+  "statusbar.line_length_title": "Readable line length (toggle full width)",
   "statusbar.spellcheck_title": "Spell check",
   "statusbar.undo_title": "Undo (Ctrl+Z)",
   "statusbar.redo_title": "Redo (Ctrl+Shift+Z)",
@@ -443,6 +444,8 @@
   "toast.blocks_merged": "Blocks merged",
   "toast.blocks_deleted": "Blocks deleted",
   "toast.text_justified": "Text justified",
+  "toast.line_length_on": "Full line length",
+  "toast.line_length_off": "Readable line length",
   "toast.spellcheck_toggled": "Spell check {state}",
   "toast.typewriter_on": "Typewriter mode on",
   "toast.typewriter_off": "Typewriter mode off",

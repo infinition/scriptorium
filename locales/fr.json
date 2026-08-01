@@ -294,6 +294,7 @@
 
   "statusbar.remove_empty_title": "Supprimer toutes les lignes vides du document",
   "statusbar.justify_title": "Justifier le texte (aligner \u00e0 gauche et \u00e0 droite)",
+  "statusbar.line_length_title": "Longueur de ligne lisible (basculer en pleine largeur)",
   "statusbar.spellcheck_title": "V\u00e9rification orthographique (Correcteur)",
   "statusbar.undo_title": "Annuler (Ctrl+Z)",
   "statusbar.redo_title": "Répéter (Ctrl+Shift+Z)",
@@ -440,6 +441,8 @@
   "toast.blocks_merged": "Blocs fusionn\u00e9s",
   "toast.blocks_deleted": "Blocs supprim\u00e9s",
   "toast.text_justified": "Texte justifi\u00e9",
+  "toast.line_length_on": "Pleine largeur",
+  "toast.line_length_off": "Longueur de ligne lisible",
   "toast.spellcheck_toggled": "Correcteur {state}",
   "toast.typewriter_on": "Mode machine \u00e0 \u00e9crire activ\u00e9",
   "toast.typewriter_off": "Mode machine \u00e0 \u00e9crire d\u00e9sactiv\u00e9",
