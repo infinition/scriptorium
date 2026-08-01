@@ -2406,21 +2406,6 @@ function loadContentMarkdown(markdown) {
   activeLineNode = null;
   // Group multi-line constructs (code fences, callouts, tables) + syntax highlight
   postProcessRenderedLines();
-  // Activate the first block so a freshly opened document is immediately
-  // draggable: the block handle only exists on an active line, and without one
-  // the user had to click a block (or drag an idea in) before being able to
-  // drag any block, e.g. onto the ideas panel.
-  const first = content.firstElementChild;
-  if (first && first.classList.contains('editor-line')) {
-    activeLineNode = first;
-    activeLineNode.classList.add('active-line');
-    const rawText = activeLineNode.dataset.raw !== undefined ? activeLineNode.dataset.raw : activeLineNode.textContent;
-    activeLineNode.dataset.rawOnActivate = rawText;
-    activeLineNode.textContent = rawText;
-    applyLineKind(activeLineNode, rawText);
-    updateBlockAddPosition();
-    updateBlockDragPosition();
-  }
 }
 
 // ============ LINE KIND (visual stability between edit/rendered states) ============
@@ -6554,11 +6539,21 @@ function hideDeleteZones() {
   if (deleteZoneRightEl) deleteZoneRightEl.style.display = 'none';
 }
 
+// The block the drag handle applies to: the active line when one is being
+// edited, otherwise the hovered block so a freshly opened document (no active
+// line) can still drag any block, e.g. onto the ideas panel.
+function getBlockHandleTarget() {
+  if (activeLineNode && content.contains(activeLineNode)) return activeLineNode;
+  if (hoveredLineNode && content.contains(hoveredLineNode)) return hoveredLineNode;
+  return null;
+}
+
 function updateBlockDragPosition() {
   if (!blockDragBtn) return;
   if (isDraggingBlock) return; // Keep visible while dragging
 
-  if (!activeLineNode || !content.contains(activeLineNode)) {
+  const target = getBlockHandleTarget();
+  if (!target) {
     blockDragBtn.classList.remove('visible');
     return;
   }
@@ -6568,7 +6563,7 @@ function updateBlockDragPosition() {
     return;
   }
 
-  const rect = activeLineNode.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
   const editorRect = editorWrap.getBoundingClientRect();
   // Hide if the line is scrolled off the editor's visible viewport
   if (rect.bottom < editorRect.top + 20 || rect.top > editorRect.bottom - 20) {
@@ -6927,8 +6922,9 @@ if (blockDragBtn) {
     if (e.button !== 0) return; // left button only — a right-click here must not start a drag
     e.preventDefault();
     e.stopPropagation();
-    if (activeLineNode) {
-      startBlockDrag(activeLineNode, e);
+    const target = getBlockHandleTarget();
+    if (target) {
+      startBlockDrag(target, e);
     }
   });
 }
@@ -9246,6 +9242,9 @@ function setHoveredLine(line) {
   if (hoveredLineNode) hoveredLineNode.classList.remove('line-hover-outline');
   hoveredLineNode = line;
   if (hoveredLineNode) hoveredLineNode.classList.add('line-hover-outline');
+  // No active line yet (fresh document): the drag handle follows the hover so
+  // any block can be dragged without activating it first.
+  if (!activeLineNode) updateBlockDragPosition();
 }
 
 // Hover previews the mode on a mouse. The whole editor is watched now, not
