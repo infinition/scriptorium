@@ -4511,6 +4511,50 @@ content.addEventListener('input', () => {
 content.addEventListener('beforeinput', (e) => {
   if (e.inputType === 'historyUndo' || e.inputType === 'historyRedo') {
     e.preventDefault();
+    return;
+  }
+  // Spellcheck correction on a rendered (non-active) block: the browser edits
+  // the displayed text, but the saved source lives in dataset.raw, so the fix
+  // would be lost on the next render. Switch that block to raw edit mode and
+  // apply the replacement to the raw markdown instead.
+  if (e.inputType === 'insertReplacementText' && !readingModeState) {
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const line = getLineForNode(range.startContainer);
+    if (!line || line === activeLineNode || !content.contains(line)) return;
+    e.preventDefault();
+    const replacement = (e.data != null) ? String(e.data) : '';
+    const word = range.toString();
+    const renderedStart = rangeOffsetIn(line, range.startContainer, range.startOffset);
+    makeLineRawAndActive(line);
+    const raw = line.textContent;
+    // Locate the misspelled word in the raw source, preferring the occurrence
+    // nearest the caret (renderedToRawOffset is exact only for block prefixes,
+    // so a nearest-index search handles words inside **bold** etc.).
+    let rawStart = -1;
+    if (word) {
+      const approx = renderedToRawOffset(line, renderedStart);
+      let best = -1, bestDist = Infinity;
+      let from = 0;
+      while (true) {
+        const idx = raw.indexOf(word, from);
+        if (idx === -1) break;
+        const dist = Math.abs(idx - approx);
+        if (dist < bestDist) { bestDist = dist; best = idx; }
+        from = idx + 1;
+      }
+      rawStart = best;
+    }
+    if (rawStart === -1) rawStart = renderedToRawOffset(line, renderedStart);
+    const newRaw = raw.slice(0, rawStart) + replacement + raw.slice(rawStart + word.length);
+    line.textContent = newRaw;
+    line.dataset.raw = newRaw;
+    setCaretInLine(line, rawStart + replacement.length);
+    markDirty();
+    updateStats();
+    saveHistory(state.activeDocId, true);
+    debouncedRegenerateTOC();
   }
 });
 
