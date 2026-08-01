@@ -4129,9 +4129,9 @@ async function loadAppMedia() {
 }
 
 // Video ping-pong: play forward, reverse at the end, forward again at 0.
-// WebView2 neither honours a negative playbackRate nor fires reliable events
-// here, so a single rAF loop drives it: native forward playback until near the
-// end, pause, then step currentTime backwards to 0, then resume forward.
+// Prefers a negative playbackRate (native, smooth reverse); falls back to
+// manual currentTime stepping where the engine clamps it. A rAF loop watches
+// both ends so the direction flips reliably.
 function setupVideoLoop(video, mode) {
   if (mode !== 'reverse') {
     video.loop = true;
@@ -4139,27 +4139,39 @@ function setupVideoLoop(video, mode) {
     return;
   }
   video.loop = false;
+
+  // Detect whether the engine actually honours a negative playback rate.
+  video.playbackRate = -1;
+  const supportsReverse = video.playbackRate < 0;
   video.playbackRate = 1;
+
   let dir = 1; // 1 forward, -1 reverse
 
   const tick = () => {
     if (!video.isConnected) return; // background changed: stop the loop
     requestAnimationFrame(tick);
     if (!video.duration) return;
+
     if (dir === 1) {
-      if (video.currentTime >= video.duration - 0.08) {
-        video.pause();
+      if (video.currentTime >= video.duration - 0.05) {
         dir = -1;
+        if (supportsReverse) {
+          video.playbackRate = -1;
+        } else {
+          video.pause();
+        }
       }
-    } else {
-      const t = video.currentTime - (1 / 60);
-      if (t <= 0) {
-        video.currentTime = 0;
-        dir = 1;
-        video.play().catch(() => {});
+    } else if (video.currentTime <= 0.05) {
+      dir = 1;
+      if (supportsReverse) {
+        video.playbackRate = 1;
       } else {
-        video.currentTime = t;
+        video.currentTime = 0;
+        video.play().catch(() => {});
       }
+    } else if (!supportsReverse) {
+      // Manual backward stepping (jankier, but always works).
+      video.currentTime = video.currentTime - (1 / 60);
     }
   };
   requestAnimationFrame(tick);
