@@ -5739,6 +5739,9 @@ function onBlockDragMove(e) {
     blockDragGhostEl.classList.remove('delete-mode');
     draggedLineNode.classList.remove('delete-mode');
     if (blockDropIndicator) blockDropIndicator.style.display = 'none';
+    // Dropping among the ideas has nothing to do with deletion: the red edge
+    // zones must not stay visible over the panel.
+    hideDeleteZones();
     updateBlockIdeaDropPosition(e.clientX, e.clientY);
   } else {
     blockDragGhostEl.classList.remove('delete-mode');

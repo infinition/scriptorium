@@ -593,7 +593,9 @@ button { font: inherit; color: inherit; }
   min-height: 100%;
   max-width: 740px;
   margin: 0 auto;
-  padding: 40px 20px 40vh;
+  /* 40px sides (like the 40px top): room for the block add/drag controls so
+     they never reach into the sidebars, symmetric left and right. */
+  padding: 40px 40px 40vh;
   transition: all 0.3s ease;
 }
 
@@ -1953,7 +1955,7 @@ mark.idea-hl {
   .app { grid-template-columns: 230px 1fr 0; }
   .app.show-ideas { grid-template-columns: 0 1fr 320px; }
   .app.show-ideas .sidebar { opacity: 0; pointer-events: none; }
-  .editor-container { padding: 30px 24px 35vh; gap: 30px; }
+  .editor-container { padding: 30px 40px 35vh; gap: 30px; }
 }
 
 @media (max-width: 720px) {
