@@ -113,9 +113,58 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Full-app background layer: image or video behind the grid, optional mosaic. */
+.app-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.app-bg.active { opacity: 1; }
+.app-bg.mosaic {
+  background-size: auto;
+  background-repeat: repeat;
+  background-position: 0 0;
+}
+.app-bg video,
+.app-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.app-bg.mosaic video,
+.app-bg.mosaic img {
+  width: auto;
+  height: auto;
+  object-fit: none;
+  max-width: none;
+  max-height: none;
+}
+
+/* When a background image/video is active, the three app columns become
+   translucent so the media shows through (opacity of the media = 1 minus the
+   columns' opacity). Children stay transparent and inherit that background. */
+.has-app-bg .sidebar,
+.has-app-bg .main,
+.has-app-bg .ideas-panel {
+  background-color: color-mix(in srgb, var(--bg) calc((1 - var(--bg-media-opacity, 0)) * 100%), transparent);
+}
+.has-app-bg .statusbar {
+  background: transparent;
+}
+
 button { font: inherit; color: inherit; }
 
 .app {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 260px 1fr 340px;
   /* 100vh on mobile counts the browser chrome as visible, which pushes the

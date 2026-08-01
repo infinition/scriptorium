@@ -78,6 +78,7 @@
 </script>
 </head>
 <body>
+<div class="app-bg" id="appBg" aria-hidden="true"></div>
 <div class="app" id="app">
 
   <div class="backdrop" id="backdrop"></div>
@@ -415,6 +416,32 @@
             <button type="button" class="btn btn-secondary" id="fontImportBtn" data-i18n="settings.import_font_btn">Importer… (.fonts)</button>
             <input type="file" id="fontImportInput" accept=".ttf,.otf,.woff,.woff2" multiple class="hidden" />
           </div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <p class="modal-desc"><span data-i18n="settings.bg_desc">Fond de l'application : une image ou une vidéo derrière toute l'interface.</span></p>
+          <div class="font-size-row">
+            <label for="appBgSelect"><span data-i18n="settings.bg_label">Fond</span></label>
+            <select id="appBgSelect" class="text-select"></select>
+          </div>
+          <div class="font-size-row">
+            <label for="appBgOpacitySlider"><span data-i18n="settings.bg_opacity_label">Opacité</span></label>
+            <input type="range" id="appBgOpacitySlider" min="0" max="100" step="1" value="25" />
+            <span class="font-size-value" id="appBgOpacityValue">25%</span>
+          </div>
+          <div class="font-size-row hidden" id="appBgVideoModeRow">
+            <label for="appBgVideoMode"><span data-i18n="settings.bg_video_mode_label">Boucle vidéo</span></label>
+            <select id="appBgVideoMode" class="text-select"></select>
+          </div>
+          <label class="checkbox-row hidden" id="appBgMosaicRow" style="margin-top: 10px;">
+            <input type="checkbox" id="appBgMosaic" />
+            <span data-i18n="settings.bg_mosaic_label">Mosaïque (texture seamless répétée)</span>
+          </label>
+          <div class="font-size-row" style="margin-top: 8px; gap: 8px;">
+            <button type="button" class="btn btn-secondary" id="appBgImportBtn" data-i18n="settings.bg_import_btn">Importer… (.media)</button>
+            <button type="button" class="btn btn-secondary" id="appBgClearBtn" data-i18n="settings.bg_clear_btn">Aucun fond</button>
+          </div>
+          <input type="file" id="appBgImportInput" accept=".png,.jpg,.jpeg,.gif,.webp,.svg,.mp4,.webm,.mov,.ogv" multiple class="hidden" />
         </div>
 
         <label class="checkbox-row" style="margin-top: 18px;">

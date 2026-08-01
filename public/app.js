@@ -4098,6 +4098,213 @@ $('fontImportInput')?.addEventListener('change', (e) => {
   e.target.value = '';
 });
 
+// ============ APP BACKGROUND (image / video) ============
+// A full-window layer behind the whole app: image (cover or seamless mosaic)
+// or video (loop: repeat or ping-pong reverse), with an opacity slider.
+
+function loadAppBackground() {
+  try {
+    const raw = localStorage.getItem('scriptoriumAppBackground');
+    if (!raw) return null;
+    const bg = JSON.parse(raw);
+    return (bg && bg.src) ? bg : null;
+  } catch (e) { return null; }
+}
+function saveAppBackground(bg) {
+  try {
+    if (bg && bg.src) localStorage.setItem('scriptoriumAppBackground', JSON.stringify(bg));
+    else localStorage.removeItem('scriptoriumAppBackground');
+  } catch (e) {}
+}
+
+let appBackgroundState = loadAppBackground();
+let appMediaFiles = []; // { id, name, url, type } from <workspace>/.media/
+
+async function loadAppMedia() {
+  try {
+    const res = await fetch('/api/media');
+    const data = await res.json();
+    appMediaFiles = (data && Array.isArray(data.media)) ? data.media : [];
+  } catch (e) { appMediaFiles = []; }
+}
+
+// Video ping-pong: play forward, reverse at the end, forward again at 0.
+function setupVideoLoop(video, mode) {
+  if (mode !== 'reverse') {
+    video.loop = true;
+    video.playbackRate = 1;
+    return;
+  }
+  video.loop = false;
+  let dir = 1;
+  video.addEventListener('timeupdate', () => {
+    if (!video.duration || video.seeking) return;
+    if (dir === 1 && video.currentTime >= video.duration - 0.05) {
+      dir = -1;
+      video.playbackRate = -1;
+    } else if (dir === -1 && video.currentTime <= 0.05) {
+      dir = 1;
+      video.playbackRate = 1;
+    }
+  });
+  video.addEventListener('ended', () => { video.currentTime = video.duration - 0.02; video.play(); });
+}
+
+function applyAppBackground(bg) {
+  const layer = $('appBg');
+  if (!layer) return;
+  layer.innerHTML = '';
+  layer.classList.remove('mosaic');
+  layer.style.backgroundImage = 'none';
+  document.documentElement.classList.toggle('has-app-bg', !!(bg && bg.src));
+  if (!bg || !bg.src) {
+    layer.style.opacity = '0';
+    document.documentElement.style.removeProperty('--bg-media-opacity');
+    return;
+  }
+  const opacity = typeof bg.opacity === 'number' ? Math.max(0, Math.min(1, bg.opacity)) : 0.25;
+  document.documentElement.style.setProperty('--bg-media-opacity', String(opacity));
+
+  const mosaic = bg.type === 'image' && !!bg.mosaic;
+  layer.classList.toggle('mosaic', mosaic);
+
+  if (bg.type === 'image') {
+    layer.style.backgroundImage = `url('${bg.src}')`;
+    layer.style.backgroundSize = mosaic ? 'auto' : 'cover';
+    layer.style.backgroundRepeat = mosaic ? 'repeat' : 'no-repeat';
+  } else if (bg.type === 'video') {
+    const video = document.createElement('video');
+    video.src = bg.src;
+    video.muted = true;
+    video.autoplay = true;
+    video.loop = false;
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    layer.appendChild(video);
+    const play = () => { video.play().catch(() => {}); };
+    video.addEventListener('canplay', play);
+    play();
+    setupVideoLoop(video, bg.videoMode || 'repeat');
+  }
+  layer.style.opacity = String(opacity);
+}
+
+function setAppBackground(bg) {
+  appBackgroundState = (bg && bg.src) ? bg : null;
+  saveAppBackground(appBackgroundState);
+  applyAppBackground(appBackgroundState);
+  syncAppBackgroundUI();
+}
+
+async function importAppMediaFiles(files) {
+  for (const file of Array.from(files || [])) {
+    const dataBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        resolve(result.indexOf(',') !== -1 ? result.slice(result.indexOf(',') + 1) : result);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    try {
+      await fetch('/api/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, dataBase64 })
+      });
+    } catch (err) { console.error('import media error', err); }
+  }
+  await loadAppMedia();
+  syncAppBackgroundUI();
+  showToast('toast.media_imported');
+}
+
+function syncAppBackgroundUI() {
+  const select = $('appBgSelect');
+  if (!select) return;
+  const bg = appBackgroundState;
+
+  const opts = [{ id: '', name: __('settings.bg_none') }].concat(
+    appMediaFiles.map(m => ({ id: m.id, name: m.name }))
+  );
+  select.innerHTML = opts.map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)}</option>`).join('');
+  select.value = bg ? bg.src.split('/').pop() : '';
+
+  const isVideo = !!(bg && bg.type === 'video');
+  const isImage = !!(bg && bg.type === 'image');
+  $('appBgVideoModeRow')?.classList.toggle('hidden', !isVideo);
+  $('appBgMosaicRow')?.classList.toggle('hidden', !isImage);
+
+  const videoMode = $('appBgVideoMode');
+  if (videoMode) {
+    videoMode.innerHTML = `
+      <option value="repeat">${escapeHtml(__('settings.bg_video_repeat'))}</option>
+      <option value="reverse">${escapeHtml(__('settings.bg_video_reverse'))}</option>`;
+    videoMode.value = (bg && bg.videoMode) || 'repeat';
+  }
+
+  const mosaic = $('appBgMosaic');
+  if (mosaic) mosaic.checked = !!(bg && bg.mosaic);
+
+  const op = bg ? bg.opacity : 0.25;
+  const slider = $('appBgOpacitySlider');
+  const valueEl = $('appBgOpacityValue');
+  if (slider) slider.value = Math.round(op * 100);
+  if (valueEl) valueEl.textContent = Math.round(op * 100) + '%';
+}
+
+async function initAppBackgroundControl() {
+  applyAppBackground(appBackgroundState);
+  await loadAppMedia();
+  syncAppBackgroundUI();
+
+  $('appBgSelect')?.addEventListener('change', (e) => {
+    const media = appMediaFiles.find(m => m.id === e.target.value);
+    if (!media) { setAppBackground(null); return; }
+    setAppBackground({
+      src: media.url,
+      type: media.type,
+      opacity: appBackgroundState ? appBackgroundState.opacity : 0.25,
+      videoMode: (appBackgroundState && appBackgroundState.videoMode) || 'repeat',
+      mosaic: (appBackgroundState && appBackgroundState.mosaic) || false
+    });
+  });
+
+  $('appBgOpacitySlider')?.addEventListener('input', (e) => {
+    const op = parseInt(e.target.value, 10) / 100;
+    const valueEl = $('appBgOpacityValue');
+    if (valueEl) valueEl.textContent = Math.round(op * 100) + '%';
+    if (appBackgroundState) {
+      appBackgroundState.opacity = op;
+      saveAppBackground(appBackgroundState);
+      applyAppBackground(appBackgroundState);
+    }
+  });
+
+  $('appBgVideoMode')?.addEventListener('change', (e) => {
+    if (!appBackgroundState) return;
+    appBackgroundState.videoMode = e.target.value;
+    saveAppBackground(appBackgroundState);
+    applyAppBackground(appBackgroundState);
+  });
+
+  $('appBgMosaic')?.addEventListener('change', (e) => {
+    if (!appBackgroundState) return;
+    appBackgroundState.mosaic = e.target.checked;
+    saveAppBackground(appBackgroundState);
+    applyAppBackground(appBackgroundState);
+  });
+
+  $('appBgClearBtn')?.addEventListener('click', () => setAppBackground(null));
+}
+
+$('appBgImportBtn')?.addEventListener('click', () => $('appBgImportInput')?.click());
+$('appBgImportInput')?.addEventListener('change', (e) => {
+  importAppMediaFiles(e.target.files);
+  e.target.value = '';
+});
+
 // ============ FONT SIZES (Settings > Apparence) ============
 // Independent sliders per heading level + body text, each an absolute px
 // CSS var — so levels can be sized independently rather than scaling
@@ -7958,6 +8165,7 @@ initColorTheme();
 initFontSizeControls();
 initBlockGapControl();
 initLineHeightControl();
+initAppBackgroundControl();
 initProWriterTools();
 initLanguageSettings();
 initReadingFadeSlider();

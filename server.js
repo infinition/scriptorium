@@ -132,6 +132,28 @@ function slugifyThemeName(name) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'theme';
 }
 
+// Background media (image or video) the user puts into <workspace>/.media/,
+// shown behind the whole app with a configurable opacity.
+const MEDIA_IMAGE_EXT = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'];
+const MEDIA_VIDEO_EXT = ['.mp4', '.webm', '.mov', '.ogv'];
+
+function getMediaDir() {
+  return path.join(workspaceDir, '.media');
+}
+
+function listMediaFiles() {
+  const dir = getMediaDir();
+  const items = [];
+  if (!fs.existsSync(dir)) return items;
+  for (const file of fs.readdirSync(dir)) {
+    const ext = path.extname(file).toLowerCase();
+    const type = MEDIA_IMAGE_EXT.includes(ext) ? 'image' : MEDIA_VIDEO_EXT.includes(ext) ? 'video' : null;
+    if (!type) continue;
+    items.push({ id: file, name: path.basename(file, ext).replace(/[_-]+/g, ' ').trim() || file, url: '/media/' + encodeURIComponent(file), type });
+  }
+  return items;
+}
+
 // Custom fonts the user drops into <workspace>/.fonts/, offered alongside the
 // built-in font choices for the UI and the editor.
 const FONT_EXTENSIONS = ['.ttf', '.otf', '.woff', '.woff2'];
@@ -528,7 +550,7 @@ Shortcuts: \`Ctrl+G\` or \`Ctrl+B\` bold, \`Ctrl+I\` italic, \`Ctrl+K\` then \`C
 The gear at the top left opens the settings.
 
 - **Folders**: workspace path and ideas folder, with a browse button.
-- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, a UI font and an editor font per theme (custom fonts you drop into \`.fonts\` are offered too), text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
+- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, a UI font and an editor font per theme (custom fonts you drop into \`.fonts\` are offered too), a background image or video behind the whole app (repeat or ping-pong loop, optional seamless mosaic, opacity slider), text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
 - **Language**: Français or English.
 
 ## Keyboard shortcuts
@@ -693,7 +715,7 @@ Raccourcis : \`Ctrl+G\` ou \`Ctrl+B\` gras, \`Ctrl+I\` italique, \`Ctrl+K\` puis
 L'engrenage en haut à gauche ouvre les paramètres.
 
 - **Dossiers** : chemin du dossier de travail et du dossier d'idées, avec bouton pour parcourir.
-- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, une police d'interface et une police d'éditeur par thème (les polices personnalisées déposées dans \`.fonts\` sont aussi proposées), tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
+- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, une police d'interface et une police d'éditeur par thème (les polices personnalisées déposées dans \`.fonts\` sont aussi proposées), une image ou vidéo de fond derrière toute l'application (boucle répétée ou aller-retour, mosaïque seamless optionnelle, curseur d'opacité), tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
 - **Langue** : Français ou English.
 
 ## Raccourcis clavier
@@ -1144,6 +1166,41 @@ app.use('/fonts', (req, res, next) => {
   const fontsDir = getFontsDir();
   if (!fs.existsSync(fontsDir)) return res.status(404).end();
   express.static(fontsDir, { maxAge: '30d', immutable: true })(req, res, next);
+});
+
+// Background media from <workspace>/.media/
+app.get('/api/media', (req, res) => {
+  res.json({ media: listMediaFiles() });
+});
+
+app.post('/api/media', guarded((req, res) => {
+  const { filename, dataBase64 } = req.body || {};
+  if (!filename || typeof dataBase64 !== 'string' || !dataBase64) {
+    return res.status(400).json({ error: 'filename and data are required' });
+  }
+  const ext = path.extname(String(filename)).toLowerCase();
+  if (!MEDIA_IMAGE_EXT.includes(ext) && !MEDIA_VIDEO_EXT.includes(ext)) {
+    return res.status(400).json({ error: 'Unsupported media type' });
+  }
+  const stem = path.basename(String(filename), ext);
+  const safeStem = assertSegment(stem, 'Media') || 'media';
+  const dir = getMediaDir();
+  fs.mkdirSync(dir, { recursive: true });
+  let safeName = `${safeStem}${ext}`;
+  let counter = 1;
+  while (fs.existsSync(path.join(dir, safeName))) {
+    safeName = `${safeStem}-${counter}${ext}`;
+    counter++;
+  }
+  fs.writeFileSync(path.join(dir, safeName), Buffer.from(dataBase64, 'base64'));
+  res.json({ success: true, file: safeName });
+}));
+
+// Serve the workspace's background media (runtime dir, like /assets).
+app.use('/media', (req, res, next) => {
+  const dir = getMediaDir();
+  if (!fs.existsSync(dir)) return res.status(404).end();
+  express.static(dir, { maxAge: '30d', immutable: true })(req, res, next);
 });
 
 // Snapshots (revision history) — persisted on disk in the workspace, one JSON
