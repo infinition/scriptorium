@@ -3719,6 +3719,8 @@ function selectColorTheme(id) {
   applyThemeFonts();
   populateFontSelects();
   applyThemeBackground();
+  renderAllIcons();
+  syncIconsUI();
   const editor = $('customThemeEditor');
   const isCustom = isCustomThemeId(id);
   if (editor) editor.classList.toggle('hidden', !isCustom);
