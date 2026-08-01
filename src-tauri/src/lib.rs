@@ -294,9 +294,24 @@ mod job {
     pub fn bind_kill_on_close(_child: &Child) {}
 }
 
+// Native folder picker, cross-platform (rfd). The Node server only implements
+// one on Windows (PowerShell), so the desktop shell handles it everywhere.
+#[tauri::command]
+fn pick_folder(current_path: Option<String>) -> Option<String> {
+    let mut dialog = rfd::FileDialog::new();
+    if let Some(p) = current_path {
+        let dir = std::path::Path::new(&p);
+        if dir.is_dir() {
+            dialog = dialog.set_directory(dir);
+        }
+    }
+    dialog.pick_folder().map(|p| p.to_string_lossy().into_owned())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![pick_folder])
         .setup(|app| {
             let root = find_project_root()
                 .or_else(extract_portable_payload)

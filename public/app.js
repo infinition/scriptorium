@@ -4765,6 +4765,13 @@ async function handlePickFolder(inputEl, btnEl) {
   if (btnEl) btnEl.classList.add('loading');
   try {
     const currentPath = inputEl ? inputEl.value.trim() : '';
+    // Desktop shell (Tauri): native cross-platform folder dialog via invoke.
+    if (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke) {
+      const path = await window.__TAURI_INTERNALS__.invoke('pickFolder', { currentPath });
+      if (path) inputEl.value = path;
+      return;
+    }
+    // Browser fallback: the Node server's native picker (Windows only).
     const res = await fetch('/api/pick-folder', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
