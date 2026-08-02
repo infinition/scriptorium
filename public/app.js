@@ -4772,9 +4772,10 @@ function initImageSettingsControl() {
 async function saveAndCloseSettings() {
   const newPath = workspacePathInput ? workspacePathInput.value.trim() : '';
   const ideasPath = ideasPathInput ? ideasPathInput.value.trim() : '';
-  
+  let workspaceChanged = false;
+
   settingsModal.classList.remove('active');
-  
+
   if (newPath && (newPath !== state.workspaceDir || (ideasPathInput && ideasPath !== state.ideasDir))) {
     try {
       const res = await fetch('/api/config', {
@@ -4784,9 +4785,9 @@ async function saveAndCloseSettings() {
       });
       const data = await res.json();
       if (data.success) {
+        workspaceChanged = true;
         state.activeDocId = null;
         state.activeThemeId = null;
-        await fetchWorkspace();
         showToast('toast.settings_saved');
       }
     } catch (err) {
@@ -4809,11 +4810,18 @@ async function saveAndCloseSettings() {
       if (res.ok) {
         state.generalLabel = newGeneralLabel;
         state.hideGeneral = newHideGeneral;
-        await fetchWorkspace();
       }
     } catch (err) {
       console.error(err);
     }
+  }
+
+  // A workspace switch must load the new workspace's own preferences (theme,
+  // fonts, background, spacing, language). Those are stored per workspace in
+  // .scriptorium/settings.json, which the pre-paint script hydrates into
+  // localStorage only at page load, so a reload is required here.
+  if (workspaceChanged) {
+    location.reload();
   }
 }
 

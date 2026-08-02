@@ -1,6 +1,6 @@
 {
   "name": "scriptorium",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Distraction-free markdown writing application with local disk sync and sentence cloud ideas",
   "main": "server.js",
   "scripts": {

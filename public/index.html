@@ -44,6 +44,15 @@
     xhr.send();
     if (xhr.status === 200) {
       var ws = JSON.parse(xhr.responseText).settings || {};
+      // Remove per-workspace preferences that no longer apply, so switching to a
+      // workspace without a given setting (theme, background, fonts...) does not
+      // keep the previous workspace's value.
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('scriptorium') === 0 && !(k in ws)) {
+          localStorage.removeItem(k);
+        }
+      }
       for (var k in ws) {
         if (k.indexOf('scriptorium') === 0) localStorage.setItem(k, ws[k]);
       }
