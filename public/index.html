@@ -424,6 +424,15 @@
             </button>
           </div>
         </div>
+        <div class="form-group" style="margin-top: 18px;">
+          <label for="generalLabelInput" data-i18n="settings.general_label">Nom de la section racine (Général) :</label>
+          <input type="text" id="generalLabelInput" placeholder="Général" />
+          <p class="modal-desc" style="margin-top: 4px;" data-i18n="settings.general_label_hint">Affiche les fichiers à la racine du workspace sous ce nom. Vide pour le nom par défaut.</p>
+          <label class="checkbox-row" style="margin-top: 10px; display: flex; gap: 8px; align-items: center;">
+            <input type="checkbox" id="hideGeneralInput" />
+            <span data-i18n="settings.general_hide">Masquer la section racine pour ne travailler qu'avec des sous-dossiers</span>
+          </label>
+        </div>
         <div class="modal-actions" style="margin-top: 20px;">
           <button class="btn btn-secondary" id="cancelSettingsBtn" data-i18n="settings.cancel_btn">Annuler</button>
           <button class="btn btn-primary" id="saveSettingsBtn" data-i18n="settings.save_btn">Enregistrer</button>

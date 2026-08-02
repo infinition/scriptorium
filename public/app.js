@@ -190,6 +190,8 @@ async function fetchWorkspace() {
     state.workspaceDir = configData.workspaceDir;
     state.ideasDir = configData.ideasDir || '';
     state.appDir = configData.appDir || '';
+    state.generalLabel = configData.generalLabel || '';
+    state.hideGeneral = !!configData.hideGeneral;
     // The server owns the padlock now — adopt its value rather than localStorage.
     if (typeof configData.locked === 'boolean') {
       state.isLocked = configData.locked;
@@ -235,15 +237,22 @@ async function saveDocumentOnDisk() {
   const doc = activeDoc();
   if (!doc) return;
 
+  // Capture the editor state now, before any await. Switching to another
+  // document while this save is in flight must not let the state update below
+  // read the other document's title and content into the document being saved.
+  const savedTitle = title.value;
+  const savedSubtitle = subtitle.value;
+  const savedContent = getContentMarkdown();
+
   try {
     const res = await fetch('/api/documents', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: doc.id,
-        title: title.value,
-        subtitle: subtitle.value,
-        content: getContentMarkdown(),
+        title: savedTitle,
+        subtitle: savedSubtitle,
+        content: savedContent,
         // Lets the server refuse the write if the file changed underneath us
         // — the same document open on a phone, in another tab, or in an
         // external editor used to overwrite whichever copy saved last.
@@ -276,14 +285,20 @@ async function saveDocumentOnDisk() {
         } else {
           delete snapshotsCache[oldId];
         }
-        state.activeDocId = data.document.id;
+        // Only re-point the active document to the renamed id if the user did
+        // not switch to another document while this save was in flight.
+        if (state.activeDocId === doc.id) {
+          state.activeDocId = data.document.id;
+        }
         renderSnapshotsList();
       }
-      
-      // Update local state without full reload
-      doc.title = title.value;
-      doc.subtitle = subtitle.value;
-      doc.content = getContentMarkdown();
+
+      // Update local state without full reload, using the captured values so a
+      // document switch during the save cannot write the other document's title
+      // or content into this one's state.
+      doc.title = savedTitle;
+      doc.subtitle = savedSubtitle;
+      doc.content = savedContent;
       doc.updatedAt = data.document.updatedAt;
       doc.id = data.document.id;
       doc.filename = data.document.filename;
@@ -367,6 +382,9 @@ async function createDocument(sectionId) {
     const data = await res.json();
     if (data.success) {
       state.activeDocId = data.document.id;
+      // A document created in a collapsed section must not stay hidden: expand
+      // that section so the new file is visible after the workspace reload.
+      localStorage.removeItem(`section-collapsed-${sectionId}`);
       await fetchWorkspace();
       setTimeout(() => title.focus(), 50);
       showToast('toast.doc_created');
@@ -386,6 +404,10 @@ async function duplicateDocument(docId) {
     const data = await res.json();
     if (data.success) {
       state.activeDocId = data.document.id;
+      // Same as createDocument: the duplicated file lives in the original
+      // section, so expand it if it was collapsed.
+      const sectionId = docId.split('/')[0];
+      localStorage.removeItem(`section-collapsed-${sectionId}`);
       await fetchWorkspace();
       showToast('toast.doc_duplicated');
     }
@@ -893,31 +915,35 @@ function renderNav() {
 
     header.querySelector('[data-act="rename"]').addEventListener('click', (e) => {
       e.stopPropagation();
-      if (section.id === '_general') {
-        themedAlert(__('nav.section_rename'));
-        return;
-      }
       const titleEl = header.querySelector('.title');
       titleEl.contentEditable = 'true';
       titleEl.focus();
-      
+
       // Select all text
       const range = document.createRange();
       range.selectNodeContents(titleEl);
       const sel = window.getSelection();
-      sel.removeAllRanges(); 
+      sel.removeAllRanges();
       sel.addRange(range);
-      
+
       const finish = () => {
         titleEl.contentEditable = 'false';
         const v = titleEl.textContent.trim();
-        if (v && v !== section.name) {
+        if (section.id === '_general') {
+          // The root section has no folder of its own: renaming updates its
+          // display label (same setting as the one in Settings > Folders).
+          if (v && v !== section.name) {
+            setGeneralLabel(v);
+          } else {
+            titleEl.textContent = section.name;
+          }
+        } else if (v && v !== section.name) {
           renameSection(section.id, v);
         } else {
           titleEl.textContent = section.name;
         }
       };
-      
+
       titleEl.addEventListener('blur', finish, { once: true });
       titleEl.addEventListener('keydown', (ke) => {
         if (ke.key === 'Enter') { ke.preventDefault(); titleEl.blur(); }
@@ -1032,10 +1058,12 @@ function renderNav() {
   });
 }
 
-function openDoc(id) {
-  // Save current before switching
+async function openDoc(id) {
+  // Save current before switching, and wait: the saved snapshot is used to
+  // refresh the previous document's state, so a switch mid-save used to read
+  // the new document's title and content into the old one.
   if (dirty) {
-    saveDocumentOnDisk();
+    await saveDocumentOnDisk();
   }
   state.activeDocId = id;
   loadActiveDoc();
@@ -4721,6 +4749,28 @@ async function saveAndCloseSettings() {
       console.error(__('alert.config_save_error') + ':', err);
     }
   }
+
+  // General section display preferences (root label and hide toggle).
+  const generalLabelInput = $('generalLabelInput');
+  const hideGeneralInput = $('hideGeneralInput');
+  const newGeneralLabel = generalLabelInput ? generalLabelInput.value.trim() : state.generalLabel;
+  const newHideGeneral = hideGeneralInput ? hideGeneralInput.checked : state.hideGeneral;
+  if (newGeneralLabel !== (state.generalLabel || '') || newHideGeneral !== !!state.hideGeneral) {
+    try {
+      const res = await fetch('/api/general-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generalLabel: newGeneralLabel, hideGeneral: newHideGeneral })
+      });
+      if (res.ok) {
+        state.generalLabel = newGeneralLabel;
+        state.hideGeneral = newHideGeneral;
+        await fetchWorkspace();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
 }
 
 $('openSettingsBtn').addEventListener('click', () => {
@@ -4728,6 +4778,10 @@ $('openSettingsBtn').addEventListener('click', () => {
   ideasPathInput.value = state.ideasDir || '';
   const appDirInput = $('appDirInput');
   if (appDirInput) appDirInput.value = state.appDir || '';
+  const generalLabelInput = $('generalLabelInput');
+  const hideGeneralInput = $('hideGeneralInput');
+  if (generalLabelInput) generalLabelInput.value = state.generalLabel || '';
+  if (hideGeneralInput) hideGeneralInput.checked = !!state.hideGeneral;
   settingsModal.classList.add('active');
   updateSettingsOverlayState();
 });
@@ -4842,11 +4896,69 @@ async function handlePickFolder(inputEl, btnEl) {
     const data = await res.json();
     if (data.success && data.path) {
       inputEl.value = data.path;
+      await maybeRenameDefaultNewFolder(inputEl, data.path);
     }
   } catch (err) {
     console.error('Pick folder error:', err);
   } finally {
     if (btnEl) btnEl.classList.remove('loading');
+  }
+}
+
+// A native folder dialog creates a folder named "Nouveau dossier" without ever
+// letting the user type a real name. Right after picking, offer to rename it so
+// the workspace does not stay stuck with the default label.
+// Updates the display label of the root (General) section.
+async function setGeneralLabel(v) {
+  try {
+    const res = await fetch('/api/general-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generalLabel: v })
+    });
+    if (res.ok) {
+      state.generalLabel = v;
+      await fetchWorkspace();
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// Hides or shows the root (General) section in the sidebar.
+async function setGeneralHidden(hidden) {
+  try {
+    const res = await fetch('/api/general-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hideGeneral: !!hidden })
+    });
+    if (res.ok) {
+      state.hideGeneral = !!hidden;
+      await fetchWorkspace();
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function maybeRenameDefaultNewFolder(inputEl, pickedPath) {
+  const base = pathBasename(pickedPath);
+  if (!/^(nouveau dossier|new folder)( \(\d+\))?$/i.test(base)) return;
+  const newName = await themedPrompt(__('prompt.rename_new_folder'), base);
+  if (!newName || !newName.trim() || newName.trim() === base) return;
+  try {
+    const res = await fetch('/api/rename-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: pickedPath, newName: newName.trim() })
+    });
+    const data = await res.json();
+    if (data.success && inputEl) {
+      inputEl.value = data.path;
+    }
+  } catch (err) {
+    console.error('Rename folder error:', err);
   }
 }
 
@@ -7347,10 +7459,12 @@ content.addEventListener('dragover', (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   }
-  // While dragging an idea, show the same between-blocks insertion line as the
-  // block drag, and remember the boundary for the drop.
+  // While dragging an idea, show the same insertion line as the block drag, and
+  // remember the boundary for the drop. The drag boundary snaps on each block's
+  // midpoint, so the line stays visible over any block and never vanishes on
+  // the empty band alone.
   if (draggedIdea) {
-    const hit = findInsertionBoundary(e.clientY);
+    const hit = findInsertionBoundaryForDrag(e.clientY);
     ideaDropHit = hit;
     if (hit) showGutterIndicator(hit);
   } else {
@@ -9151,6 +9265,33 @@ function findInsertionBoundary(clientY) {
   return null;
 }
 
+// Drag-friendly insertion boundary. Unlike findInsertionBoundary, which only
+// fires inside the empty band between blocks, this one snaps on each block's
+// own midpoint: hovering the top half of a block inserts above it, the bottom
+// half inserts below. The drop line therefore never vanishes while dragging an
+// idea over the editor, it just moves from the block's top to its bottom.
+function findInsertionBoundaryForDrag(clientY) {
+  const lines = getEditorLines();
+  if (!lines.length) return null;
+
+  const firstRect = lines[0].getBoundingClientRect();
+  if (clientY <= firstRect.top) {
+    return { line: lines[0], insertBefore: true, edgeY: firstRect.top };
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const r = lines[i].getBoundingClientRect();
+    const mid = r.top + r.height / 2;
+    if (clientY < mid) {
+      return { line: lines[i], insertBefore: true, edgeY: r.top };
+    }
+  }
+
+  const lastLine = lines[lines.length - 1];
+  const lastRect = lastLine.getBoundingClientRect();
+  return { line: lastLine, insertBefore: false, edgeY: lastRect.bottom, atTail: true };
+}
+
 // Drives the two mutually exclusive affordances. Showing the block outline and
 // the insertion line at the same time was half the confusion: the cursor now
 // commits to one reading of what a click will do.
@@ -9585,9 +9726,14 @@ if (isCoarsePointer) {
   function openSectionMenu(sectionId, x, y) {
     closeMenu();
     const section = state.sections.find(s => s.id === sectionId);
-    if (!section || !isLocalMachine) return;
+    if (!section) return;
     const place = buildMenu(x, y, section.name);
-    addItem('📁', __('nav.section_open_folder'), () => openSectionFolder(sectionId));
+    if (isLocalMachine) {
+      addItem('📁', __('nav.section_open_folder'), () => openSectionFolder(sectionId));
+    }
+    if (sectionId === '_general') {
+      addItem('🙈', __('nav.section_hide'), () => setGeneralHidden(true));
+    }
     place();
   }
 
@@ -9653,9 +9799,10 @@ if (isCoarsePointer) {
       if (id) openMoveMenu(id, e.clientX, e.clientY);
       return;
     }
-    // Right-clicking the section header opens its folder on disk.
+    // Right-clicking a section header opens its menu (folder on disk, hide for
+    // the root section). The menu itself gates the local-only actions.
     const sectionEl = e.target.closest('.nav-section');
-    if (!sectionEl || !isLocalMachine) return;
+    if (!sectionEl) return;
     e.preventDefault();
     openSectionMenu(sectionEl.dataset.id, e.clientX, e.clientY);
   });

@@ -52,6 +52,13 @@ const CUSTOM_THEME_FILE = path.join(__dirname, 'theme.custom.json');
 let workspaceDir = path.join(require('os').homedir(), 'Scriptorium');
 let ideasDirSetting = '';
 
+// Display preferences for the "Général" section (the workspace root). Renaming
+// is a display-only label: _general has no folder of its own to rename, and
+// hiding it lets the user work with subfolders only. Both are stored in
+// config.json and exposed to the client.
+let generalLabel = '';
+let hideGeneral = false;
+
 // User preferences live in <workspace>/.scriptorium/settings.json so every
 // workspace is an independent, portable unit (theme, fonts, backgrounds,
 // icons, spacing, language, …).
@@ -260,6 +267,12 @@ function loadConfig() {
       if (typeof data.locked === 'boolean') {
         workspaceLocked = data.locked;
       }
+      if (typeof data.generalLabel === 'string') {
+        generalLabel = data.generalLabel;
+      }
+      if (typeof data.hideGeneral === 'boolean') {
+        hideGeneral = data.hideGeneral;
+      }
     }
   } catch (err) {
     console.error('Error loading config:', err);
@@ -273,7 +286,9 @@ function saveConfig() {
       workspaceDir: process.env.SCRIPTORIUM_WORKSPACE ? configuredWorkspaceDir : workspaceDir,
       ideasDir: ideasDirSetting,
       accessToken,
-      locked: workspaceLocked
+      locked: workspaceLocked,
+      generalLabel,
+      hideGeneral
     }, null, 2), 'utf8');
   } catch (err) {
     console.error('Error saving config:', err);
@@ -1092,8 +1107,25 @@ app.get('/api/config', (req, res) => {
     effectiveIdeasDir: getIdeasDir(),
     locked: workspaceLocked,
     configured: workspaceConfigured,
-    appDir: __dirname
+    appDir: __dirname,
+    generalLabel,
+    hideGeneral
   });
+});
+
+// Saves the display preferences of the "Général" section (root label and hide
+// toggle). Kept separate from /api/config so changing them never re-runs the
+// workspace-selection logic.
+app.post('/api/general-settings', (req, res) => {
+  const { generalLabel: newLabel, hideGeneral: newHide } = req.body || {};
+  if (typeof newLabel === 'string') {
+    generalLabel = newLabel.trim();
+  }
+  if (typeof newHide === 'boolean') {
+    hideGeneral = newHide;
+  }
+  saveConfig();
+  res.json({ success: true, generalLabel, hideGeneral });
 });
 
 // Save an image pasted or dropped into a document. Stored in <workspace>/assets
@@ -1584,6 +1616,38 @@ app.post('/api/pick-folder', (req, res) => {
   });
 });
 
+// Renames a folder the user just picked, e.g. the "Nouveau dossier" a native
+// folder dialog creates without letting them name it. The path is an absolute
+// directory anywhere on disk, so the checks only require the new name to be a
+// single safe segment and the target not to exist.
+app.post('/api/rename-folder', (req, res) => {
+  const { path: folderPath, newName } = req.body || {};
+  if (!folderPath || typeof folderPath !== 'string' || !newName || typeof newName !== 'string' || !newName.trim()) {
+    return res.status(400).json({ error: 'Path and new name required' });
+  }
+  let newId;
+  try {
+    newId = assertSegment(newName, 'Nom de dossier');
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid folder name' });
+  }
+  try {
+    const abs = path.resolve(folderPath);
+    if (!fs.existsSync(abs) || !fs.statSync(abs).isDirectory()) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+    const target = path.join(path.dirname(abs), newId);
+    if (fs.existsSync(target)) {
+      return res.status(400).json({ error: 'A folder with that name already exists' });
+    }
+    fs.renameSync(abs, target);
+    res.json({ success: true, path: target });
+  } catch (err) {
+    console.error('Error renaming folder:', err);
+    res.status(500).json({ error: 'Failed to rename folder' });
+  }
+});
+
 // Workspace preferences (theme, fonts, backgrounds, icons, spacing, language)
 // stored in .scriptorium/settings.json, so each workspace is portable.
 app.get('/api/settings', (req, res) => {
@@ -1679,11 +1743,12 @@ app.get('/api/workspace', (req, res) => {
       }
     }
     
-    // Append a "Général" section if root documents exist
-    if (generalDocs.length > 0) {
+    // Append the "Général" section if root documents exist and it is not
+    // hidden; its label can be renamed (display-only, the root has no folder).
+    if (generalDocs.length > 0 && !hideGeneral) {
       sections.unshift({
         id: '_general',
-        name: 'Général',
+        name: generalLabel || 'Général',
         collapsed: false,
         documents: generalDocs
       });
