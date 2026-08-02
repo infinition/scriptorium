@@ -111,8 +111,19 @@ the file is renamed on save.
 - **Search** (`Ctrl+P`): full text across documents and ideas.
 - **Find / Replace** (`Ctrl+F`): on the raw markdown source.
 - **Export**: print / PDF, standalone HTML, Markdown.
-- **Paste or drop an image**: it is saved into the workspace `assets/` folder
-  and inserted into the text.
+- **Images**: paste, drop or drag an image onto the editor. It is saved into
+  the workspace `.medias/` folder and inserted as a markdown reference; the
+  drop target is shown with the same insertion line as an idea drag. Type `%%`
+  in any text field to open a media gallery (thumbnails, scroll), insert one
+  instead of `%%`, delete one directly, or import more. In Settings > Appearance
+  you can align images (left, center, right) and cap their width.
+- **Root section**: the root (General) section holds the files at the workspace
+  root. Rename it inline or from Settings, and hide it (right-click > Hide
+  section, or the Settings toggle) to work with subfolders only.
+- **Language-aware seeding**: a fresh empty workspace seeds only the welcome
+  document and demo idea theme for the interface language you pick (EN or FR).
+- **Drop tolerance**: dragging an idea or an image over the editor snaps on
+  each block midpoint, so the insertion line never vanishes.
 - **Spell check**: corrections are applied to the raw markdown, and a
   right-click keeps the suggestion menu working.
 - **Language**: the interface is fully translated in English and French, and

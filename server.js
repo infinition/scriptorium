@@ -484,6 +484,13 @@ app.use('/assets', (req, res, next) => {
   express.static(assetsDir)(req, res, next);
 });
 
+// Document images dropped or pasted into the editor.
+app.use('/medias', (req, res, next) => {
+  const dir = path.join(workspaceDir, '.medias');
+  if (!fs.existsSync(dir)) return res.status(404).end();
+  express.static(dir)(req, res, next);
+});
+
 // SSE (Server-Sent Events) for real-time workspace updates
 const sseClients = new Set();
 
@@ -699,6 +706,14 @@ An image:
 
 ![Test image](https://picsum.photos/600/300)
 
+Insert images from your workspace media folder:
+
+Type %% anywhere and the media gallery opens. Click a thumbnail to insert it,
+import new images, or hover the red cross to delete one. You can also drag an
+image file from your computer onto the editor: it is copied into .medias and
+inserted where you drop it. Settings > Appearance controls the alignment and
+width of the images.
+
 Happy writing.
 `;
 
@@ -863,6 +878,14 @@ Un tableau :
 Une image :
 
 ![Image de test](https://picsum.photos/600/300)
+
+Insérez des images depuis le dossier média de votre workspace :
+
+Tapez %% n'importe où et la galerie média s'ouvre. Cliquez une vignette pour
+l'insérer, importez de nouvelles images, ou survolez la croix rouge pour en
+supprimer une. Vous pouvez aussi glisser un fichier image de votre ordinateur
+sur l'éditeur : il est copié dans .medias et inséré à l'endroit du dépôt.
+Réglages > Apparence contrôle l'alignement et la largeur des images.
 
 Bonne écriture.
 `;
@@ -1156,6 +1179,69 @@ app.post('/api/assets', guarded((req, res) => {
   fs.writeFileSync(path.join(assetsDir, safeName), buf);
   res.json({ success: true, path: `assets/${safeName}` });
 }));
+
+// Document images live in <workspace>/.medias so the markdown reference
+// (medias/foo.png) stays portable with the workspace. This is separate from
+// .scriptorium/media, which holds background media for themes.
+function getDocMediaDir() {
+  return path.join(workspaceDir, '.medias');
+}
+
+app.get('/api/doc-media', (req, res) => {
+  const dir = getDocMediaDir();
+  const files = [];
+  if (fs.existsSync(dir)) {
+    for (const file of fs.readdirSync(dir)) {
+      const ext = path.extname(file).toLowerCase();
+      if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'].includes(ext)) {
+        files.push({ name: file, url: '/medias/' + encodeURIComponent(file) });
+      }
+    }
+  }
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  res.json({ media: files });
+});
+
+app.post('/api/doc-media', (req, res) => {
+  const { filename, dataBase64 } = req.body || {};
+  if (!filename || typeof dataBase64 !== 'string' || !dataBase64) {
+    return res.status(400).json({ error: 'filename and data are required' });
+  }
+  const extMatch = String(filename).match(/\.([a-z0-9]+)$/i);
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
+  if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) {
+    return res.status(400).json({ error: 'Unsupported image type' });
+  }
+  const stem = extMatch ? filename.slice(0, -extMatch[0].length) : filename;
+  let safeStem;
+  try { safeStem = assertSegment(stem, 'Image'); } catch (e) { return res.status(400).json({ error: 'Invalid image name' }); }
+  const dir = getDocMediaDir();
+  fs.mkdirSync(dir, { recursive: true });
+  let safeName = `${safeStem}.${ext}`;
+  let counter = 1;
+  while (fs.existsSync(path.join(dir, safeName))) {
+    safeName = `${safeStem}-${counter}.${ext}`;
+    counter++;
+  }
+  const buf = Buffer.from(dataBase64, 'base64');
+  fs.writeFileSync(path.join(dir, safeName), buf);
+  res.json({ success: true, path: `medias/${safeName}` });
+});
+
+app.delete('/api/doc-media/:name', (req, res) => {
+  const name = path.basename(req.params.name || '');
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const dir = getDocMediaDir();
+  const target = path.join(dir, name);
+  try {
+    if (!fs.existsSync(target)) return res.status(404).json({ error: 'File not found' });
+    fs.unlinkSync(target);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting media:', err);
+    res.status(500).json({ error: 'Failed to delete media' });
+  }
+});
 
 // The padlock is enforced server-side, so it has to be persisted here rather
 // than in localStorage only.

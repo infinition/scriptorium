@@ -1454,6 +1454,7 @@ let draggedIdea = null;
 // The between-blocks boundary under the cursor during an idea drag into the
 // editor (from findInsertionBoundary), used by the drop to place the new block.
 let ideaDropHit = null;
+let imageDropHit = null;
 // While a block is dragged over the ideas panel, remembers where the new idea
 // will be inserted: { themeId, beforeText, after } or null when not over a chip.
 let blockIdeaDrop = null;
@@ -4724,6 +4725,49 @@ function initLineHeightControl() {
   });
 }
 
+// Image alignment and width for images inside blocks.
+const IMAGE_ALIGN_DEFAULT = 'center';
+const IMAGE_WIDTH_DEFAULT = 'full';
+function loadImageAlign() {
+  const v = localStorage.getItem('scriptoriumImageAlign');
+  return v === 'left' || v === 'right' || v === 'center' ? v : IMAGE_ALIGN_DEFAULT;
+}
+function loadImageWidth() {
+  const v = localStorage.getItem('scriptoriumImageWidth');
+  if (v === 'full') return v;
+  const n = parseInt(v, 10);
+  return isFinite(n) && n > 0 ? String(n) : IMAGE_WIDTH_DEFAULT;
+}
+let imageAlignState = loadImageAlign();
+let imageWidthState = loadImageWidth();
+function applyImageSettings() {
+  document.documentElement.style.setProperty('--img-max-width', imageWidthState === 'full' ? '100%' : imageWidthState + 'px');
+  if (content) {
+    content.classList.remove('img-align-left', 'img-align-center', 'img-align-right');
+    content.classList.add('img-align-' + imageAlignState);
+  }
+}
+function syncImageSettingsUI() {
+  const al = $('imageAlignSelect');
+  const w = $('imageWidthSelect');
+  if (al) al.value = imageAlignState;
+  if (w) w.value = imageWidthState;
+}
+function initImageSettingsControl() {
+  applyImageSettings();
+  syncImageSettingsUI();
+  $('imageAlignSelect')?.addEventListener('change', () => {
+    imageAlignState = $('imageAlignSelect').value;
+    localStorage.setItem('scriptoriumImageAlign', imageAlignState);
+    applyImageSettings();
+  });
+  $('imageWidthSelect')?.addEventListener('change', () => {
+    imageWidthState = $('imageWidthSelect').value;
+    localStorage.setItem('scriptoriumImageWidth', imageWidthState);
+    applyImageSettings();
+  });
+}
+
 // Settings Modal Events
 async function saveAndCloseSettings() {
   const newPath = workspacePathInput ? workspacePathInput.value.trim() : '';
@@ -5057,7 +5101,10 @@ if (lockToggleBtn) {
 // Drag and drop import global overlays
 let dragCounter = 0;
 window.addEventListener('dragenter', (e) => {
-  if (!e.dataTransfer.types.includes('Files')) return;
+  if (!e.dataTransfer.types || !e.dataTransfer.types.includes('Files')) return;
+  // The editor handles its own drops (images go to .medias, text is inserted),
+  // so do not cover it with the global ".md import" overlay.
+  if (content && e.target && content.contains(e.target)) return;
   dragCounter++;
   dropOverlay.classList.add('active');
 });
@@ -5071,25 +5118,34 @@ window.addEventListener('dragleave', () => {
 window.addEventListener('dragover', (e) => {
   if (e.dataTransfer.types.includes('Files')) e.preventDefault();
 });
+const IMAGE_FILE_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
+function isImageFile(file) {
+  return !!(file && ((file.type && file.type.indexOf('image/') === 0) || (file.name && IMAGE_FILE_RE.test(file.name))));
+}
+
 window.addEventListener('drop', (e) => {
   if (!e.dataTransfer.files.length) return;
+  // Image files dropped on the editor are handled by the editor itself (saved
+  // to .medias and inserted). Never import them as markdown documents here.
+  const droppedFiles = Array.from(e.dataTransfer.files);
+  if (droppedFiles.every(f => isImageFile(f))) return;
   e.preventDefault();
   dragCounter = 0;
   dropOverlay.classList.remove('active');
-  
+
   const ideasRect = $('ideasPanel').getBoundingClientRect();
   const sidebarRect = $('sidebar').getBoundingClientRect();
   const x = e.clientX, y = e.clientY;
-  
+
   if (x >= ideasRect.left && x <= ideasRect.right && y >= ideasRect.top && y <= ideasRect.bottom && ideasRect.width > 0) {
     // Dropped on ideas panel
-    Array.from(e.dataTransfer.files).forEach(file => {
+    droppedFiles.forEach(file => {
       importIdeasFileToServer(file);
     });
   } else {
     // Dropped on editor or sidebar
     const targetSection = state.sections[0]?.id || 'Manifestes';
-    Array.from(e.dataTransfer.files).forEach(file => {
+    droppedFiles.forEach(file => {
       importFileToServer(file, targetSection);
     });
   }
@@ -7455,25 +7511,35 @@ content.addEventListener('paste', (e) => {
 // a dragover has been allowed).
 content.addEventListener('dragover', (e) => {
   const types = e.dataTransfer && e.dataTransfer.types;
-  if (types && (types.indexOf('text/plain') !== -1 || draggedIdea)) {
+  const hasFiles = !!(types && types.indexOf('Files') !== -1);
+  if ((types && types.indexOf('text/plain') !== -1) || draggedIdea || hasFiles) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   }
-  // While dragging an idea, show the same insertion line as the block drag, and
-  // remember the boundary for the drop. The drag boundary snaps on each block's
-  // midpoint, so the line stays visible over any block and never vanishes on
-  // the empty band alone.
+  // While dragging an idea or an external image, show the same insertion line
+  // as the block drag, and remember the boundary for the drop. The drag
+  // boundary snaps on each block's midpoint, so the line stays visible over any
+  // block and never vanishes on the empty band alone.
   if (draggedIdea) {
     const hit = findInsertionBoundaryForDrag(e.clientY);
     ideaDropHit = hit;
     if (hit) showGutterIndicator(hit);
+  } else if (hasFiles) {
+    const hit = findInsertionBoundaryForDrag(e.clientY);
+    imageDropHit = hit;
+    if (hit) showGutterIndicator(hit);
+    content.classList.add('media-drag-over');
   } else {
     hideGutterIndicator();
+    content.classList.remove('media-drag-over');
   }
 });
 
 content.addEventListener('dragleave', (e) => {
-  if (!content.contains(e.relatedTarget)) hideGutterIndicator();
+  if (!content.contains(e.relatedTarget)) {
+    hideGutterIndicator();
+    content.classList.remove('media-drag-over');
+  }
 });
 
 content.addEventListener('drop', (e) => {
@@ -7491,11 +7557,15 @@ content.addEventListener('drop', (e) => {
     insertIdeaBlockAtBoundary(draggedText, hit);
     return;
   }
-  const imageFiles = Array.from(dt.files || []).filter(f => f.type && f.type.indexOf('image/') === 0);
+  const imageFiles = Array.from(dt.files || []).filter(f => isImageFile(f));
   if (imageFiles.length) {
     e.preventDefault();
     e.stopPropagation();
-    imageFiles.forEach(f => handlePastedImage(f, f.name));
+    hideGutterIndicator();
+    content.classList.remove('media-drag-over');
+    const hit = imageDropHit;
+    imageDropHit = null;
+    imageFiles.forEach(f => handleImageDrop(f, hit));
     return;
   }
   if (!dt.types || dt.types.includes('Files')) return;
@@ -7506,9 +7576,9 @@ content.addEventListener('drop', (e) => {
   insertMarkdownAtCaret(text);
 });
 
-// Reads an image (clipboard or dropped file), uploads it to <workspace>/assets
-// and inserts its markdown reference at the caret.
-async function handlePastedImage(file, suggestedName) {
+// Uploads an image file to <workspace>/.medias and returns the markdown-relative
+// path (medias/name.ext) plus the cleaned base name, or null on failure.
+async function uploadImageToMedia(file, suggestedName) {
   const dataBase64 = await new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -7526,24 +7596,62 @@ async function handlePastedImage(file, suggestedName) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40) || 'image';
   try {
-    const res = await fetch('/api/assets', {
+    const res = await fetch('/api/doc-media', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filename: `${base}.${ext}`, dataBase64 })
     });
     const data = await res.json();
-    if (data.path) {
-      insertMarkdownAtCaret(`![${base}](${data.path})`);
-      markDirty();
-      updateStats();
-      showToast('toast.image_added');
-    } else {
-      showToast('toast.image_save_error');
-    }
+    return data.path ? { path: data.path, base } : null;
   } catch (err) {
-    console.error('Image save error:', err);
+    console.error('Image upload error:', err);
+    return null;
+  }
+}
+
+// Reads an image (clipboard or dropped file), uploads it to <workspace>/.medias
+// and inserts its markdown reference at the caret.
+async function handlePastedImage(file, suggestedName) {
+  const uploaded = await uploadImageToMedia(file, suggestedName);
+  if (uploaded) {
+    insertMarkdownAtCaret(`![${uploaded.base}](${uploaded.path})`);
+    markDirty();
+    updateStats();
+    showToast('toast.image_added');
+  } else {
     showToast('toast.image_save_error');
   }
+}
+
+// Inserts a new block containing the image reference at the drop boundary, so
+// the image lands exactly where the pointer was, not at the caret.
+async function handleImageDrop(file, hit) {
+  const uploaded = await uploadImageToMedia(file, file.name);
+  if (!uploaded) {
+    showToast('toast.image_save_error');
+    return;
+  }
+  const mdRef = `![${uploaded.base}](${uploaded.path})`;
+  if (hit && hit.line && content.contains(hit.line)) {
+    insertImageBlockAtBoundary(mdRef, hit);
+  } else {
+    insertMarkdownAtCaret(mdRef);
+  }
+  markDirty();
+  updateStats();
+  showToast('toast.image_added');
+}
+
+function insertImageBlockAtBoundary(mdRef, hit) {
+  saveHistory(state.activeDocId, true);
+  const newLine = makeLineNode(mdRef);
+  content.insertBefore(newLine, hit.insertBefore ? hit.line : hit.line.nextSibling);
+  makeLineRawAndActive(newLine);
+  setCaretInLine(newLine, mdRef.length);
+  markDirty();
+  updateStats();
+  saveHistory(state.activeDocId, true);
+  debouncedRegenerateTOC();
 }
 
 // ============ FIND / REPLACE ============
@@ -8717,22 +8825,28 @@ $('emojiSearch')?.addEventListener('input', (e) => renderEmojiGrid(e.target.valu
 $('emojiModal')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEmojiPicker(true); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeEmojiPicker(true); });
 
-// Typing or pasting @@ in any text field opens the picker, remembering where
-// to insert. A paste can fire input before the caret has settled, so a deferred
-// re-check catches it too.
+// Typing or pasting @@ opens the emoji picker, %% opens the media gallery,
+// remembering where to insert. A paste can fire input before the caret has
+// settled, so a deferred re-check catches it too.
 document.addEventListener('input', (e) => {
   const el = e.target;
   if (!el) return;
-  if (el.closest && el.closest('#emojiModal')) return; // the picker's own search
-  if (e.isComposing || emojiPickerTarget) return;
+  if (el.closest && (el.closest('#emojiModal') || el.closest('#mediaModal'))) return; // the pickers' own inputs
+  if (e.isComposing || emojiPickerTarget || mediaPickerTarget) return;
 
   const tryTrigger = () => {
     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
       const v = el.value || '';
       const pos = el.selectionStart;
-      if (typeof pos === 'number' && v.slice(pos - 2, pos) === '@@') {
-        openEmojiPicker({ el, isContentEditable: false, replaceStart: pos - 2, replaceEnd: pos });
-        return true;
+      if (typeof pos === 'number') {
+        if (v.slice(pos - 2, pos) === '@@') {
+          openEmojiPicker({ el, isContentEditable: false, replaceStart: pos - 2, replaceEnd: pos });
+          return true;
+        }
+        if (v.slice(pos - 2, pos) === '%%') {
+          openMediaPicker({ el, isContentEditable: false, replaceStart: pos - 2, replaceEnd: pos });
+          return true;
+        }
       }
     } else if (el.isContentEditable) {
       const sel = window.getSelection();
@@ -8742,12 +8856,17 @@ document.addEventListener('input', (e) => {
         const off = range.startOffset;
         const line = getLineForNode(node);
         const lineOff = line ? rangeOffsetIn(line, node, off) : -1;
-        // Compare against the whole line text: a pasted @@ can be split across
-        // several text nodes, so the immediate text node alone is not enough.
+        // Compare against the whole line text: a pasted trigger can be split
+        // across several text nodes, so the immediate text node alone is not
+        // enough.
         if (line && lineOff >= 2) {
           const lineText = line.textContent;
           if (lineText.slice(lineOff - 2, lineOff) === '@@') {
             openEmojiPicker({ el, isContentEditable: true, line, lineOff: lineOff - 2 });
+            return true;
+          }
+          if (lineText.slice(lineOff - 2, lineOff) === '%%') {
+            openMediaPicker({ el, isContentEditable: true, line, lineOff: lineOff - 2 });
             return true;
           }
         }
@@ -8758,6 +8877,169 @@ document.addEventListener('input', (e) => {
 
   if (!tryTrigger()) setTimeout(tryTrigger, 0);
 });
+
+// ============ MEDIA GALLERY (%% in any text field) ============
+// Lists the images in <workspace>/.medias, lets the user insert one (replacing
+// the %% trigger), delete one directly, or import more.
+let mediaPickerTarget = null;
+
+function openMediaPicker(ctx) {
+  mediaPickerTarget = ctx;
+  loadDocMedia();
+  const modal = $('mediaModal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeMediaPicker(removeTrigger) {
+  const modal = $('mediaModal');
+  if (modal) modal.classList.remove('active');
+  if (removeTrigger && mediaPickerTarget) removeMediaTrigger(mediaPickerTarget);
+  mediaPickerTarget = null;
+}
+
+function removeMediaTrigger(ctx) {
+  if (ctx.isContentEditable) {
+    const line = ctx.line;
+    if (line && line.isConnected) {
+      const raw = line.textContent;
+      const start = Math.max(0, Math.min(ctx.lineOff || 0, raw.length));
+      if (raw.slice(start, start + 2) === '%%') {
+        const newRaw = raw.slice(0, start) + raw.slice(start + 2);
+        line.textContent = newRaw;
+        line.dataset.raw = newRaw;
+        setCaretInLine(line, start);
+        if (content) content.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  } else {
+    const el = ctx.el;
+    if (!el) return;
+    const v = el.value || '';
+    const start = typeof ctx.replaceStart === 'number' ? ctx.replaceStart : 0;
+    const end = typeof ctx.replaceEnd === 'number' ? ctx.replaceEnd : v.length;
+    if (v.slice(start, start + 2) === '%%') {
+      el.value = v.slice(0, start) + v.slice(end);
+      el.selectionStart = el.selectionEnd = start;
+      el.focus();
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+}
+
+let docMediaCache = [];
+async function loadDocMedia() {
+  try {
+    const res = await fetch('/api/doc-media');
+    const data = await res.json();
+    docMediaCache = (data && Array.isArray(data.media)) ? data.media : [];
+  } catch (e) {
+    docMediaCache = [];
+  }
+  renderMediaGrid();
+}
+
+function renderMediaGrid() {
+  const grid = $('mediaGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  if (!docMediaCache.length) {
+    const empty = document.createElement('div');
+    empty.className = 'emoji-cat-title';
+    empty.textContent = __('media.empty');
+    grid.appendChild(empty);
+    return;
+  }
+  docMediaCache.forEach(m => {
+    const wrap = document.createElement('div');
+    wrap.className = 'media-item';
+    const img = document.createElement('img');
+    img.src = m.url;
+    img.alt = m.name;
+    img.title = m.name;
+    img.addEventListener('click', () => insertMedia(m));
+    const del = document.createElement('button');
+    del.className = 'media-del';
+    del.type = 'button';
+    del.title = __('media.delete_title');
+    del.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    del.addEventListener('click', (e) => { e.stopPropagation(); deleteDocMedia(m); });
+    wrap.appendChild(img);
+    wrap.appendChild(del);
+    grid.appendChild(wrap);
+  });
+}
+
+function insertMedia(m) {
+  const ctx = mediaPickerTarget;
+  closeMediaPicker();
+  if (!ctx) return;
+  const ref = `![](${m.url})`;
+  if (ctx.isContentEditable) {
+    const line = ctx.line;
+    if (line && line.isConnected) {
+      const raw = line.textContent;
+      let start = Math.max(0, Math.min(ctx.lineOff || 0, raw.length));
+      if (raw.slice(start, start + 2) !== '%%') {
+        const idx = raw.lastIndexOf('%%');
+        start = idx >= 0 ? idx : raw.length;
+      }
+      const newRaw = raw.slice(0, start) + ref + raw.slice(start + 2);
+      line.textContent = newRaw;
+      line.dataset.raw = newRaw;
+      setCaretInLine(line, start + ref.length);
+      if (content) content.dispatchEvent(new Event('input', { bubbles: true }));
+      markDirty();
+      updateStats();
+    }
+  } else {
+    const el = ctx.el;
+    if (!el) return;
+    const v = el.value || '';
+    let start = typeof ctx.replaceStart === 'number' ? ctx.replaceStart : v.lastIndexOf('%%');
+    if (start < 0) start = v.length;
+    const end = typeof ctx.replaceEnd === 'number' ? ctx.replaceEnd : start + 2;
+    el.value = v.slice(0, start) + ref + v.slice(end);
+    el.selectionStart = el.selectionEnd = start + ref.length;
+    el.focus();
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+// Deletes the image directly, without a confirmation dialog.
+async function deleteDocMedia(m) {
+  try {
+    const res = await fetch('/api/doc-media/' + encodeURIComponent(m.name), { method: 'DELETE' });
+    if (res.ok) {
+      docMediaCache = docMediaCache.filter(x => x.name !== m.name);
+      renderMediaGrid();
+      showToast('toast.media_deleted');
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// Import button and hidden file input in the media gallery.
+$('mediaImportBtn')?.addEventListener('click', () => {
+  const input = $('mediaFileInput');
+  if (input) input.click();
+});
+$('mediaFileInput')?.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  for (const f of files) {
+    await uploadImageToMedia(f, f.name);
+  }
+  if (files.length) {
+    await loadDocMedia();
+    showToast('toast.image_added');
+  }
+});
+$('mediaCloseBtn')?.addEventListener('click', () => closeMediaPicker(true));
+$('mediaModal')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeMediaPicker(true); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mediaPickerTarget) closeMediaPicker(true); });
 
 // ============ CUSTOM UI ICONS (per theme) ============
 // Every UI icon has a stable key and a default SVG. A theme may override any
@@ -8990,6 +9272,7 @@ initIconControl();
 initFontSizeControls();
 initBlockGapControl();
 initLineHeightControl();
+initImageSettingsControl();
 initAppBackgroundControl();
 initProWriterTools();
 initLanguageSettings();

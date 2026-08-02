@@ -574,6 +574,24 @@
           <span class="font-size-value" id="lineHeightValue"></span>
         </div>
 
+        <div class="form-group" style="margin-top: 16px;">
+          <label for="imageAlignSelect"><span data-i18n="settings.image_align_label">Alignement des images</span></label>
+          <select id="imageAlignSelect" class="text-select">
+            <option value="left" data-i18n="settings.image_align_left">Gauche</option>
+            <option value="center" data-i18n="settings.image_align_center">Centré</option>
+            <option value="right" data-i18n="settings.image_align_right">Droite</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label for="imageWidthSelect"><span data-i18n="settings.image_width_label">Largeur des images</span></label>
+          <select id="imageWidthSelect" class="text-select">
+            <option value="full" data-i18n="settings.image_width_full">Toute la largeur disponible</option>
+            <option value="640">640 px</option>
+            <option value="480">480 px</option>
+            <option value="320">320 px</option>
+          </select>
+        </div>
+
         <div class="font-size-preview" id="fontSizePreview">
           <div class="fsp-doc-title"><span data-i18n="font_preview.doc_title">Titre du document</span></div>
           <div class="fsp-doc-subtitle"><span data-i18n="font_preview.doc_subtitle">Sous-titre ou description du document</span></div>
@@ -819,6 +837,21 @@
     <div class="emoji-grid" id="emojiGrid"></div>
   </div>
 </div>
+
+<!-- MEDIA GALLERY (%% trigger): insert an image from <workspace>/.medias -->
+<div class="modal-overlay emoji-modal" id="mediaModal">
+  <div class="emoji-modal-inner">
+    <div class="emoji-modal-header">
+      <span class="media-modal-title" data-i18n="media.title">Médias</span>
+      <button class="icon-btn" id="mediaImportBtn" type="button" data-i18n-title="media.import_title" aria-label="Import">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+      <button class="close-btn" id="mediaCloseBtn" type="button" data-i18n-aria-label="dialog.close" aria-label="Close">&times;</button>
+    </div>
+    <div class="media-grid" id="mediaGrid"></div>
+  </div>
+</div>
+<input type="file" id="mediaFileInput" accept="image/*" multiple hidden />
 
 <!-- ICON PICKER (choose an imported icon for a slot) -->
 <div class="icon-picker hidden" id="iconPicker"></div>
