@@ -68,14 +68,23 @@ workspace/
     welcome.md
   ideas/                           <- the sentence-cloud source
     general.md                     <- one theme per file
+  .scriptorium/                    <- app-managed: settings, themes, fonts,
+  |                                  backgrounds, icons, snapshots (per workspace)
+  .medias/                         <- images inserted in documents
+  assets/                          <- legacy image folder, kept for old documents
 ```
 
 - A subfolder is a section. Rename the folder, the section renames.
-- A `.md` at the root lands in the implicit "General" section.
+- A `.md` at the root lands in the implicit "General" section, which you can
+  rename or hide from Settings.
 - Drag a `.md` onto a section to import it.
 - `ideas/*.md` files feed the ideas panel. Each line starting with `- ` is an
   idea; `- [x] ...` means archived. The files are rewritten in place when you
   click an idea, so editing them from another editor works too.
+- `.scriptorium/` keeps every preference of this workspace (theme, fonts,
+  backgrounds, icons, spacing, language). Copy the workspace folder and the
+  whole setup follows.
+- `.medias/` holds the images you paste, drop or drag into documents.
 
 Filenames are derived from the title (slugified, ASCII). Change the title and
 the file is renamed on save.

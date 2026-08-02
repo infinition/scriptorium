@@ -1,6 +1,6 @@
 [package]
 name = "scriptorium"
-version = "1.2.9"
+version = "1.2.10"
 description = "Distraction-free markdown editor reading and writing .md files on your own disk."
 authors = ["Scriptorium"]
 edition = "2021"

@@ -554,6 +554,9 @@ A distraction-free Markdown editor. Your texts are plain \`.md\` files on your d
 - **New section**: "New section" button. A section is a folder; a document is a \`.md\` file inside it.
 - **Open a document**: click it in the sidebar.
 - **Rename**: change the title in the editor. The file is renamed on save.
+- **The root (General) section** holds the files at the workspace root. Rename
+  it inline (the pen icon) or from Settings, and hide it to work with
+  subfolders only.
 - **Move**: right-click a document (long-press on mobile), then pick the section.
 - **Import**: drag a \`.md\` file onto a section. Drag it onto the ideas panel to import a theme.
 - **Sort**: the sort button in the sidebar toggles alphabetical order and order by date.
@@ -626,7 +629,8 @@ Markdown renders live. The line you are editing switches to raw text, the others
 - The \`+\` button in the margin inserts a block: paragraph, headings H1 to H6, lists, checkbox, quote, code block, image, divider.
 - The block handle moves it, the trash deletes it.
 - Click an image to switch back to its Markdown source and edit the URL directly.
-- Pasting or dropping an image saves it into the workspace \`assets\` folder and inserts it as Markdown.
+- Pasting or dropping an image saves it into the workspace \`.medias\` folder and inserts it as Markdown.
+- Type \`@@\` in any text field to open the emoji palette and insert one.
 - A quote starting with \`> [!note]\` becomes a coloured callout (tip, warning, danger, question…).
 - \`Ctrl\`+click blocks to select several, then merge them into one or delete them together.
 - A click between two blocks inserts a new block there.
@@ -639,7 +643,7 @@ Shortcuts: \`Ctrl+G\` or \`Ctrl+B\` bold, \`Ctrl+I\` italic, \`Ctrl+K\` then \`C
 The gear at the top left opens the settings.
 
 - **Folders**: workspace path and ideas folder, with a browse button.
-- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, a UI font and an editor font per theme (custom fonts you drop into \`.fonts\` are offered too), custom UI icons per theme (import SVG, PNG, WebP or ICO into \`.icons\` and replace each one), a background image or video behind the whole app (repeat loop, optional seamless mosaic, opacity slider), text sizes per heading level, the space between blocks, the line height of the blocks, reading fade, hide YAML frontmatter, colour headings and formatting differently.
+- **Appearance**: colour themes (Default, Ivory, Polaire) plus your own named themes saved in the \`.themes\` folder of the workspace, a UI font and an editor font per theme (custom fonts you drop into \`.fonts\` are offered too), custom UI icons per theme (import SVG, PNG, WebP or ICO into \`.icons\` and replace each one), a background image or video behind the whole app (repeat loop, optional seamless mosaic, opacity slider), text sizes per heading level, the space between blocks, the line height of the blocks, image alignment (left, center, right) and width, reading fade, hide YAML frontmatter, colour headings and formatting differently, and a paper page mode that turns the editing area into a white sheet with rounded corners.
 - **Language**: Français or English.
 
 ## Keyboard shortcuts
@@ -660,6 +664,21 @@ The gear at the top left opens the settings.
 | \`Tab\` | Cycle display modes |
 | \`F\` | Focus mode |
 | \`Ctrl\`+click | Select several blocks |
+
+## Workspace folders
+
+Scriptorium keeps everything inside your workspace, portable:
+
+- \`.scriptorium/\` holds the app's settings, colour themes, fonts, backgrounds,
+  icons and snapshots for this workspace only. Copy the folder, the whole setup
+  follows.
+- \`.medias/\` holds the images you paste, drop or drag into your documents.
+- \`ideas/\` holds one file per idea theme.
+- \`assets/\` is the legacy image folder, kept for older documents.
+
+Drag an image file from your computer onto the editor: it is copied into
+\`.medias\` and inserted at the drop point, with the same insertion line as an
+idea drag.
 
 ## Supported Markdown
 
@@ -727,6 +746,7 @@ Un éditeur Markdown sans distraction. Vos textes sont de simples fichiers \`.md
 - **Nouvelle section** : bouton « Nouvelle section ». Une section est un dossier ; un document est un fichier \`.md\` dans ce dossier.
 - **Ouvrir un document** : cliquez dessus dans la barre latérale.
 - **Renommer** : changez le titre dans l'éditeur. Le fichier est renommé à la sauvegarde.
+- **La section racine (Général)** contient les fichiers à la racine de l'espace de travail. Renommez-la en ligne (l'icône crayon) ou depuis les réglages, et masquez-la pour ne travailler qu'avec des sous-dossiers.
 - **Déplacer** : clic droit sur un document (appui long sur mobile), puis choisissez la section.
 - **Importer** : glissez un fichier \`.md\` sur une section. Glissez-le sur le panneau d'idées pour importer un thème.
 - **Trier** : le bouton de tri dans la barre latérale alterne l'ordre alphabétique et l'ordre par date.
@@ -799,7 +819,8 @@ Le Markdown s'affiche en direct. La ligne que vous éditez passe en texte brut, 
 - Le bouton \`+\` dans la marge insère un bloc : paragraphe, titres H1 à H6, listes, case à cocher, citation, bloc de code, image, séparateur.
 - La poignée de bloc le déplace, la corbeille le supprime.
 - Cliquez sur une image pour revenir à son code Markdown et modifier l'URL directement.
-- Coller ou déposer une image l'enregistre dans le dossier \`assets\` de l'espace de travail et l'insère en Markdown.
+- Coller ou déposer une image l'enregistre dans le dossier \`.medias\` de l'espace de travail et l'insère en Markdown.
+- Tapez \`@@\` dans n'importe quel champ pour ouvrir la palette d'émojis et en insérer un.
 - Une citation commençant par \`> [!note]\` devient une note colorée (tip, warning, danger, question…).
 - \`Ctrl\`+clic sur des blocs pour en sélectionner plusieurs, puis les fusionner en un seul ou les supprimer ensemble.
 - Un clic entre deux blocs insère un nouveau bloc à cet endroit.
@@ -812,7 +833,7 @@ Raccourcis : \`Ctrl+G\` ou \`Ctrl+B\` gras, \`Ctrl+I\` italique, \`Ctrl+K\` puis
 L'engrenage en haut à gauche ouvre les paramètres.
 
 - **Dossiers** : chemin du dossier de travail et du dossier d'idées, avec bouton pour parcourir.
-- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, une police d'interface et une police d'éditeur par thème (les polices personnalisées déposées dans \`.fonts\` sont aussi proposées), des icônes d'interface personnalisées par thème (importez SVG, PNG, WebP ou ICO dans \`.icons\` et remplacez chacune), une image ou vidéo de fond derrière toute l'application (boucle répétée, mosaïque seamless optionnelle, curseur d'opacité), tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme.
+- **Apparence** : thèmes de couleur (Défaut, Ivoire, Polaire) et vos propres thèmes nommés enregistrés dans le dossier \`.themes\` de l'espace de travail, une police d'interface et une police d'éditeur par thème (les polices personnalisées déposées dans \`.fonts\` sont aussi proposées), des icônes d'interface personnalisées par thème (importez SVG, PNG, WebP ou ICO dans \`.icons\` et remplacez chacune), une image ou vidéo de fond derrière toute l'application (boucle répétée, mosaïque seamless optionnelle, curseur d'opacité), tailles de texte par niveau de titre, espacement entre les blocs, hauteur de ligne des blocs, alignement des images (gauche, centre, droite) et largeur, fondu du mode lecture, masquer le frontmatter YAML, colorer différemment les titres et la mise en forme, et un mode page qui transforme la zone d'édition en feuille blanche aux coins arrondis.
 - **Langue** : Français ou English.
 
 ## Raccourcis clavier
@@ -833,6 +854,17 @@ L'engrenage en haut à gauche ouvre les paramètres.
 | \`Tab\` | Alterner les modes d'affichage |
 | \`F\` | Mode focus |
 | \`Ctrl\`+clic | Sélectionner plusieurs blocs |
+
+## Dossiers de l'espace de travail
+
+Scriptorium garde tout à l'intérieur de votre espace de travail, portable :
+
+- \`.scriptorium/\` contient les réglages de l'application, les thèmes de couleurs, les polices, les fonds, les icônes et les instantanés propres à cet espace de travail. Copiez le dossier, tout le réglage suit.
+- \`.medias/\` contient les images collées, déposées ou glissées dans vos documents.
+- \`ideas/\` contient un fichier par thème d'idées.
+- \`assets/\` est l'ancien dossier d'images, conservé pour les documents plus anciens.
+
+Glissez un fichier image de votre ordinateur sur l'éditeur : il est copié dans \`.medias\` et inséré à l'endroit du dépôt, avec la même ligne d'insertion qu'un glisser d'idée.
 
 ## Markdown supporté
 
