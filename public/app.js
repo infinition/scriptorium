@@ -4708,7 +4708,7 @@ async function saveAndCloseSettings() {
       const res = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPath, ideasPath })
+        body: JSON.stringify({ newPath, ideasPath, lang: getLocale() })
       });
       const data = await res.json();
       if (data.success) {
@@ -8927,7 +8927,7 @@ function initWorkspaceSetupModal() {
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ newPath })
+          body: JSON.stringify({ newPath, lang: getLocale() })
         });
         const data = await res.json();
         if (data.success) {

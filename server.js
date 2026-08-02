@@ -904,10 +904,11 @@ function ensureWorkspaceDirs() {
   }
 }
 
-// Fills a freshly chosen empty workspace with the bilingual welcome docs and
-// the two default idea themes. Only called when the user selects a new
+// Fills a freshly chosen empty workspace with the welcome doc and demo idea
+// theme in the chosen language only, so a new workspace is not cluttered with
+// unused English and French copies. Only called when the user selects a new
 // workspace (POST /api/config) and only when that folder has no content.
-function seedNewWorkspace() {
+function seedNewWorkspace(lang) {
   try {
     const items = fs.readdirSync(workspaceDir);
     const resolvedIdeasDir = path.resolve(getIdeasDir());
@@ -920,45 +921,44 @@ function seedNewWorkspace() {
     // A folder that already contains documents must not be polluted with demos.
     if (subdirs.length > 0) return;
 
-    const welcomeEn = path.join(workspaceDir, 'Welcome.md');
-    const welcomeFr = path.join(workspaceDir, 'Bienvenue.md');
-    if (!fs.existsSync(welcomeEn)) fs.writeFileSync(welcomeEn, WELCOME_DEMO_EN, 'utf8');
-    if (!fs.existsSync(welcomeFr)) fs.writeFileSync(welcomeFr, WELCOME_DEMO_FR, 'utf8');
+    const locale = lang === 'fr' ? 'fr' : 'en';
 
-    // Demo idea themes, one per language. Created per file so a workspace whose
-    // ideas folder already exists still gets them on a fresh empty workspace.
+    // Welcome doc in the chosen language.
+    const welcomeFile = path.join(workspaceDir, locale === 'fr' ? 'Bienvenue.md' : 'Welcome.md');
+    if (!fs.existsSync(welcomeFile)) {
+      fs.writeFileSync(welcomeFile, locale === 'fr' ? WELCOME_DEMO_FR : WELCOME_DEMO_EN, 'utf8');
+    }
+
+    // Demo idea theme in the chosen language. Created per file so a workspace
+    // whose ideas folder already exists still gets it on a fresh empty folder.
     const ideasDir = getIdeasDir();
     fs.mkdirSync(ideasDir, { recursive: true });
-    const defaultThemes = {
-      'general': {
-        name: 'General ideas',
-        ideas: [
-          'Each line starting with a dash is an idea',
-          'Click an idea to archive it',
-          'Right-click to insert an idea into your text',
-          'Hover an idea to read it in full',
-          'Add your own ideas, one per line',
-          'An ideas theme is just a markdown file'
-        ]
-      },
-      'général': {
-        name: 'Idées générales',
-        ideas: [
-          'Chaque ligne commençant par un tiret est une idée',
-          'Cliquez sur une idée pour l\'archiver',
-          'Clic droit pour insérer une idée dans votre texte',
-          'Survolez une idée pour la lire en entier',
-          'Ajoutez vos propres idées, une par ligne',
-          'Un thème d\'idées est simplement un fichier markdown'
-        ]
-      }
+    const demoTheme = locale === 'fr' ? {
+      id: 'général',
+      name: 'Idées générales',
+      ideas: [
+        'Chaque ligne commençant par un tiret est une idée',
+        'Cliquez sur une idée pour l\'archiver',
+        'Clic droit pour insérer une idée dans votre texte',
+        'Survolez une idée pour la lire en entier',
+        'Ajoutez vos propres idées, une par ligne',
+        'Un thème d\'idées est simplement un fichier markdown'
+      ]
+    } : {
+      id: 'general',
+      name: 'General ideas',
+      ideas: [
+        'Each line starting with a dash is an idea',
+        'Click an idea to archive it',
+        'Right-click to insert an idea into your text',
+        'Hover an idea to read it in full',
+        'Add your own ideas, one per line',
+        'An ideas theme is just a markdown file'
+      ]
     };
-    for (const [id, theme] of Object.entries(defaultThemes)) {
-      const themeFile = path.join(ideasDir, `${id}.md`);
-      if (!fs.existsSync(themeFile)) {
-        const fileContent = `# ${theme.name}\n\n` + theme.ideas.map(idea => `- [ ] ${idea}`).join('\n') + '\n';
-        fs.writeFileSync(themeFile, fileContent, 'utf8');
-      }
+    const themeFile = path.join(ideasDir, `${demoTheme.id}.md`);
+    if (!fs.existsSync(themeFile)) {
+      fs.writeFileSync(themeFile, `# ${demoTheme.name}\n\n` + demoTheme.ideas.map(idea => `- [ ] ${idea}`).join('\n') + '\n', 'utf8');
     }
   } catch (err) {
     console.error('Error seeding new workspace:', err);
@@ -1139,11 +1139,11 @@ app.post('/api/lock', (req, res) => {
 
 // Update config
 app.post('/api/config', (req, res) => {
-  const { newPath, ideasPath } = req.body;
+  const { newPath, ideasPath, lang } = req.body;
   if (!newPath) {
     return res.status(400).json({ error: 'Path is required' });
   }
-  
+
   workspaceDir = path.resolve(newPath);
   if (ideasPath !== undefined) {
     ideasDirSetting = ideasPath ? ideasPath.trim() : '';
@@ -1152,7 +1152,7 @@ app.post('/api/config', (req, res) => {
   saveConfig();
   ensureWorkspaceDirs();
   // Demo content is only for a brand-new, empty workspace the user just picked.
-  seedNewWorkspace();
+  seedNewWorkspace(lang);
 
   res.json({
     success: true,
