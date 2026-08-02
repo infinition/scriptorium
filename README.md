@@ -117,6 +117,9 @@ the file is renamed on save.
   in any text field to open a media gallery (thumbnails, scroll), insert one
   instead of `%%`, delete one directly, or import more. In Settings > Appearance
   you can align images (left, center, right) and cap their width.
+- **Paper mode**: Settings > Appearance can turn the editing area into a white
+  page with rounded corners, like a sheet of paper. The font preview in the
+  panel mirrors the white page so what you see is what you get.
 - **Root section**: the root (General) section holds the files at the workspace
   root. Rename it inline or from Settings, and hide it (right-click > Hide
   section, or the Settings toggle) to work with subfolders only.

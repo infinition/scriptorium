@@ -239,6 +239,7 @@
   "settings.image_align_right": "Droite",
   "settings.image_width_label": "Largeur des images",
   "settings.image_width_full": "Toute la largeur disponible",
+  "settings.paper_mode_label": "Zone d'édition en page (fond blanc)",
   "settings.cancel_btn": "Annuler",
   "settings.save_btn": "Enregistrer",
   "settings.language_desc": "Choisissez la langue de l'application. Le changement s'applique imm\u00e9diatement.",

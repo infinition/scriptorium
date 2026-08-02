@@ -4768,6 +4768,25 @@ function initImageSettingsControl() {
   });
 }
 
+// Paper page mode: the editing area becomes a white sheet (Settings > Appearance).
+function loadPaperMode() {
+  return localStorage.getItem('scriptoriumPaperMode') === '1';
+}
+let paperModeState = loadPaperMode();
+function applyPaperMode() {
+  document.body.classList.toggle('paper-mode', paperModeState);
+}
+function initPaperModeControl() {
+  applyPaperMode();
+  const input = $('paperModeInput');
+  if (input) input.checked = paperModeState;
+  $('paperModeInput')?.addEventListener('change', () => {
+    paperModeState = $('paperModeInput').checked;
+    localStorage.setItem('scriptoriumPaperMode', paperModeState ? '1' : '0');
+    applyPaperMode();
+  });
+}
+
 // Settings Modal Events
 async function saveAndCloseSettings() {
   const newPath = workspacePathInput ? workspacePathInput.value.trim() : '';
@@ -9281,6 +9300,7 @@ initFontSizeControls();
 initBlockGapControl();
 initLineHeightControl();
 initImageSettingsControl();
+initPaperModeControl();
 initAppBackgroundControl();
 initProWriterTools();
 initLanguageSettings();

@@ -951,6 +951,34 @@ button { font: inherit; color: inherit; }
 }
 .content-area::placeholder { color: var(--text-faint); font-style: italic; }
 
+/* Paper page mode: the editing area becomes a white sheet with rounded corners
+   and a shadow, like a printed page, instead of a transparent background. */
+.paper-mode .content-area {
+  background: #fff;
+  color: #1f2937;
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  padding: 56px 60px;
+  max-width: 820px;
+  min-height: 920px;
+  margin: 0 auto;
+}
+.paper-mode .content-area::placeholder { color: #9ca3af; }
+.paper-mode .editor-line.active-line { background: rgba(124, 58, 237, 0.08); outline-color: rgba(124, 58, 237, 0.08); }
+/* In paper mode the font preview mirrors the white page so the appearance panel
+   stays truthful to what the editor looks like. */
+body.paper-mode .font-size-preview {
+  background: #fff;
+  color: #1f2937;
+  border-color: #e2e8f0;
+}
+body.paper-mode .font-size-preview .fsp-doc-subtitle,
+body.paper-mode .font-size-preview .fsp-h5,
+body.paper-mode .font-size-preview .fsp-h6,
+body.paper-mode .font-size-preview .fsp-quote blockquote {
+  color: #64748b;
+}
+
 /* preview mode and inline editor: rendered markdown */
 .preview, .preview-content, .content-area {
   font-family: var(--serif);
