@@ -11,6 +11,8 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
 
+use tauri::Manager;
+
 // The spawned `node server.js` process, killed when the window closes.
 static SERVER: Mutex<Option<Child>> = Mutex::new(None);
 
@@ -22,12 +24,35 @@ const CANDIDATE_PORTS: [u16; 3] = [48731, 48732, 48733];
 // Where server.js, config.json and node_modules live. In dev, cargo runs from
 // src-tauri (the project root is its parent); a packaged or ad-hoc run may
 // happen from the repo root itself.
-fn find_project_root() -> Option<PathBuf> {
+fn find_project_root(resource_dir: Option<PathBuf>) -> Option<PathBuf> {
     // SCRIPTORIUM_ROOT wins when set explicitly.
     if let Ok(p) = std::env::var("SCRIPTORIUM_ROOT") {
         let root = PathBuf::from(p);
         if root.join("server.js").exists() {
             return Some(root);
+        }
+    }
+    // Tauri's canonical resource directory. A .deb installs the bundle there
+    // (e.g. /usr/lib/Scriptorium); the ".." resources land in an _up_ folder,
+    // so both the folder itself and its _up_ child are candidates. Without
+    // this the packaged binary only walked parents of the executable and never
+    // found server.js on Linux.
+    if let Some(rd) = resource_dir {
+        let candidates = [rd.clone(), rd.join("_up_")];
+        for c in &candidates {
+            if c.join("server.js").exists() {
+                return Some(c.clone());
+            }
+        }
+        // The .deb may place the resources under the product name while Tauri
+        // reports a sibling (crate-name) folder; check the parent too.
+        if let Some(parent) = rd.parent() {
+            let siblings = [parent.join("_up_"), parent.join("Scriptorium").join("_up_")];
+            for c in &siblings {
+                if c.join("server.js").exists() {
+                    return Some(c.clone());
+                }
+            }
         }
     }
     if let Ok(cwd) = std::env::current_dir() {
@@ -298,7 +323,7 @@ mod job {
 pub fn run() {
     let app = tauri::Builder::default()
         .setup(|app| {
-            let root = find_project_root()
+            let root = find_project_root(app.path().resource_dir().ok())
                 .or_else(extract_portable_payload)
                 .ok_or_else(|| fatal("Serveur Scriptorium introuvable. Utilisez l'archive portable, ou placez l'application dans le dossier du projet, à côté de server.js."))?;
 
