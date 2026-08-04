@@ -3,6 +3,10 @@ node_modules/
 
 # Local runtime config (workspace path and access token are per-machine)
 config.json
+# Sidecars of the atomic writer: backup, in-flight write, quarantined file
+config.json.bak
+config.json.tmp
+config.json.corrupt-*
 
 # Custom colour theme saved from Settings > Apparence
 theme.custom.json

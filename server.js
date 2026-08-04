@@ -52,6 +52,103 @@ const CUSTOM_THEME_FILE = path.join(__dirname, 'theme.custom.json');
 let workspaceDir = path.join(require('os').homedir(), 'Scriptorium');
 let ideasDirSetting = '';
 
+// ============ FAULT-TOLERANT JSON STORAGE ============
+// Settings files are written through here. A crash, a full disk or a USB stick
+// pulled mid-write must never leave a truncated file that costs the user the
+// whole customisation of a workspace: we write a temp file, flush it to disk,
+// keep the previous version as .bak, then rename over the target. Rename over
+// an existing file is atomic on Windows, macOS and Linux alike.
+function writeJsonAtomic(file, data) {
+  const tmp = `${file}.tmp`;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const json = JSON.stringify(data, null, 2);
+    const fd = fs.openSync(tmp, 'w');
+    try {
+      fs.writeFileSync(fd, json, 'utf8');
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    if (fs.existsSync(file)) {
+      // Best effort: losing the backup is not a reason to abort the write.
+      try { fs.copyFileSync(file, `${file}.bak`); } catch (err) {}
+    }
+    fs.renameSync(tmp, file);
+    return true;
+  } catch (err) {
+    console.error(`Error writing ${path.basename(file)}:`, err);
+    try { fs.unlinkSync(tmp); } catch (e) {}
+    return false;
+  }
+}
+
+// Reads a JSON object, falling back to the .bak copy when the main file is
+// unreadable. A damaged file is kept under a .corrupt name rather than
+// overwritten, so nothing is destroyed silently.
+function readJsonSafe(file, fallback) {
+  for (const candidate of [file, `${file}.bak`]) {
+    if (!fs.existsSync(candidate)) continue;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (candidate !== file) {
+          console.warn(`${path.basename(file)} was unreadable, recovered from its backup.`);
+        }
+        return parsed;
+      }
+    } catch (err) {
+      console.error(`Error reading ${path.basename(candidate)}:`, err.message);
+      if (candidate === file) {
+        try { fs.renameSync(file, `${file}.corrupt-${Date.now()}`); } catch (e) {}
+      }
+    }
+  }
+  return fallback;
+}
+
+// ============ PORTABLE PATHS ============
+// A path that sits under the reference folder is stored relative to it, with
+// forward slashes. A workspace carried on a USB stick therefore survives the
+// drive letter changing between machines, and reads the same on Windows,
+// macOS and Linux. Anything outside stays absolute, because there is nothing
+// portable to say about it.
+function toPortablePath(target, baseDir) {
+  if (!target) return '';
+  const abs = path.resolve(target);
+  const rel = path.relative(path.resolve(baseDir), abs);
+  if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) {
+    return rel.split(path.sep).join('/');
+  }
+  return abs;
+}
+
+// Windows hands out 8.3 short names (C:\Users\INFINI~1\…) and macOS reaches
+// /tmp through a symlink, so the same folder can be spelled several ways. The
+// canonical spelling keeps the stored path, the file watcher and every path
+// comparison talking about the same thing. This is not cosmetic: libuv aborts
+// the whole process when the folder it watches is handed to it in short form.
+function canonicalDir(dir) {
+  if (!dir) return dir;
+  try {
+    return fs.realpathSync.native(dir);
+  } catch (err) {
+    // The folder does not exist yet, or is unreadable: resolving is the best we
+    // can do, and the caller reports a missing workspace from there.
+    return path.resolve(dir);
+  }
+}
+
+function fromPortablePath(stored, baseDir) {
+  if (!stored) return '';
+  if (path.isAbsolute(stored)) return path.resolve(stored);
+  // A Windows path read on macOS or Linux: it cannot be resolved here, so keep
+  // it as it is and let the caller report a missing folder rather than build a
+  // nonsensical path under the base folder.
+  if (/^[A-Za-z]:[\\/]/.test(stored)) return stored;
+  return path.resolve(baseDir, stored);
+}
+
 // Display preferences for the "Général" section (the workspace root). Renaming
 // is a display-only label: _general has no folder of its own to rename, and
 // hiding it lets the user work with subfolders only. Both are stored in
@@ -65,26 +162,34 @@ let hideGeneral = false;
 function getSettingsFile() {
   return path.join(getScriptoriumDir(), 'settings.json');
 }
+
+// A workspace can be copied to a USB stick, synced to a cloud drive or
+// committed to a repository, so device-only values must never be written into
+// it. The LAN access token is one: it belongs to the phone or laptop that was
+// handed the URL, not to the folder.
+const DEVICE_ONLY_KEYS = new Set(['scriptorium_token']);
+
+// Settings that describe the workspace itself rather than the look of the app
+// live under this reserved key. The client never reads or writes it, so a
+// preferences sync from any device cannot clobber it.
+const WORKSPACE_BLOCK = '_workspace';
+
 function loadWorkspaceSettings() {
-  try {
-    if (fs.existsSync(getSettingsFile())) {
-      const data = JSON.parse(fs.readFileSync(getSettingsFile(), 'utf8'));
-      return (data && typeof data === 'object') ? data : {};
-    }
-  } catch (err) {
-    console.error('Error loading workspace settings:', err);
-  }
-  return {};
+  return readJsonSafe(getSettingsFile(), {});
 }
+
 function saveWorkspaceSettings(settings) {
-  try {
-    fs.mkdirSync(getScriptoriumDir(), { recursive: true });
-    fs.writeFileSync(getSettingsFile(), JSON.stringify(settings || {}, null, 2), 'utf8');
-    return true;
-  } catch (err) {
-    console.error('Error saving workspace settings:', err);
-    return false;
-  }
+  return writeJsonAtomic(getSettingsFile(), settings || {});
+}
+
+// Drops any device-only key that an older version mirrored into the workspace.
+function purgeDeviceOnlySettings() {
+  const all = loadWorkspaceSettings();
+  const found = [...DEVICE_ONLY_KEYS].filter((key) => key in all);
+  if (found.length === 0) return;
+  found.forEach((key) => { delete all[key]; });
+  console.warn(`Removed device-only ${found.join(', ')} from the workspace settings.`);
+  saveWorkspaceSettings(all);
 }
 let accessToken = '';
 let workspaceLocked = false;
@@ -250,48 +355,78 @@ function getIdeasDir() {
   return path.join(workspaceDir, 'ideas');
 }
 
+// Values that used to live in config.json although they describe a workspace.
+// Captured at load so migrateLegacyConfig() can move them where they belong.
+let legacyWorkspaceConfig = {};
+
+// config.json now holds the two things that cannot live inside a workspace:
+// which workspace to open (the chicken and egg of any pointer) and the LAN
+// access token (a secret that must not travel with the folder).
 function loadConfig() {
-  try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-      if (data.workspaceDir) {
-        workspaceDir = data.workspaceDir;
-        workspaceConfigured = true;
-      }
-      if (data.ideasDir !== undefined) {
-        ideasDirSetting = data.ideasDir;
-      }
-      if (typeof data.accessToken === 'string') {
-        accessToken = data.accessToken;
-      }
-      if (typeof data.locked === 'boolean') {
-        workspaceLocked = data.locked;
-      }
-      if (typeof data.generalLabel === 'string') {
-        generalLabel = data.generalLabel;
-      }
-      if (typeof data.hideGeneral === 'boolean') {
-        hideGeneral = data.hideGeneral;
-      }
-    }
-  } catch (err) {
-    console.error('Error loading config:', err);
+  const data = readJsonSafe(CONFIG_FILE, {});
+  if (typeof data.workspaceDir === 'string' && data.workspaceDir) {
+    workspaceDir = canonicalDir(fromPortablePath(data.workspaceDir, __dirname));
+    workspaceConfigured = true;
   }
+  if (typeof data.accessToken === 'string') {
+    accessToken = data.accessToken;
+  }
+  legacyWorkspaceConfig = {
+    ideasDir: typeof data.ideasDir === 'string' ? data.ideasDir : undefined,
+    locked: typeof data.locked === 'boolean' ? data.locked : undefined,
+    generalLabel: typeof data.generalLabel === 'string' ? data.generalLabel : undefined,
+    hideGeneral: typeof data.hideGeneral === 'boolean' ? data.hideGeneral : undefined
+  };
 }
 
 function saveConfig() {
-  try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify({
-      // An env override is for this run only — it must not leak into the file.
-      workspaceDir: process.env.SCRIPTORIUM_WORKSPACE ? configuredWorkspaceDir : workspaceDir,
-      ideasDir: ideasDirSetting,
-      accessToken,
-      locked: workspaceLocked,
-      generalLabel,
-      hideGeneral
-    }, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Error saving config:', err);
+  // An env override is for this run only, it must not leak into the file.
+  const target = process.env.SCRIPTORIUM_WORKSPACE ? configuredWorkspaceDir : workspaceDir;
+  return writeJsonAtomic(CONFIG_FILE, {
+    // Relative to the app folder when the workspace sits under it, so an app
+    // and its workspace on the same stick survive a new drive letter.
+    workspaceDir: toPortablePath(target, __dirname),
+    accessToken
+  });
+}
+
+// Reads the workspace-scoped settings of the workspace currently open. Called
+// again on every workspace switch, which is what stops one workspace's root
+// label, padlock or ideas folder from following you into the next one.
+function loadWorkspaceScoped() {
+  const block = loadWorkspaceSettings()[WORKSPACE_BLOCK];
+  const data = (block && typeof block === 'object' && !Array.isArray(block)) ? block : {};
+  ideasDirSetting = typeof data.ideasDir === 'string' ? fromPortablePath(data.ideasDir, workspaceDir) : '';
+  generalLabel = typeof data.generalLabel === 'string' ? data.generalLabel : '';
+  hideGeneral = data.hideGeneral === true;
+  workspaceLocked = data.locked === true;
+}
+
+function saveWorkspaceScoped() {
+  const all = loadWorkspaceSettings();
+  all[WORKSPACE_BLOCK] = {
+    ideasDir: toPortablePath(ideasDirSetting, workspaceDir),
+    generalLabel,
+    hideGeneral,
+    locked: workspaceLocked
+  };
+  return saveWorkspaceSettings(all);
+}
+
+// One-time move of the workspace-scoped fields out of config.json, run once per
+// workspace. Before this, renaming the root section or locking a workspace
+// applied to every workspace opened afterwards.
+function migrateLegacyConfig() {
+  if (!workspaceConfigured) return;
+  if (loadWorkspaceSettings()[WORKSPACE_BLOCK]) return;
+  const legacy = legacyWorkspaceConfig;
+  if (legacy.ideasDir !== undefined) ideasDirSetting = legacy.ideasDir;
+  if (legacy.generalLabel !== undefined) generalLabel = legacy.generalLabel;
+  if (legacy.hideGeneral !== undefined) hideGeneral = legacy.hideGeneral;
+  if (legacy.locked !== undefined) workspaceLocked = legacy.locked;
+  if (saveWorkspaceScoped()) {
+    // config.json is rewritten without the moved fields.
+    saveConfig();
   }
 }
 
@@ -301,11 +436,17 @@ loadConfig();
 // touching the saved config: SCRIPTORIUM_WORKSPACE=/tmp/scratch npm start
 let configuredWorkspaceDir = workspaceDir;
 if (process.env.SCRIPTORIUM_WORKSPACE) {
-  workspaceDir = path.resolve(process.env.SCRIPTORIUM_WORKSPACE);
+  workspaceDir = canonicalDir(path.resolve(process.env.SCRIPTORIUM_WORKSPACE));
   // An explicit override counts as configured for this run.
   workspaceConfigured = true;
   console.log(`Workspace overridden by SCRIPTORIUM_WORKSPACE: ${workspaceDir}`);
 }
+
+// The workspace is known by now, so its own settings can be read. Migration
+// runs after, and only fills in a workspace that has none yet.
+loadWorkspaceScoped();
+migrateLegacyConfig();
+purgeDeviceOnlySettings();
 
 // A token is only meaningful once the server is reachable from outside this
 // machine; on loopback the OS already scopes access to the local user.
@@ -1179,7 +1320,7 @@ app.post('/api/general-settings', (req, res) => {
   if (typeof newHide === 'boolean') {
     hideGeneral = newHide;
   }
-  saveConfig();
+  saveWorkspaceScoped();
   res.json({ success: true, generalLabel, hideGeneral });
 });
 
@@ -1283,7 +1424,7 @@ app.post('/api/lock', (req, res) => {
     return res.status(400).json({ error: 'locked (boolean) is required' });
   }
   workspaceLocked = locked;
-  saveConfig();
+  saveWorkspaceScoped();
   res.json({ success: true, locked: workspaceLocked });
 });
 
@@ -1295,11 +1436,22 @@ app.post('/api/config', (req, res) => {
   }
 
   workspaceDir = path.resolve(newPath);
+  workspaceConfigured = true;
+  // Create the folder before canonicalising it: a brand new workspace has no
+  // real path to read yet, and the watcher must be given the canonical one.
+  // Only the root, the rest of the skeleton waits until the settings of this
+  // workspace are loaded, otherwise the previous ideas folder gets recreated.
+  try { fs.mkdirSync(workspaceDir, { recursive: true }); } catch (err) {}
+  workspaceDir = canonicalDir(workspaceDir);
+  saveConfig();
+  // Adopt the settings of the workspace we just opened before applying what
+  // the user typed, so nothing carries over from the previous one.
+  loadWorkspaceScoped();
   if (ideasPath !== undefined) {
     ideasDirSetting = ideasPath ? ideasPath.trim() : '';
   }
-  workspaceConfigured = true;
-  saveConfig();
+  saveWorkspaceScoped();
+  purgeDeviceOnlySettings();
   ensureWorkspaceDirs();
   // Demo content is only for a brand-new, empty workspace the user just picked.
   seedNewWorkspace(lang);
@@ -1769,15 +1921,33 @@ app.post('/api/rename-folder', (req, res) => {
 // Workspace preferences (theme, fonts, backgrounds, icons, spacing, language)
 // stored in .scriptorium/settings.json, so each workspace is portable.
 app.get('/api/settings', (req, res) => {
-  res.json({ settings: loadWorkspaceSettings() });
+  const all = loadWorkspaceSettings();
+  // The reserved block is server-owned and device-only keys never belong to a
+  // workspace, so neither is handed to the client.
+  const settings = {};
+  for (const [key, value] of Object.entries(all)) {
+    if (key === WORKSPACE_BLOCK || DEVICE_ONLY_KEYS.has(key)) continue;
+    settings[key] = value;
+  }
+  res.json({ settings });
 });
 
+// The client posts the full set of preferences it holds. Merging rather than
+// overwriting keeps the reserved block intact, and a device that somehow sends
+// a token cannot write it into the folder.
 app.post('/api/settings', guarded((req, res) => {
-  const settings = (req.body && req.body.settings) || {};
-  if (typeof settings !== 'object' || Array.isArray(settings)) {
+  const incoming = (req.body && req.body.settings) || {};
+  if (typeof incoming !== 'object' || Array.isArray(incoming)) {
     return res.status(400).json({ error: 'Invalid settings' });
   }
-  if (saveWorkspaceSettings(settings)) {
+  const merged = {};
+  for (const [key, value] of Object.entries(incoming)) {
+    if (key === WORKSPACE_BLOCK || DEVICE_ONLY_KEYS.has(key)) continue;
+    merged[key] = value;
+  }
+  const existing = loadWorkspaceSettings()[WORKSPACE_BLOCK];
+  if (existing) merged[WORKSPACE_BLOCK] = existing;
+  if (saveWorkspaceSettings(merged)) {
     res.json({ success: true });
   } else {
     res.status(500).json({ error: 'Failed to save settings' });

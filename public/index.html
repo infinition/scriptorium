@@ -37,10 +37,28 @@
 <script>
 // Hydrate localStorage from the workspace settings file before the app reads
 // it, so every workspace carries its own preferences (theme, fonts, icons…).
+// Which localStorage keys follow the workspace and which stay on the device.
+// The access token is device-only: a workspace can be copied to a stick or
+// synced to a drive, and the token must never travel with it. The right panel
+// view is device-only too, since a phone and a desktop do not lay out the same
+// way. Everything else that describes the workspace follows the folder, so the
+// same workspace looks identical on Windows, macOS, Linux, Android and iOS.
+window.__scriptoriumDeviceOnly = { scriptorium_token: 1, rightPanelView: 1 };
+window.__scriptoriumSynced = function (key) {
+  if (typeof key !== 'string') return false;
+  if (window.__scriptoriumDeviceOnly[key]) return false;
+  return key.indexOf('scriptorium') === 0 || key.indexOf('section-collapsed-') === 0;
+};
 (function () {
   try {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/api/settings', false); // synchronous, runs before app.js
+    // On a phone or tablet the server is reached over the LAN and guards every
+    // API call with a token. app.js has not run yet, so the token is picked up
+    // here, from the URL on the first visit and from storage after that.
+    var token = new URLSearchParams(location.search).get('token')
+      || localStorage.getItem('scriptorium_token');
+    if (token) xhr.setRequestHeader('X-Scriptorium-Token', token);
     xhr.send();
     if (xhr.status === 200) {
       var ws = JSON.parse(xhr.responseText).settings || {};
@@ -49,12 +67,12 @@
       // keep the previous workspace's value.
       for (var i = localStorage.length - 1; i >= 0; i--) {
         var k = localStorage.key(i);
-        if (k && k.indexOf('scriptorium') === 0 && !(k in ws)) {
+        if (window.__scriptoriumSynced(k) && !(k in ws)) {
           localStorage.removeItem(k);
         }
       }
       for (var k in ws) {
-        if (k.indexOf('scriptorium') === 0) localStorage.setItem(k, ws[k]);
+        if (window.__scriptoriumSynced(k)) localStorage.setItem(k, ws[k]);
       }
     }
   } catch (e) {}

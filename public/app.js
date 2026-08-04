@@ -1,31 +1,47 @@
 'use strict';
 
 // ============ WORKSPACE-SCOPED PREFERENCES ============
-// Every scriptorium* localStorage key is mirrored to
+// Workspace-scoped localStorage keys are mirrored to
 // <workspace>/.scriptorium/settings.json, so a workspace is an independent,
-// portable unit. The pre-paint script hydrates localStorage from the file;
-// here writes are synced back (debounced).
+// portable unit. The pre-paint script in index.html hydrates localStorage from
+// the file and owns the list of keys that follow the workspace; here writes are
+// synced back (debounced).
 (function () {
   const origSet = Storage.prototype.setItem;
   const origRemove = Storage.prototype.removeItem;
   let saveTimer = null;
-  const isPref = (k) => typeof k === 'string' && k.indexOf('scriptorium') === 0;
+  let retryTimer = null;
+  // The pre-paint script defines this. The fallback only matters if that script
+  // failed to run, and errs on the safe side by never syncing the token.
+  const isPref = window.__scriptoriumSynced
+    || ((k) => typeof k === 'string' && k.indexOf('scriptorium') === 0 && k !== 'scriptorium_token');
+
+  function push(attempt) {
+    const out = {};
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (isPref(k)) out[k] = localStorage.getItem(k);
+      }
+    } catch (e) {}
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: out })
+    }).then((res) => {
+      if (!res.ok) throw new Error(res.status);
+    }).catch(() => {
+      // A phone on a weak link must not lose a preference silently: retry a few
+      // times with a growing delay, then give up until the next change.
+      if (attempt >= 3) return;
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => push(attempt + 1), 1000 * Math.pow(2, attempt));
+    });
+  }
+
   function scheduleSync() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      const out = {};
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (isPref(k)) out[k] = localStorage.getItem(k);
-        }
-      } catch (e) {}
-      fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: out })
-      }).catch(() => {});
-    }, 400);
+    saveTimer = setTimeout(() => push(0), 400);
   }
   Storage.prototype.setItem = function (k, v) {
     origSet.call(this, k, v);
@@ -35,6 +51,14 @@
     origRemove.call(this, k);
     if (this === localStorage && isPref(k)) scheduleSync();
   };
+  // iOS and Android suspend a backgrounded tab without warning, so flush a
+  // pending change while the page is still alive.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && saveTimer) {
+      clearTimeout(saveTimer);
+      push(0);
+    }
+  });
 })();
 
 // ============ ACCESS TOKEN ============
