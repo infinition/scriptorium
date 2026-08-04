@@ -4907,15 +4907,19 @@ function renderUpdateState() {
   const notes = $('updateNotesLink');
   const install = $('updateInstallBtn');
   const toggle = $('updateCheckToggle');
+  const version = $('updateVersion');
   if (!bar || !text) return;
 
   if (settingsBtn) settingsBtn.classList.toggle('has-update', !!updateState.updateAvailable);
 
   bar.hidden = false;
   if (toggle) toggle.checked = updateState.enabled !== false;
+  // The version you are running is shown in every state, waiting update
+  // included: it is the answer to "which one am I on", which comes first.
+  if (version) version.textContent = __('update.version', { version: updateState.current || '' });
 
   if (updateState.enabled === false) {
-    text.textContent = __('update.disabled', { version: updateState.current || '' });
+    text.textContent = __('update.disabled');
     if (dot) dot.hidden = true;
     if (notes) notes.hidden = true;
     if (install) install.hidden = true;
@@ -4929,7 +4933,7 @@ function renderUpdateState() {
     // Only a desktop build with the updater plugin can install by itself.
     if (install) install.hidden = !window.__TAURI__;
   } else {
-    text.textContent = __('update.up_to_date', { version: updateState.current || '' });
+    text.textContent = __('update.up_to_date');
     if (dot) dot.hidden = true;
     if (notes) notes.hidden = true;
     if (install) install.hidden = true;

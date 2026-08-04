@@ -414,6 +414,10 @@ window.__scriptoriumSynced = function (key) {
     <div class="update-bar" id="updateBar" hidden>
       <div class="update-line">
         <span class="update-dot" id="updateDot" hidden></span>
+        <!-- The installed version shows in every state, including when an
+             update is waiting: knowing what you run comes before knowing what
+             you could run. -->
+        <span class="update-version" id="updateVersion"></span>
         <span id="updateText"></span>
         <a id="updateNotesLink" href="#" target="_blank" rel="noopener" data-i18n="update.notes" hidden>See what changed</a>
       </div>

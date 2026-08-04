@@ -137,8 +137,12 @@ jobs:
           rm -f payload.tar.gz
           gh release upload "$GITHUB_REF_NAME" "Scriptorium_${VERSION}_x64.exe" --clobber
 
-      # Tauri names the macOS .app.tar.gz without the version. Rename it so
-      # every asset carries the version.
+      # Tauri names the macOS .app.tar.gz without the version. Publish a copy
+      # that carries it, for anyone downloading by hand.
+      #
+      # The original has to stay: latest.json points the macOS updater at that
+      # exact name, and its signature is published under it too. Deleting it,
+      # which this step used to do, left the manifest aiming at a 404.
       - name: Version the macOS tar.gz
         if: matrix.platform == 'macos-latest' && startsWith(github.ref, 'refs/tags/')
         shell: bash
@@ -146,9 +150,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          OLD="Scriptorium_aarch64.app.tar.gz"
           NEW="Scriptorium_${VERSION}_aarch64.app.tar.gz"
           FILE=$(find src-tauri/target/release/bundle -name "*.app.tar.gz" | head -1)
           cp "$FILE" "$NEW"
-          gh release delete-asset "$GITHUB_REF_NAME" "$OLD" --yes || true
           gh release upload "$GITHUB_REF_NAME" "$NEW" --clobber

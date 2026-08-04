@@ -371,7 +371,9 @@ button { font: inherit; color: inherit; }
   font-size: 13px;
   color: var(--text-muted);
 }
-.update-line { display: flex; align-items: center; gap: 8px; }
+.update-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* The installed version is the fact, the rest is commentary on it. */
+.update-version { color: var(--text); font-weight: 500; }
 .update-dot {
   width: 7px;
   height: 7px;

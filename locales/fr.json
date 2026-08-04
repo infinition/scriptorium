@@ -499,11 +499,12 @@
   "toast.no_empty_lines": "Aucune ligne vide à supprimer",
   "panel.cycle_tooltip": "Changer de panneau (clic pour cycle)",
   "update.available": "La version {version} est disponible",
-  "update.up_to_date": "Scriptorium {version} est à jour",
-  "update.disabled": "Scriptorium {version}. Vérification des mises à jour désactivée.",
+  "update.up_to_date": "est à jour",
+  "update.disabled": "Vérification des mises à jour désactivée.",
   "update.notes": "Voir les changements",
   "update.install_btn": "Installer et redémarrer",
   "update.installing": "Installation…",
   "update.install_error": "Échec de la mise à jour, ouverture de la page de téléchargement",
-  "update.check_label": "Vérifier les nouvelles versions"
+  "update.check_label": "Vérifier les nouvelles versions",
+  "update.version": "Scriptorium {version}"
 }

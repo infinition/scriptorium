@@ -499,11 +499,12 @@
   "editor.block_menu_aria": "Block type",
   "panel.cycle_tooltip": "Switch panel (click to cycle)",
   "update.available": "Version {version} is available",
-  "update.up_to_date": "Scriptorium {version} is up to date",
-  "update.disabled": "Scriptorium {version}. Update check is off.",
+  "update.up_to_date": "is up to date",
+  "update.disabled": "Update check is off.",
   "update.notes": "See what changed",
   "update.install_btn": "Install and restart",
   "update.installing": "Installing…",
   "update.install_error": "Update failed, opening the download page",
-  "update.check_label": "Check for a new version"
+  "update.check_label": "Check for a new version",
+  "update.version": "Scriptorium {version}"
 }
