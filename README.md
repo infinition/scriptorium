@@ -92,6 +92,11 @@ sudo dpkg -i Scriptorium_<version>_amd64.deb
 Then launch Scriptorium from the applications menu, or run `scriptorium` from a
 terminal.
 
+The `.deb` is the one format that does not update itself. A package installed
+system-wide belongs to the package manager, not to the application, so
+Scriptorium tells you when a new version is out and leaves the install to
+`dpkg`. Every other format updates in place from the app.
+
 The AppImage, the `.deb`, the macOS app and the portable Windows exe all carry
 their own Node runtime and the server, so Node does not need to be installed on
 the target machine.

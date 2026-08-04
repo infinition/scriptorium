@@ -134,9 +134,48 @@
     font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
     font-size: 12px; color: var(--text-muted);
   }
-  .shot { margin: 52px auto 0; max-width: 780px; }
-  .shot img { width: 100%; height: auto; display: block; border: 1px solid var(--border-strong); border-radius: 12px;
-              box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55); }
+  /* Screenshot carousel. Advances on its own every 5s, pauses while the
+     pointer is on it, and can be driven by the dots, the arrow keys or a
+     swipe. Slides are stacked and cross-faded, so the frame never jumps. */
+  .shot { margin: 52px auto 0; max-width: 780px; outline: none; }
+  .shot:focus-visible .shot-frame { border-color: var(--accent); }
+  .shot-frame {
+    position: relative; border: 1px solid var(--border-strong); border-radius: 12px;
+    overflow: hidden; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+    background: var(--bg-elevated);
+  }
+  .shot-slides { position: relative; }
+  .shot-slide { display: block; width: 100%; height: auto; }
+  /* The first slide holds the frame open, the others are stacked over it. */
+  .shot-slide + .shot-slide { position: absolute; inset: 0; height: 100%; object-fit: cover; }
+  .shot-slide { opacity: 0; transition: opacity 0.6s ease; }
+  .shot-slide.current { opacity: 1; }
+
+  .shot-dots { display: flex; justify-content: center; gap: 9px; margin-top: 16px; }
+  /* A single screenshot builds no dots, and must not leave a gap behind. */
+  .shot-dots:empty { display: none; }
+  .shot-dots button {
+    position: relative; width: 9px; height: 9px; padding: 0;
+    border: 0; border-radius: 999px; background: var(--border-strong);
+    cursor: pointer; overflow: hidden;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1), background 0.25s;
+  }
+  .shot-dots button:hover { background: var(--text-faint); }
+  /* The active dot stretches into a track that fills as the timer runs, so the
+     wait is visible rather than a surprise. */
+  .shot-dots button[aria-current="true"] { width: 38px; background: var(--border-strong); }
+  .shot-dots button::after {
+    content: ''; position: absolute; inset: 0; width: 0;
+    background: var(--accent); border-radius: 999px;
+  }
+  .shot-dots button[aria-current="true"]::after { animation: shot-fill 5s linear forwards; }
+  .shot-dots button[aria-current="true"].paused::after { animation-play-state: paused; }
+  @keyframes shot-fill { from { width: 0; } to { width: 100%; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shot-slide { transition: none; }
+    .shot-dots button[aria-current="true"]::after { animation: none; width: 100%; }
+  }
 
   section { padding: 64px 0; border-top: 1px solid var(--border); }
   section h2 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 30px; margin: 0 0 32px; }
@@ -267,14 +306,22 @@
           </li>
           <li>Launch Scriptorium from the applications menu, or run <code>scriptorium</code> in a terminal.</li>
         </ol>
-        <p class="panel-note">Debian, Ubuntu and derivatives, x86_64. The package carries its own Node runtime, so Node does not need to be installed.</p>
+        <p class="panel-note">Debian, Ubuntu and derivatives, x86_64. The package carries its own Node runtime, so Node does not need to be installed. This is the one format with no in-app update: a system package is the package manager's business, so Scriptorium tells you a version is out and leaves the install to <code>dpkg</code>.</p>
       </div>
     </div>
 
     <p class="releases-note">Installers are built for every version tag. <a href="https://github.com/infinition/scriptorium/releases">See all versions</a></p>
 
-    <div class="shot">
-      <img src="screenshot.jpg" alt="Scriptorium screenshot" />
+    <!-- To add a screenshot: drop the file in docs/ and add one <img> below.
+         The dots, the timer and the keyboard control adapt on their own, and
+         the whole carousel hides its controls when there is a single slide. -->
+    <div class="shot" id="shot" tabindex="0" aria-roledescription="carousel" aria-label="Scriptorium screenshots, use the arrow keys">
+      <div class="shot-frame">
+        <div class="shot-slides">
+          <img class="shot-slide current" src="screenshot.jpg" alt="Scriptorium, the editor with a document open" />
+        </div>
+      </div>
+      <div class="shot-dots" id="shotDots"></div>
     </div>
   </div>
 
@@ -374,6 +421,74 @@
     }
     return selectAndCopy(node);
   }
+
+  // ---- Screenshot carousel ----
+  (function () {
+    var root = document.getElementById('shot');
+    var dotsBox = document.getElementById('shotDots');
+    if (!root || !dotsBox) return;
+    var slides = [].slice.call(root.querySelectorAll('.shot-slide'));
+    // One screenshot needs no controls and no timer.
+    if (slides.length < 2) return;
+
+    var index = 0;
+    var timer = null;
+    var DELAY = 5000;
+
+    var dots = slides.map(function (slide, i) {
+      var dot = document.createElement('button');
+      dot.type = 'button';
+      dot.setAttribute('aria-label', 'Screenshot ' + (i + 1) + ' of ' + slides.length);
+      dot.addEventListener('click', function () { show(i); start(); });
+      dotsBox.appendChild(dot);
+      return dot;
+    });
+
+    function show(next) {
+      index = (next + slides.length) % slides.length;
+      slides.forEach(function (slide, i) { slide.classList.toggle('current', i === index); });
+      dots.forEach(function (dot, i) {
+        // Removing the attribute restarts the fill animation from zero.
+        dot.removeAttribute('aria-current');
+        if (i === index) dot.setAttribute('aria-current', 'true');
+      });
+    }
+
+    function start() {
+      clearInterval(timer);
+      timer = setInterval(function () { show(index + 1); }, DELAY);
+    }
+
+    function pause(on) {
+      dots[index].classList.toggle('paused', on);
+      if (on) clearInterval(timer); else start();
+    }
+
+    root.addEventListener('mouseenter', function () { pause(true); });
+    root.addEventListener('mouseleave', function () { pause(false); });
+    // A backgrounded tab should not burn through the slides unseen.
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') clearInterval(timer); else start();
+    });
+
+    root.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') { show(index + 1); start(); }
+      if (e.key === 'ArrowLeft') { show(index - 1); start(); }
+    });
+
+    // Swipe, since most of the traffic that reaches a screenshot is a phone.
+    var startX = null;
+    root.addEventListener('touchstart', function (e) { startX = e.touches[0].clientX; }, { passive: true });
+    root.addEventListener('touchend', function (e) {
+      if (startX === null) return;
+      var dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) { show(index + (dx < 0 ? 1 : -1)); start(); }
+      startX = null;
+    }, { passive: true });
+
+    show(0);
+    start();
+  })();
 
   document.querySelectorAll('.cmd .copy').forEach(function (button) {
     button.addEventListener('click', function () {
