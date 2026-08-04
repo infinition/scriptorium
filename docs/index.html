@@ -60,36 +60,79 @@
   .hero .tagline { font-family: 'Newsreader', serif; font-style: italic; font-size: 22px; color: var(--text-muted); margin: 0 0 16px; }
   .hero .lead { color: var(--text-muted); font-size: 17px; max-width: 640px; margin: 0 auto 40px; }
 
-  .downloads { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .dl { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-radius: 8px;
-        background: var(--accent-soft); border: 1px solid var(--accent); color: var(--accent);
-        text-decoration: none; font-weight: 500; font-size: 15px; transition: all 0.15s; text-align: left; }
-  .dl:hover { background: var(--accent); color: var(--bg); }
-  .dl small { display: block; font-weight: 400; opacity: 0.75; font-size: 12px; }
-  .dl svg { width: 20px; height: 20px; flex-shrink: 0; }
-  .downloads.secondary { margin-top: 14px; }
-  .downloads.secondary .dl {
-    padding: 11px 18px; font-size: 14px;
-    background: transparent; border-color: var(--border-strong); color: var(--text-muted);
+  /* Platform picker: pick your OS, then the format. The panel shows the one
+     download that matters plus its install steps, commands ready to copy. */
+  .os-switch {
+    display: inline-flex; gap: 4px; padding: 4px;
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 11px;
   }
-  .downloads.secondary .dl svg { width: 17px; height: 17px; }
-  .downloads.secondary .dl small { font-size: 11px; }
-  .downloads.secondary .dl:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-  .releases-note { margin-top: 22px; font-size: 13px; color: var(--text-faint); }
-  .releases-note a { color: var(--accent); }
-  .install-notes {
-    margin: 26px auto 0; max-width: 640px; text-align: left;
-    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px;
-    padding: 16px 20px; font-size: 13px; color: var(--text-faint);
+  .os-switch button {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 20px; border: 0; border-radius: 8px;
+    background: transparent; color: var(--text-muted);
+    font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
   }
-  .install-notes p { margin: 0 0 10px; }
-  .install-notes p:last-child { margin-bottom: 0; }
-  .install-notes b { color: var(--text-muted); font-weight: 600; }
-  .install-notes code {
+  .os-switch button svg { width: 17px; height: 17px; }
+  .os-switch button:hover { color: var(--text); }
+  .os-switch button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+
+  .os-panel { display: none; max-width: 600px; margin: 22px auto 0; text-align: left; }
+  .os-panel.active { display: block; }
+  .fmt-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .fmt-row button {
+    padding: 6px 13px; border-radius: 999px;
+    border: 1px solid var(--border-strong); background: transparent; color: var(--text-muted);
+    font: inherit; font-size: 12.5px; cursor: pointer; transition: all 0.15s;
+  }
+  .fmt-row button:hover { color: var(--text); }
+  .fmt-row button[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+  .fmt-panel { display: none; }
+  .fmt-panel.active { display: block; }
+  .get {
+    display: flex; align-items: center; gap: 14px;
+    padding: 15px 20px; border-radius: 10px;
+    background: var(--accent); color: var(--bg); text-decoration: none;
+    font-weight: 600; font-size: 15px; transition: filter 0.15s;
+  }
+  .get:hover { filter: brightness(1.09); }
+  .get svg { width: 19px; height: 19px; flex-shrink: 0; }
+  .get .file { display: block; font-weight: 400; font-size: 12px; opacity: 0.72; }
+
+  .steps { margin: 18px 0 0; padding-left: 22px; color: var(--text-muted); font-size: 13.5px; line-height: 1.65; }
+  .steps li { margin-bottom: 12px; }
+  .steps li:last-child { margin-bottom: 0; }
+  .steps li::marker { color: var(--text-faint); }
+  .steps code {
     font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
-    font-size: 12px; color: var(--accent);
-    background: var(--accent-soft); border-radius: 4px; padding: 1px 5px;
-    word-break: break-all;
+    font-size: 12.5px; color: var(--text);
+  }
+
+  .cmd {
+    display: flex; align-items: center; gap: 10px; margin-top: 9px;
+    background: var(--bg); border: 1px solid var(--border-strong); border-radius: 7px;
+    padding: 8px 8px 8px 12px;
+  }
+  .cmd code {
+    flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap;
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 12.5px; color: var(--accent);
+  }
+  .cmd button {
+    flex-shrink: 0; padding: 4px 10px; border-radius: 5px;
+    border: 1px solid var(--border-strong); background: transparent; color: var(--text-faint);
+    font: inherit; font-size: 11.5px; cursor: pointer; transition: all 0.15s;
+  }
+  .cmd button:hover, .cmd button.done { color: var(--accent); border-color: var(--accent); }
+
+  .panel-note {
+    margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--border);
+    font-size: 12.5px; color: var(--text-faint);
+  }
+  .panel-note code {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--text-muted);
   }
   .shot { margin: 52px auto 0; max-width: 780px; }
   .shot img { width: 100%; height: auto; display: block; border: 1px solid var(--border-strong); border-radius: 12px;
@@ -108,8 +151,11 @@
   @media (max-width: 640px) {
     .hero { padding: 64px 0 48px; }
     .hero h1 { font-size: 40px; }
-    .downloads { flex-direction: column; align-items: stretch; }
-    .dl { justify-content: center; }
+    .os-switch { display: flex; width: 100%; }
+    .os-switch button { flex: 1; justify-content: center; padding: 9px 10px; }
+    .get { padding: 14px 16px; font-size: 14px; }
+    .cmd { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 12px; }
+    .cmd button { align-self: flex-start; }
   }
 </style>
 </head>
@@ -133,43 +179,99 @@
     <p class="tagline">Your writing companion.</p>
     <p class="lead">A distraction-free Markdown editor that reads and writes plain `.md` files on your own disk. Headings, lists, code and math render live; nothing leaves your machine.</p>
 
-    <div class="downloads">
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_x64-setup.exe">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        <span>Windows<small>Scriptorium_1.2.11_x64-setup.exe</small></span>
-      </a>
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_aarch64.dmg">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="4"/><circle cx="7" cy="8" r="1"/></svg>
-        <span>macOS<small>Scriptorium_1.2.11_aarch64.dmg</small></span>
-      </a>
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_amd64.AppImage">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        <span>Linux<small>Scriptorium_1.2.11_amd64.AppImage</small></span>
-      </a>
+    <div class="os-switch" role="tablist" aria-label="Choose your platform">
+      <button type="button" role="tab" data-os="win" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> Windows</button>
+      <button type="button" role="tab" data-os="mac" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="4"/><circle cx="7" cy="8" r="1"/></svg> macOS</button>
+      <button type="button" role="tab" data-os="linux" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Linux</button>
     </div>
-    <div class="downloads secondary">
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_x64.exe">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        <span>Windows portable<small>Scriptorium_1.2.11_x64.exe</small></span>
-      </a>
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_aarch64.app.tar.gz">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="4"/><circle cx="7" cy="8" r="1"/></svg>
-        <span>macOS tar.gz<small>Scriptorium_1.2.11_aarch64.app.tar.gz</small></span>
-      </a>
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_amd64.deb">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        <span>Linux deb<small>Scriptorium_1.2.11_amd64.deb</small></span>
-      </a>
-    </div>
-    <p class="releases-note">Installers are built for every version tag. <a href="https://github.com/infinition/scriptorium/releases">See all versions</a></p>
 
-    <div class="install-notes">
-      <p><b>Windows</b> Run the installer, or keep the portable exe anywhere and double-click it. Nothing else to install.</p>
-      <p><b>macOS</b> Drag the app into Applications. It is not signed with an Apple developer certificate, so macOS refuses the first launch. Clear the quarantine flag once and it opens normally: <code>xattr -cr /Applications/Scriptorium.app</code></p>
-      <p><b>Linux, AppImage</b> Make it executable, then run it: <code>chmod +x Scriptorium_1.2.11_amd64.AppImage</code> then <code>./Scriptorium_1.2.11_amd64.AppImage</code>. On distributions that ship FUSE 3 only, install <code>libfuse2</code> first.</p>
-      <p><b>Linux, deb</b> <code>sudo dpkg -i Scriptorium_1.2.11_amd64.deb</code> then launch Scriptorium from the applications menu.</p>
-      <p>Every package carries its own Node runtime, so Node does not need to be installed.</p>
+    <div class="os-panel active" data-os="win">
+      <div class="fmt-row" role="tablist" aria-label="Windows formats">
+        <button type="button" role="tab" data-fmt="win-setup" aria-selected="true">Installer</button>
+        <button type="button" role="tab" data-fmt="win-portable" aria-selected="false">Portable, no install</button>
+      </div>
+
+      <div class="fmt-panel active" data-fmt="win-setup">
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_x64-setup.exe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download for Windows<span class="file">Scriptorium_1.2.11_x64-setup.exe</span></span></a>
+        <ol class="steps">
+          <li>Run the installer.</li>
+          <li>Launch Scriptorium from the start menu.</li>
+        </ol>
+      </div>
+
+      <div class="fmt-panel" data-fmt="win-portable">
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_x64.exe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download the portable exe<span class="file">Scriptorium_1.2.11_x64.exe</span></span></a>
+        <ol class="steps">
+          <li>Keep the exe wherever you like, a USB stick included, and double-click it. There is no installer and no Node to set up.</li>
+          <li>On first run it unpacks its server into <code>%APPDATA%\Scriptorium\portable</code> and keeps its <code>config.json</code> there, so the workspace setting stays on that machine. Your documents live wherever you point Scriptorium, the stick included.</li>
+        </ol>
+      </div>
+
+      <p class="panel-note">64-bit Windows. The package carries its own Node runtime, so Node does not need to be installed.</p>
     </div>
+
+    <div class="os-panel" data-os="mac">
+      <div class="fmt-row" role="tablist" aria-label="macOS formats">
+        <button type="button" role="tab" data-fmt="mac-dmg" aria-selected="true">Disk image</button>
+        <button type="button" role="tab" data-fmt="mac-targz" aria-selected="false">Archive</button>
+      </div>
+
+      <div class="fmt-panel active" data-fmt="mac-dmg">
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_aarch64.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download for macOS<span class="file">Scriptorium_1.2.11_aarch64.dmg</span></span></a>
+        <ol class="steps">
+          <li>Open the disk image and drag Scriptorium into Applications.</li>
+          <li>The app is not signed with an Apple developer certificate, so macOS refuses the first launch. Clear the quarantine flag once:
+            <span class="cmd"><code>xattr -cr /Applications/Scriptorium.app</code><button type="button" class="copy">copy</button></span>
+          </li>
+          <li>Open Scriptorium from Launchpad. macOS asks nothing after that.</li>
+        </ol>
+      </div>
+
+      <div class="fmt-panel" data-fmt="mac-targz">
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_aarch64.app.tar.gz"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download the macOS archive<span class="file">Scriptorium_1.2.11_aarch64.app.tar.gz</span></span></a>
+        <ol class="steps">
+          <li>Extract the archive and move Scriptorium into Applications.</li>
+          <li>Clear the quarantine flag once, for the same reason as the disk image:
+            <span class="cmd"><code>xattr -cr /Applications/Scriptorium.app</code><button type="button" class="copy">copy</button></span>
+          </li>
+        </ol>
+      </div>
+
+      <p class="panel-note">Apple Silicon. The app carries its own Node runtime, so Node does not need to be installed.</p>
+    </div>
+
+    <div class="os-panel" data-os="linux">
+      <div class="fmt-row" role="tablist" aria-label="Linux formats">
+        <button type="button" role="tab" data-fmt="linux-appimage" aria-selected="true">AppImage</button>
+        <button type="button" role="tab" data-fmt="linux-deb" aria-selected="false">Debian package</button>
+      </div>
+
+      <div class="fmt-panel active" data-fmt="linux-appimage">
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_amd64.AppImage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download the AppImage<span class="file">Scriptorium_1.2.11_amd64.AppImage</span></span></a>
+        <ol class="steps">
+          <li>Give the file its executable bit:
+            <span class="cmd"><code>chmod +x Scriptorium_1.2.11_amd64.AppImage</code><button type="button" class="copy">copy</button></span>
+          </li>
+          <li>Run it:
+            <span class="cmd"><code>./Scriptorium_1.2.11_amd64.AppImage</code><button type="button" class="copy">copy</button></span>
+          </li>
+        </ol>
+        <p class="panel-note">Runs on any distribution, x86_64. On the ones that ship FUSE 3 only, install <code>libfuse2</code> first, or unpack the image with <code>--appimage-extract</code>.</p>
+      </div>
+
+      <div class="fmt-panel" data-fmt="linux-deb">
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_amd64.deb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download the deb<span class="file">Scriptorium_1.2.11_amd64.deb</span></span></a>
+        <ol class="steps">
+          <li>Install the package:
+            <span class="cmd"><code>sudo dpkg -i Scriptorium_1.2.11_amd64.deb</code><button type="button" class="copy">copy</button></span>
+          </li>
+          <li>Launch Scriptorium from the applications menu, or run <code>scriptorium</code> in a terminal.</li>
+        </ol>
+        <p class="panel-note">Debian, Ubuntu and derivatives, x86_64. The package carries its own Node runtime, so Node does not need to be installed.</p>
+      </div>
+    </div>
+
+    <p class="releases-note">Installers are built for every version tag. <a href="https://github.com/infinition/scriptorium/releases">See all versions</a></p>
 
     <div class="shot">
       <img src="screenshot.jpg" alt="Scriptorium screenshot" />
@@ -223,6 +325,71 @@
     <p><a href="https://github.com/infinition/scriptorium">github.com/infinition/scriptorium</a></p>
   </div>
 </footer>
+
+<script>
+(function () {
+  var osTabs = document.querySelectorAll('.os-switch button');
+  var osPanels = document.querySelectorAll('.os-panel');
+
+  function selectOs(os) {
+    osTabs.forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.os === os)); });
+    osPanels.forEach(function (p) { p.classList.toggle('active', p.dataset.os === os); });
+  }
+
+  osTabs.forEach(function (tab) {
+    tab.addEventListener('click', function () { selectOs(tab.dataset.os); });
+  });
+
+  // Each platform panel has its own format tabs.
+  document.querySelectorAll('.os-panel').forEach(function (panel) {
+    var fmtTabs = panel.querySelectorAll('.fmt-row button');
+    var fmtPanels = panel.querySelectorAll('.fmt-panel');
+    fmtTabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        fmtTabs.forEach(function (t) { t.setAttribute('aria-selected', String(t === tab)); });
+        fmtPanels.forEach(function (p) { p.classList.toggle('active', p.dataset.fmt === tab.dataset.fmt); });
+      });
+    });
+  });
+
+  // Open on the visitor's own platform.
+  var ua = navigator.userAgent;
+  if (/Mac|iPhone|iPad/.test(ua)) { selectOs('mac'); }
+  else if (/Linux|X11|Android|CrOS/.test(ua)) { selectOs('linux'); }
+
+  // navigator.clipboard is missing outside a secure context, so fall back to
+  // selecting the command, which leaves it one keystroke away.
+  function selectAndCopy(node) {
+    var range = document.createRange();
+    range.selectNodeContents(node);
+    var selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return document.execCommand('copy') ? Promise.resolve() : Promise.reject();
+  }
+
+  function copy(text, node) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(function () { return selectAndCopy(node); });
+    }
+    return selectAndCopy(node);
+  }
+
+  document.querySelectorAll('.cmd .copy').forEach(function (button) {
+    button.addEventListener('click', function () {
+      var code = button.parentNode.querySelector('code');
+      copy(code.textContent, code).then(function () {
+        button.textContent = 'copied';
+        button.classList.add('done');
+        setTimeout(function () {
+          button.textContent = 'copy';
+          button.classList.remove('done');
+        }, 1600);
+      }, function () {});
+    });
+  });
+})();
+</script>
 
 </body>
 </html>

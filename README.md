@@ -54,8 +54,10 @@ Replace `<version>` below with the version you downloaded, for example
 **Windows**
 
 Run `Scriptorium_<version>_x64-setup.exe`. There is also a portable single file,
-`Scriptorium_<version>_x64.exe`, which needs no installation: it unpacks the
-server and its Node runtime on first run.
+`Scriptorium_<version>_x64.exe`, which needs no installer: on first run it
+unpacks its server and Node runtime into `%APPDATA%\Scriptorium\portable` and
+keeps its `config.json` there, so the exe travels but the workspace setting
+stays on the machine that ran it.
 
 **macOS** (Apple Silicon)
 
