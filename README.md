@@ -1,7 +1,11 @@
+<img width="128" height="128" alt="app-icon" src="https://github.com/user-attachments/assets/a0b602d1-b407-4ccd-86cc-63a2ad80a71c" />
+
 # Scriptorium
 
 A distraction-free markdown writer that reads and writes plain `.md` files on
 your own disk. Built for long-form work: manifestos, essays, notes, drafts.
+
+[infinition.github.io/scriptorium/](https://infinition.github.io/scriptorium/)
 
 The editor stays out of your way. Headings, lists, code blocks and math render
 in place; the line under your cursor switches to raw markdown so you can edit
