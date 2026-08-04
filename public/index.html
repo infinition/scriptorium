@@ -409,6 +409,20 @@ window.__scriptoriumSynced = function (key) {
       <h3 data-i18n="settings.title">Paramètres</h3>
       <button class="close-btn" id="closeSettingsBtn">&times;</button>
     </div>
+    <!-- Version and update state, above the tabs so it shows whichever one is
+         open. Hidden entirely when the update check is switched off. -->
+    <div class="update-bar" id="updateBar" hidden>
+      <div class="update-line">
+        <span class="update-dot" id="updateDot" hidden></span>
+        <span id="updateText"></span>
+        <a id="updateNotesLink" href="#" target="_blank" rel="noopener" data-i18n="update.notes" hidden>See what changed</a>
+      </div>
+      <button class="btn btn-primary btn-sm" id="updateInstallBtn" type="button" hidden data-i18n="update.install_btn">Install and restart</button>
+      <label class="update-toggle">
+        <input type="checkbox" id="updateCheckToggle" />
+        <span data-i18n="update.check_label">Check for a new version at startup</span>
+      </label>
+    </div>
     <div class="settings-tabs" role="tablist">
       <button class="settings-tab active" id="settingsTabFolders" data-panel="folders" role="tab" type="button" data-i18n="settings.tab_folders">Dossiers</button>
       <button class="settings-tab" id="settingsTabAppearance" data-panel="appearance" role="tab" type="button" data-i18n="settings.tab_appearance">Apparence</button>

@@ -18,6 +18,46 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The release notes are built from the log between two tags, which
+          # needs the whole history rather than the default shallow clone.
+          fetch-depth: 0
+
+      # Release notes: one line per commit since the previous version tag, with
+      # the full messages folded underneath for anyone who wants the reasoning.
+      - name: Build release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        id: notes
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PREV=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then RANGE="${PREV}..${TAG}"; else RANGE="$TAG"; fi
+          REPO_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          {
+            echo 'body<<SCRIPTORIUM_NOTES_EOF'
+            if [ -n "$PREV" ]; then
+              echo "Changes since ${PREV}."
+            else
+              echo "First tagged release."
+            fi
+            echo
+            echo '### Commits'
+            echo
+            git log --no-merges --reverse --pretty=format:"- %s ([\`%h\`](${REPO_URL}/commit/%H))" "$RANGE"
+            echo
+            echo
+            echo '<details><summary>Full commit messages</summary>'
+            echo
+            git log --no-merges --reverse --pretty=format:'#### %s%n%n%b%n' "$RANGE"
+            echo
+            echo '</details>'
+            if [ -n "$PREV" ]; then
+              echo
+              echo "Full changelog: ${REPO_URL}/compare/${PREV}...${TAG}"
+            fi
+            echo 'SCRIPTORIUM_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-node@v4
         with:
@@ -68,7 +108,7 @@ jobs:
         with:
           tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
           releaseName: ${{ startsWith(github.ref, 'refs/tags/') && format('Scriptorium {0}', github.ref_name) || '' }}
-          releaseBody: Release build of Scriptorium.
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
 

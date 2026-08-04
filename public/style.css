@@ -344,6 +344,52 @@ button { font: inherit; color: inherit; }
 .icon-btn:hover { color: var(--text); background: var(--bg-hover); }
 .icon-btn:active { background: var(--bg-active); }
 .icon-btn.active { color: var(--accent); background: var(--accent-soft); }
+
+/* A new version is out: a dot on the settings icon, the only thing in the
+   interface allowed to ask for attention while someone is writing. */
+.icon-btn.has-update { position: relative; }
+.icon-btn.has-update::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger, #e05c4b);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Version and update state at the top of the Settings modal. */
+.update-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.update-line { display: flex; align-items: center; gap: 8px; }
+.update-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger, #e05c4b);
+  flex-shrink: 0;
+}
+.update-bar a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.update-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.btn-sm { padding: 5px 12px; font-size: 12.5px; }
 /* 3rd state indicator for the reading-toggle cycle (off -> reading -> typewriter-reading) */
 .icon-btn.active.reading-typewriter {
   background: linear-gradient(135deg, var(--accent-soft) 0%, var(--bg-hover) 100%);

@@ -192,6 +192,9 @@ function purgeDeviceOnlySettings() {
   saveWorkspaceSettings(all);
 }
 let accessToken = '';
+// Belongs to the installation rather than to a workspace: it says whether this
+// copy of Scriptorium is allowed to ask GitHub about new versions.
+let updateCheckEnabled = true;
 let workspaceLocked = false;
 // False until config.json records a workspace: the client then shows the
 // first-launch chooser instead of silently using the ~/Scriptorium default.
@@ -371,6 +374,9 @@ function loadConfig() {
   if (typeof data.accessToken === 'string') {
     accessToken = data.accessToken;
   }
+  if (typeof data.updateCheck === 'boolean') {
+    updateCheckEnabled = data.updateCheck;
+  }
   legacyWorkspaceConfig = {
     ideasDir: typeof data.ideasDir === 'string' ? data.ideasDir : undefined,
     locked: typeof data.locked === 'boolean' ? data.locked : undefined,
@@ -386,7 +392,8 @@ function saveConfig() {
     // Relative to the app folder when the workspace sits under it, so an app
     // and its workspace on the same stick survive a new drive letter.
     workspaceDir: toPortablePath(target, __dirname),
-    accessToken
+    accessToken,
+    updateCheck: updateCheckEnabled
   });
 }
 
@@ -1917,6 +1924,89 @@ app.post('/api/rename-folder', (req, res) => {
     res.status(500).json({ error: 'Failed to rename folder' });
   }
 });
+
+// ============ UPDATE CHECK ============
+// Scriptorium is offline-first and this is the only outbound call it ever
+// makes: one request to the GitHub releases API, at most once every six hours,
+// and only while the user leaves the check on. Every failure is silent, since
+// someone writing must never be interrupted by a network that is not there.
+const UPDATE_ENDPOINT = 'https://api.github.com/repos/infinition/scriptorium/releases/latest';
+const UPDATE_TTL_MS = 6 * 60 * 60 * 1000;
+const APP_VERSION = require('./package.json').version;
+let updateCache = { checkedAt: 0, latest: '', url: '', notes: '' };
+
+// Numeric comparison of dotted versions. A tag with a suffix (1.3.0-beta.1)
+// sorts before the plain version, which is what a prerelease should do.
+function compareVersions(a, b) {
+  const parse = (v) => {
+    const [core, pre] = String(v).replace(/^v/, '').split('-');
+    return { nums: core.split('.').map((n) => parseInt(n, 10) || 0), pre: pre || '' };
+  };
+  const left = parse(a);
+  const right = parse(b);
+  for (let i = 0; i < Math.max(left.nums.length, right.nums.length); i++) {
+    const diff = (left.nums[i] || 0) - (right.nums[i] || 0);
+    if (diff !== 0) return diff > 0 ? 1 : -1;
+  }
+  if (left.pre === right.pre) return 0;
+  if (!left.pre) return 1;
+  if (!right.pre) return -1;
+  return left.pre > right.pre ? 1 : -1;
+}
+
+async function fetchLatestRelease() {
+  if (Date.now() - updateCache.checkedAt < UPDATE_TTL_MS && updateCache.latest) {
+    return updateCache;
+  }
+  try {
+    const res = await fetch(UPDATE_ENDPOINT, {
+      headers: {
+        // GitHub rejects requests without one.
+        'User-Agent': `Scriptorium/${APP_VERSION}`,
+        Accept: 'application/vnd.github+json'
+      },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    updateCache = {
+      checkedAt: Date.now(),
+      latest: String(data.tag_name || '').replace(/^v/, ''),
+      url: String(data.html_url || ''),
+      notes: String(data.body || '').slice(0, 4000)
+    };
+  } catch (err) {
+    // Offline, rate limited, or GitHub is down: remember the attempt so we do
+    // not retry on every page load, and report "no update" rather than an error.
+    updateCache = { ...updateCache, checkedAt: Date.now() };
+  }
+  return updateCache;
+}
+
+app.get('/api/update', async (req, res) => {
+  if (!updateCheckEnabled) {
+    return res.json({ enabled: false, current: APP_VERSION, updateAvailable: false });
+  }
+  const info = await fetchLatestRelease();
+  res.json({
+    enabled: true,
+    current: APP_VERSION,
+    latest: info.latest,
+    updateAvailable: !!info.latest && compareVersions(info.latest, APP_VERSION) > 0,
+    url: info.url || 'https://github.com/infinition/scriptorium/releases/latest',
+    notes: info.notes
+  });
+});
+
+app.post('/api/update-check', guarded((req, res) => {
+  const { enabled } = req.body || {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) is required' });
+  }
+  updateCheckEnabled = enabled;
+  saveConfig();
+  res.json({ success: true, enabled: updateCheckEnabled });
+}));
 
 // Workspace preferences (theme, fonts, backgrounds, icons, spacing, language)
 // stored in .scriptorium/settings.json, so each workspace is portable.

@@ -4881,6 +4881,105 @@ $('openSettingsBtn').addEventListener('click', () => {
   updateSettingsOverlayState();
 });
 
+// ============ UPDATE CHECK ============
+// Asks the server, which is the only side allowed to reach the network and
+// caches the answer for six hours. A new version shows up as a dot on the
+// settings icon and a line at the top of the modal. Nothing blocks, nothing
+// pops up: someone in the middle of a sentence must not be interrupted.
+let updateState = { enabled: true, updateAvailable: false, latest: '', url: '' };
+
+async function refreshUpdateState() {
+  try {
+    const res = await fetch('/api/update');
+    if (!res.ok) return;
+    updateState = await res.json();
+  } catch (e) {
+    return; // Offline is the normal case for this app, not an error.
+  }
+  renderUpdateState();
+}
+
+function renderUpdateState() {
+  const settingsBtn = $('openSettingsBtn');
+  const bar = $('updateBar');
+  const text = $('updateText');
+  const dot = $('updateDot');
+  const notes = $('updateNotesLink');
+  const install = $('updateInstallBtn');
+  const toggle = $('updateCheckToggle');
+  if (!bar || !text) return;
+
+  if (settingsBtn) settingsBtn.classList.toggle('has-update', !!updateState.updateAvailable);
+
+  bar.hidden = false;
+  if (toggle) toggle.checked = updateState.enabled !== false;
+
+  if (updateState.enabled === false) {
+    text.textContent = __('update.disabled', { version: updateState.current || '' });
+    if (dot) dot.hidden = true;
+    if (notes) notes.hidden = true;
+    if (install) install.hidden = true;
+    return;
+  }
+
+  if (updateState.updateAvailable) {
+    text.textContent = __('update.available', { version: updateState.latest });
+    if (dot) dot.hidden = false;
+    if (notes) { notes.hidden = false; notes.href = updateState.url; }
+    // Only a desktop build with the updater plugin can install by itself.
+    if (install) install.hidden = !window.__TAURI__;
+  } else {
+    text.textContent = __('update.up_to_date', { version: updateState.current || '' });
+    if (dot) dot.hidden = true;
+    if (notes) notes.hidden = true;
+    if (install) install.hidden = true;
+  }
+}
+
+const updateCheckToggle = $('updateCheckToggle');
+if (updateCheckToggle) {
+  updateCheckToggle.addEventListener('change', async () => {
+    const enabled = updateCheckToggle.checked;
+    try {
+      await fetch('/api/update-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
+    } catch (e) {}
+    if (enabled) refreshUpdateState();
+    else {
+      updateState = { ...updateState, enabled: false, updateAvailable: false };
+      renderUpdateState();
+    }
+  });
+}
+
+const updateInstallBtn = $('updateInstallBtn');
+if (updateInstallBtn) {
+  updateInstallBtn.addEventListener('click', async () => {
+    // The desktop shell exposes the updater; the browser build never sees this
+    // button, and a package installed by a package manager is left to it.
+    if (!window.__TAURI__ || !window.__TAURI__.updater) {
+      window.open(updateState.url, '_blank', 'noopener');
+      return;
+    }
+    updateInstallBtn.disabled = true;
+    updateInstallBtn.textContent = __('update.installing');
+    try {
+      const { check } = window.__TAURI__.updater;
+      const found = await check();
+      if (found) await found.downloadAndInstall();
+      if (window.__TAURI__.process) await window.__TAURI__.process.relaunch();
+    } catch (err) {
+      updateInstallBtn.disabled = false;
+      updateInstallBtn.textContent = __('update.install_btn');
+      showToast('update.install_error');
+      window.open(updateState.url, '_blank', 'noopener');
+    }
+  });
+}
+
 // Opens the app folder (server.js, config.json) in the OS file manager.
 $('openAppDirBtn')?.addEventListener('click', async () => {
   try {
@@ -9329,6 +9428,9 @@ initAppBackgroundControl();
 initProWriterTools();
 initLanguageSettings();
 initReadingFadeSlider();
+// Deferred: the version check is the least urgent thing on the page, and it
+// must never delay the first document appearing.
+setTimeout(refreshUpdateState, 2500);
 
 // ============ FIRST-LAUNCH WORKSPACE SETUP ============
 // Shown only when no workspace has ever been configured (config.json without
