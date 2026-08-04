@@ -45,6 +45,55 @@ A build pipeline (GitHub Actions) produces installers for Windows, Linux and
 macOS on every `v*` version tag. Binaries are on the releases page:
 <https://github.com/infinition/scriptorium/releases>
 
+### Installing the packaged app
+
+Prebuilt installers are attached to every `v*` release on the releases page.
+Replace `<version>` below with the version you downloaded, for example
+`1.2.11`.
+
+**Windows**
+
+Run `Scriptorium_<version>_x64-setup.exe`. There is also a portable single file,
+`Scriptorium_<version>_x64.exe`, which needs no installation: it unpacks the
+server and its Node runtime on first run.
+
+**macOS** (Apple Silicon)
+
+Open `Scriptorium_<version>_aarch64.dmg` and drag Scriptorium into Applications.
+The app is not signed with an Apple developer certificate, so Gatekeeper refuses
+to open it and reports it as damaged. Clear the quarantine flag once, then the
+app opens normally:
+
+```bash
+xattr -cr /Applications/Scriptorium.app
+```
+
+**Linux (AppImage)**
+
+The AppImage needs the executable bit before it can run:
+
+```bash
+chmod +x Scriptorium_<version>_amd64.AppImage
+./Scriptorium_<version>_amd64.AppImage
+```
+
+If your distribution ships FUSE 3 only, install `libfuse2` (on Debian and
+Ubuntu: `sudo apt install libfuse2`), or extract the image and run it from
+there with `--appimage-extract`.
+
+**Linux (.deb)**
+
+```bash
+sudo dpkg -i Scriptorium_<version>_amd64.deb
+```
+
+Then launch Scriptorium from the applications menu, or run `scriptorium` from a
+terminal.
+
+The AppImage, the `.deb`, the macOS app and the portable Windows exe all carry
+their own Node runtime and the server, so Node does not need to be installed on
+the target machine.
+
 ## First launch
 
 On first launch, when no working folder has been configured yet, the app asks

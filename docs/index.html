@@ -72,6 +72,20 @@
   .alt-links a:hover { color: var(--text); }
   .releases-note { margin-top: 22px; font-size: 13px; color: var(--text-faint); }
   .releases-note a { color: var(--accent); }
+  .install-notes {
+    margin: 26px auto 0; max-width: 640px; text-align: left;
+    background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 20px; font-size: 13px; color: var(--text-faint);
+  }
+  .install-notes p { margin: 0 0 10px; }
+  .install-notes p:last-child { margin-bottom: 0; }
+  .install-notes b { color: var(--text-muted); font-weight: 600; }
+  .install-notes code {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+    font-size: 12px; color: var(--accent);
+    background: var(--accent-soft); border-radius: 4px; padding: 1px 5px;
+    word-break: break-all;
+  }
   .shot { margin: 52px auto 0; max-width: 780px; }
   .shot img { width: 100%; height: auto; display: block; border: 1px solid var(--border-strong); border-radius: 12px;
               box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55); }
@@ -115,25 +129,33 @@
     <p class="lead">A distraction-free Markdown editor that reads and writes plain `.md` files on your own disk. Headings, lists, code and math render live; nothing leaves your machine.</p>
 
     <div class="downloads">
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_x64-setup.exe">
+      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_x64-setup.exe">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-        <span>Windows<small>Scriptorium_1.1.0_x64-setup.exe</small></span>
+        <span>Windows<small>Scriptorium_1.2.11_x64-setup.exe</small></span>
       </a>
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_aarch64.dmg">
+      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_aarch64.dmg">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><circle cx="12" cy="14" r="4"/><circle cx="7" cy="8" r="1"/></svg>
-        <span>macOS<small>Scriptorium_1.1.0_aarch64.dmg</small></span>
+        <span>macOS<small>Scriptorium_1.2.11_aarch64.dmg</small></span>
       </a>
-      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_amd64.AppImage">
+      <a class="dl" href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_amd64.AppImage">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        <span>Linux<small>Scriptorium_1.1.0_amd64.AppImage</small></span>
+        <span>Linux<small>Scriptorium_1.2.11_amd64.AppImage</small></span>
       </a>
     </div>
     <div class="alt-links">
-      <a href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_x64.exe">Windows portable (single exe)</a>
-      <a href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_aarch64.app.tar.gz">macOS tar.gz</a>
-      <a href="https://github.com/infinition/scriptorium/releases/download/v1.1.0/Scriptorium_1.1.0_amd64.deb">Linux deb</a>
+      <a href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_x64.exe">Windows portable (single exe)</a>
+      <a href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_aarch64.app.tar.gz">macOS tar.gz</a>
+      <a href="https://github.com/infinition/scriptorium/releases/download/v1.2.11/Scriptorium_1.2.11_amd64.deb">Linux deb</a>
     </div>
     <p class="releases-note">Installers are built for every version tag. <a href="https://github.com/infinition/scriptorium/releases">See all versions</a></p>
+
+    <div class="install-notes">
+      <p><b>Windows</b> Run the installer, or keep the portable exe anywhere and double-click it. Nothing else to install.</p>
+      <p><b>macOS</b> Drag the app into Applications. It is not signed with an Apple developer certificate, so macOS refuses the first launch. Clear the quarantine flag once and it opens normally: <code>xattr -cr /Applications/Scriptorium.app</code></p>
+      <p><b>Linux, AppImage</b> Make it executable, then run it: <code>chmod +x Scriptorium_1.2.11_amd64.AppImage</code> then <code>./Scriptorium_1.2.11_amd64.AppImage</code>. On distributions that ship FUSE 3 only, install <code>libfuse2</code> first.</p>
+      <p><b>Linux, deb</b> <code>sudo dpkg -i Scriptorium_1.2.11_amd64.deb</code> then launch Scriptorium from the applications menu.</p>
+      <p>Every package carries its own Node runtime, so Node does not need to be installed.</p>
+    </div>
 
     <div class="shot">
       <img src="screenshot.jpg" alt="Scriptorium screenshot" />
