@@ -7,12 +7,22 @@
     "frontendDist": "../public"
   },
   "app": {
+    "withGlobalTauri": true,
     "security": {
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/infinition/scriptorium/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY3QTI1MTM1MDhCNDg1OEUKUldTT2hiUUlOVkdpWjA5WEYramxWWDhyYkhkU0xjZEZTbGVjVS8xL2FUeGkrUk1pS0NKd05ocFEK"
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",

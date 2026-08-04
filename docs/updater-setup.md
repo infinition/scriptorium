@@ -1,13 +1,8 @@
-# Setting up the in-app updater
+# The in-app updater
 
-The update check ships already: the server asks the GitHub releases API at most
-once every six hours, a dot appears on the settings icon, and the modal links to
-the release. That part needs no key and no configuration.
-
-Installing the update from inside the app is the part described here. It needs a
-signing key, because the Tauri updater refuses to install a package whose
-signature it cannot verify. The key has nothing to do with the API rate limit:
-the limit applies to the check, the key applies to the install.
+Everything is wired: the plugin, the capability, the signed artifacts and the
+`latest.json` manifest. One step is left, and only you can do it, because it
+involves a secret: putting the signing key into the repository secrets.
 
 ## What can and cannot update itself
 
@@ -19,120 +14,74 @@ the limit applies to the check, the key applies to the install.
 | Linux `.deb`, `.rpm` | no, the package manager owns the install |
 | Windows portable `.exe` | no, see the note at the end |
 
-For the two rows that answer no, the app shows the dot and points at the
-download page. That behaviour is already in place.
+For the two rows that answer no, the app shows the dot on the settings icon and
+points at the download page.
 
-## 1. Generate the key pair
+## The one step left: the secrets
 
-Run this once, on your machine. It writes the private key to the file you name
-and prints the public key.
+The key pair is already generated. It lives outside this repository, in
+`~/.scriptorium-updater/`:
 
-```bash
-npx @tauri-apps/cli signer generate -w "$HOME/.scriptorium-updater.key"
-```
+- `scriptorium.key` is the private key. It signs the updates.
+- `scriptorium.key.pub` is the public key. It is already in
+  `src-tauri/tauri.conf.json`, and it is meant to be public.
+- `passphrase.txt` is the passphrase protecting the private key.
 
-Keep the file out of the repository, and back it up somewhere safe. Losing it
-means no existing installation can accept another update: they all have to be
+Back that folder up somewhere safe. Losing the private key means no existing
+installation will ever accept another update: every one of them has to be
 reinstalled by hand.
 
-## 2. Add the secrets on GitHub
+On GitHub, open the repository, then `Settings`, `Secrets and variables`,
+`Actions`, `New repository secret`, and create two:
 
-In the repository, `Settings` then `Secrets and variables` then `Actions`, add:
+| Secret name | Value |
+|---|---|
+| `TAURI_SIGNING_PRIVATE_KEY` | the whole content of `scriptorium.key` |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | the content of `passphrase.txt` |
 
-- `TAURI_SIGNING_PRIVATE_KEY`: the whole content of the private key file
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: the passphrase you typed, or an empty
-  value if you chose none
+Paste the file contents whole, including the comment line at the top of the key
+and the trailing newline. The workflow already reads both.
 
-Then declare them in the build step of `.github/workflows/build.yml`, next to
-`GITHUB_TOKEN`:
+Until these two secrets exist, tagging a release still produces working
+installers, it simply produces no usable update manifest.
 
-```yaml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          includeUpdaterJson: true
-```
+## What was wired, and where
 
-`includeUpdaterJson` publishes the `latest.json` manifest that the app reads to
-learn a new version exists and where to fetch it.
+`src-tauri/tauri.conf.json`
 
-## 3. Declare the updater in the app
+- `plugins.updater.endpoints` points at
+  `releases/latest/download/latest.json`
+- `plugins.updater.pubkey` holds the public key
+- `bundle.createUpdaterArtifacts` makes the build produce the signed artifacts
+- `app.withGlobalTauri` exposes `window.__TAURI__` to the page, which is what
+  `public/app.js` calls
 
-`src-tauri/tauri.conf.json`, with the public key printed in step 1:
-
-```json
-  "bundle": {
-    "createUpdaterArtifacts": true
-  },
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/infinition/scriptorium/releases/latest/download/latest.json"
-      ],
-      "pubkey": "PASTE THE PUBLIC KEY HERE"
-    }
-  }
-```
-
-`src-tauri/Cargo.toml`:
-
-```toml
-tauri-plugin-updater = "2"
-tauri-plugin-process = "2"
-```
-
-`src-tauri/src/lib.rs`, in the builder chain:
-
-```rust
-        .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_process::init())
-```
-
-## 4. The part specific to Scriptorium
+`src-tauri/capabilities/updater.json`
 
 Most Tauri apps load their own bundled files. Scriptorium does not: the window
 shows `http://localhost:<port>`, served by the Node process the shell spawns.
-Tauri 2 does not expose its API to a page on an origin it does not own, so
-`window.__TAURI__` is absent today and the client already falls back to opening
-the download page.
+Tauri 2 gives a page on an origin it does not own no access at all, so the
+capability grants that origin exactly two permissions, `updater:default` and
+`process:allow-restart`, and nothing else. Any page served on that origin can
+use what the capability opens, so it is deliberately kept to the minimum.
 
-To let the page drive the updater, the localhost origin has to be granted that
-one capability, and only that one. Create `src-tauri/capabilities/updater.json`:
+The three ports listed there are the ones `CANDIDATE_PORTS` in `lib.rs` tries,
+in order. Keep the two lists in step.
 
-```json
-{
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "updater",
-  "windows": ["main"],
-  "remote": {
-    "urls": ["http://localhost:48731", "http://localhost:48732", "http://localhost:48733"]
-  },
-  "permissions": ["updater:default", "process:allow-restart"]
-}
-```
+`.github/workflows/build.yml` passes the signing key to the build and sets
+`includeUpdaterJson: true`.
 
-The three ports are the ones `CANDIDATE_PORTS` in `lib.rs` tries, in order. Keep
-the two lists in step.
+## Checking it worked
 
-Grant nothing beyond these two permissions. Any page served on that origin can
-call whatever the capability opens up, and the origin is a local HTTP server.
-Loopback binding keeps that contained, but there is no reason to widen it.
-
-Set `"withGlobalTauri": true` under `app` in `tauri.conf.json` so the page sees
-`window.__TAURI__` without a bundler step, which is what `public/app.js` expects.
-
-## 5. Check it worked
-
-Tag a release, wait for the three builds, then confirm the release carries
+Tag a release and let the three builds finish, then confirm the release carries
 `latest.json` next to the installers. Install the previous version, open
-Settings, and the install button should appear next to the dot.
+Settings, and the install button appears next to the dot.
 
-I could not test this section here: it needs a full bundle on each of the three
-operating systems and a signing key. The steps above follow the Tauri 2 updater
-documentation, and the capability shape in step 4 is the part worth checking
-against the current docs before you tag.
+What was verified here: the Rust side compiles, and `generate_context!`
+validates capability permissions at compile time, so the capability file and
+its two permission names are correct. What was not verified here: a full bundle
+on each of the three operating systems, and an actual update round trip. Both
+need the secrets and a tagged build.
 
 ## The portable Windows exe
 
