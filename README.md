@@ -7,6 +7,14 @@ The editor stays out of your way. Headings, lists, code blocks and math render
 in place; the line under your cursor switches to raw markdown so you can edit
 it like a regular text file. Nothing leaves your machine.
 
+Alongside the editor sits the thing the app is arranged around: **Ideas**. A
+sentence you think of now rarely belongs where you are writing now, so it goes
+into a cloud beside your text instead of interrupting it. Ideas are grouped
+into themes, one plain `.md` file per theme, and everything about them is drag
+and drop: reorder one inside its theme, drop it on another theme's tab to move
+it there, or drag it into the document to insert it as a block exactly where
+you let go.
+
 ![Scriptorium](docs/screenshot.jpg)
 
 ## Usage

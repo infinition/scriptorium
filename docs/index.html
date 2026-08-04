@@ -6,7 +6,11 @@
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#0d0d0e" />
 <title>Scriptorium</title>
-<link rel="icon" href="https://raw.githubusercontent.com/infinition/scriptorium/main/public/icon.svg" type="image/svg+xml" />
+<!-- Served from the site, not from raw.githubusercontent.com: GitHub sends raw
+     files as text/plain, which browsers refuse to use as an icon. The hero logo
+     and the brand mark reuse this same file, so it is fetched once. -->
+<link rel="icon" href="app-icon.png" type="image/png" />
+<link rel="apple-touch-icon" href="app-icon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
@@ -43,11 +47,49 @@
     border-bottom: 1px solid var(--border);
   }
   header.site .wrap { display: flex; align-items: center; gap: 24px; padding: 14px 24px; }
-  .brand { font-family: 'Newsreader', serif; font-size: 19px; font-weight: 500; color: var(--text); text-decoration: none; }
+  .brand {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: 'Newsreader', serif; font-size: 19px; font-weight: 500;
+    color: var(--text); text-decoration: none;
+  }
+  .brand-mark { width: 60px; height: 60px; border-radius: 14px; display: block; }
   .brand .dot { color: var(--accent); }
   nav { margin-left: auto; display: flex; gap: 18px; }
   nav a { color: var(--text-muted); text-decoration: none; font-size: 14px; }
   nav a:hover { color: var(--text); }
+
+  /* Language picker. A list rather than a pair of buttons, so adding a
+     language stays a one-line change instead of a layout question. */
+  .lang-picker { position: relative; }
+  .lang-picker > button {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 8px; border-radius: 6px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-muted);
+    font: inherit; font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+    cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  }
+  .lang-picker > button:hover { color: var(--text); border-color: var(--border-strong); }
+  .lang-picker > button svg { width: 12px; height: 12px; transition: transform 0.2s ease; }
+  .lang-picker > button[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+  .lang-menu {
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
+    min-width: 148px; margin: 0; padding: 4px; list-style: none;
+    background: var(--bg-elevated); border: 1px solid var(--border-strong);
+    border-radius: 9px; box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  }
+  .lang-menu button {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    width: 100%; padding: 7px 10px; border: 0; border-radius: 6px;
+    background: transparent; color: var(--text-muted);
+    font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .lang-menu button:hover { background: var(--bg-hover); color: var(--text); }
+  .lang-menu button[aria-selected="true"] { color: var(--accent); }
+  .lang-menu .tick { opacity: 0; }
+  .lang-menu button[aria-selected="true"] .tick { opacity: 1; }
 
   .hero { padding: 96px 0 72px; text-align: center; }
   .hero .logo {
@@ -55,8 +97,77 @@
     margin: 0 auto 28px; display: block;
     background: var(--bg-elevated); border: 1px solid var(--border-strong);
   }
-  .hero h1 { font-family: 'Newsreader', serif; font-weight: 500; font-size: 56px; margin: 0 0 12px; letter-spacing: -0.01em; }
+  .hero h1 {
+    position: relative; font-family: 'Newsreader', serif; font-weight: 500;
+    font-size: 56px; margin: 0 0 12px; letter-spacing: -0.01em;
+  }
   .hero h1 .dot { color: var(--accent); }
+
+  /* The title is written out letter by letter. Each one is laid down in gold
+     and dries into the text colour, the way ink darkens on the page. Letters
+     keep their place in the layout from the start, so nothing shifts while it
+     writes. Without JavaScript the title simply renders, already complete. */
+  .hero h1.writing .ch { opacity: 0; }
+  .hero h1 .ch.inked { animation: ink-in 560ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+  @keyframes ink-in {
+    0% {
+      opacity: 0; transform: translateY(7px) scale(0.96); filter: blur(7px);
+      color: var(--accent); text-shadow: 0 0 22px rgba(201, 169, 106, 0.85);
+    }
+    55% { opacity: 1; filter: blur(0); color: var(--accent); }
+    100% { opacity: 1; transform: none; filter: blur(0); text-shadow: none; }
+  }
+
+  /* The full stop is the seal at the end of the page: a drop of gilded ink
+     that lands, blooms, and sends one ring out into the paper. */
+  .hero h1 .dot { position: relative; display: inline-block; }
+  .hero h1.writing .dot { opacity: 0; }
+  .hero h1 .dot.sealed { animation: seal-drop 700ms cubic-bezier(0.18, 1.2, 0.4, 1) forwards; }
+  @keyframes seal-drop {
+    0% { opacity: 0; transform: translateY(-16px) scale(0.2); }
+    55% { opacity: 1; transform: translateY(0) scale(1.45); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .hero h1 .dot::before,
+  .hero h1 .dot::after {
+    content: ''; position: absolute; left: 50%; top: 62%;
+    border-radius: 50%; pointer-events: none; opacity: 0;
+    transform: translate(-50%, -50%);
+  }
+  /* The bloom of light under the drop. */
+  .hero h1 .dot::before {
+    width: 12px; height: 12px;
+    background: radial-gradient(circle, rgba(201, 169, 106, 0.85) 0%, rgba(201, 169, 106, 0) 70%);
+  }
+  .hero h1 .dot.sealed::before { animation: seal-bloom 1100ms ease-out 160ms forwards; }
+  @keyframes seal-bloom {
+    0% { opacity: 0; width: 8px; height: 8px; }
+    30% { opacity: 1; }
+    100% { opacity: 0; width: 130px; height: 130px; }
+  }
+  /* The ring spreading through the fibres. */
+  .hero h1 .dot::after {
+    width: 8px; height: 8px; border: 1px solid rgba(201, 169, 106, 0.7);
+  }
+  .hero h1 .dot.sealed::after { animation: seal-ring 900ms cubic-bezier(0.1, 0.8, 0.3, 1) 200ms forwards; }
+  @keyframes seal-ring {
+    0% { opacity: 0.9; width: 8px; height: 8px; border-width: 2px; }
+    100% { opacity: 0; width: 92px; height: 92px; border-width: 0.5px; }
+  }
+
+  /* Once the seal has landed, the gold keeps catching the light. Slow and
+     low, so it reads as a material that shines rather than as a blinking
+     element asking to be clicked. */
+  .hero h1 .dot.shimmer { animation: dot-shimmer 3.4s ease-in-out infinite; }
+  @keyframes dot-shimmer {
+    0%, 100% { text-shadow: 0 0 0 rgba(201, 169, 106, 0); }
+    50% { text-shadow: 0 0 15px rgba(201, 169, 106, 0.8); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero h1 .ch, .hero h1 .dot { opacity: 1 !important; animation: none !important; }
+    .hero h1 .dot::before, .hero h1 .dot::after { animation: none !important; opacity: 0 !important; }
+  }
   .hero .tagline { font-family: 'Newsreader', serif; font-style: italic; font-size: 22px; color: var(--text-muted); margin: 0 0 16px; }
   .hero .lead { color: var(--text-muted); font-size: 17px; max-width: 640px; margin: 0 auto 40px; }
 
@@ -183,6 +294,15 @@
   .card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
   .card h3 { font-size: 15px; margin: 0 0 8px; color: var(--accent); font-weight: 600; }
   .card p { font-size: 14px; color: var(--text-muted); margin: 0; }
+  /* The one feature the whole app is arranged around takes the full row. */
+  .card-feature {
+    grid-column: 1 / -1;
+    border-color: var(--accent);
+    background: linear-gradient(180deg, var(--accent-soft), transparent 65%), var(--bg-elevated);
+    padding: 24px;
+  }
+  .card-feature h3 { font-family: 'Newsreader', serif; font-size: 22px; font-weight: 500; margin-bottom: 10px; }
+  .card-feature p { font-size: 15px; max-width: 68ch; }
 
   .foot { border-top: 1px solid var(--border); padding: 40px 0 56px; text-align: center; color: var(--text-faint); font-size: 13px; }
   .foot a { color: var(--accent); text-decoration: none; }
@@ -202,21 +322,30 @@
 
 <header class="site">
   <div class="wrap">
-    <a class="brand" href="#">Scriptorium<span class="dot">.</span></a>
+    <!-- The word and its full stop are one flex item, otherwise the gap that
+         spaces the mark from the name also pushes the dot away. -->
+    <a class="brand" href="#"><img class="brand-mark" src="app-icon.png" alt="" width="60" height="60" /><span>Scriptorium<span class="dot">.</span></span></a>
     <nav>
-      <a href="#features">Features</a>
-      <a href="#download">Download</a>
+      <a href="#features" data-t="nav.features">Features</a>
+      <a href="#download" data-t="nav.download">Download</a>
       <a href="https://github.com/infinition/scriptorium">GitHub</a>
+      <div class="lang-picker">
+        <button type="button" id="langBtn" aria-haspopup="listbox" aria-expanded="false">
+          <span id="langCurrent">EN</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <ul class="lang-menu" id="langMenu" role="listbox" aria-label="Language" hidden></ul>
+      </div>
     </nav>
   </div>
 </header>
 
 <main>
   <div class="hero" id="download">
-    <img class="logo" src="https://raw.githubusercontent.com/infinition/scriptorium/main/public/app-icon.png" alt="Scriptorium logo" width="88" height="88" />
-    <h1>Scriptorium<span class="dot">.</span></h1>
-    <p class="tagline">Your writing companion.</p>
-    <p class="lead">A distraction-free Markdown editor that reads and writes plain `.md` files on your own disk. Headings, lists, code and math render live; nothing leaves your machine.</p>
+    <img class="logo" src="app-icon.png" alt="Scriptorium logo" width="88" height="88" />
+    <h1 id="heroTitle"><span class="quill" id="heroWord">Scriptorium</span><span class="dot" id="heroDot">.</span></h1>
+    <p class="tagline" data-t="hero.tagline">Your writing companion, and a home for every idea.</p>
+    <p class="lead" data-t="hero.lead">A distraction-free Markdown editor that reads and writes plain `.md` files on your own disk. Headings, lists, code and math render live; nothing leaves your machine.</p>
 
     <div class="os-switch" role="tablist" aria-label="Choose your platform">
       <button type="button" role="tab" data-os="win" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> Windows</button>
@@ -226,91 +355,91 @@
 
     <div class="os-panel active" data-os="win">
       <div class="fmt-row" role="tablist" aria-label="Windows formats">
-        <button type="button" role="tab" data-fmt="win-setup" aria-selected="true">Installer</button>
-        <button type="button" role="tab" data-fmt="win-portable" aria-selected="false">Portable, no install</button>
+        <button type="button" role="tab" data-fmt="win-setup" aria-selected="true" data-t="fmt.installer">Installer</button>
+        <button type="button" role="tab" data-fmt="win-portable" aria-selected="false" data-t="fmt.portable">Portable, no install</button>
       </div>
 
       <div class="fmt-panel active" data-fmt="win-setup">
-        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_x64-setup.exe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download for Windows<span class="file">Scriptorium_1.3.0_x64-setup.exe</span></span></a>
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_x64-setup.exe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span><span data-t="get.win_setup">Download for Windows</span><span class="file">Scriptorium_1.3.0_x64-setup.exe</span></span></a>
         <ol class="steps">
-          <li>Run the installer.</li>
-          <li>Launch Scriptorium from the start menu.</li>
+          <li data-t="step.win_run">Run the installer.</li>
+          <li data-t="step.win_launch">Launch Scriptorium from the start menu.</li>
         </ol>
       </div>
 
       <div class="fmt-panel" data-fmt="win-portable">
-        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_x64.exe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download the portable exe<span class="file">Scriptorium_1.3.0_x64.exe</span></span></a>
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_x64.exe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span><span data-t="get.win_portable">Download the portable exe</span><span class="file">Scriptorium_1.3.0_x64.exe</span></span></a>
         <ol class="steps">
-          <li>Keep the exe wherever you like, a USB stick included, and double-click it. There is no installer and no Node to set up.</li>
-          <li>On first run it unpacks its server into <code>%APPDATA%\Scriptorium\portable</code> and keeps its <code>config.json</code> there, so the workspace setting stays on that machine. Your documents live wherever you point Scriptorium, the stick included.</li>
+          <li data-t="step.portable_keep">Keep the exe wherever you like, a USB stick included, and double-click it. There is no installer and no Node to set up.</li>
+          <li data-t-html="step.portable_unpack">On first run it unpacks its server into <code>%APPDATA%\Scriptorium\portable</code> and keeps its <code>config.json</code> there, so the workspace setting stays on that machine. Your documents live wherever you point Scriptorium, the stick included.</li>
         </ol>
       </div>
 
-      <p class="panel-note">64-bit Windows. The package carries its own Node runtime, so Node does not need to be installed.</p>
+      <p class="panel-note" data-t="note.windows">64-bit Windows. The package carries its own Node runtime, so Node does not need to be installed.</p>
     </div>
 
     <div class="os-panel" data-os="mac">
       <div class="fmt-row" role="tablist" aria-label="macOS formats">
-        <button type="button" role="tab" data-fmt="mac-dmg" aria-selected="true">Disk image</button>
-        <button type="button" role="tab" data-fmt="mac-targz" aria-selected="false">Archive</button>
+        <button type="button" role="tab" data-fmt="mac-dmg" aria-selected="true" data-t="fmt.dmg">Disk image</button>
+        <button type="button" role="tab" data-fmt="mac-targz" aria-selected="false" data-t="fmt.archive">Archive</button>
       </div>
 
       <div class="fmt-panel active" data-fmt="mac-dmg">
-        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_aarch64.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download for macOS<span class="file">Scriptorium_1.3.0_aarch64.dmg</span></span></a>
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_aarch64.dmg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span><span data-t="get.mac_dmg">Download for macOS</span><span class="file">Scriptorium_1.3.0_aarch64.dmg</span></span></a>
         <ol class="steps">
-          <li>Open the disk image and drag Scriptorium into Applications.</li>
-          <li>The app is not signed with an Apple developer certificate, so macOS refuses the first launch. Clear the quarantine flag once:
-            <span class="cmd"><code>xattr -cr /Applications/Scriptorium.app</code><button type="button" class="copy">copy</button></span>
+          <li data-t="step.dmg_drag">Open the disk image and drag Scriptorium into Applications.</li>
+          <li><span data-t="step.dmg_quarantine">The app is not signed with an Apple developer certificate, so macOS refuses the first launch. Clear the quarantine flag once:</span>
+            <span class="cmd"><code>xattr -cr /Applications/Scriptorium.app</code><button type="button" class="copy" data-t="cmd.copy">copy</button></span>
           </li>
-          <li>Open Scriptorium from Launchpad. macOS asks nothing after that.</li>
+          <li data-t="step.dmg_open">Open Scriptorium from Launchpad. macOS asks nothing after that.</li>
         </ol>
       </div>
 
       <div class="fmt-panel" data-fmt="mac-targz">
-        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_aarch64.app.tar.gz"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download the macOS archive<span class="file">Scriptorium_1.3.0_aarch64.app.tar.gz</span></span></a>
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_aarch64.app.tar.gz"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span><span data-t="get.mac_targz">Download the macOS archive</span><span class="file">Scriptorium_1.3.0_aarch64.app.tar.gz</span></span></a>
         <ol class="steps">
-          <li>Extract the archive and move Scriptorium into Applications.</li>
-          <li>Clear the quarantine flag once, for the same reason as the disk image:
-            <span class="cmd"><code>xattr -cr /Applications/Scriptorium.app</code><button type="button" class="copy">copy</button></span>
+          <li data-t="step.targz_extract">Extract the archive and move Scriptorium into Applications.</li>
+          <li><span data-t="step.targz_quarantine">Clear the quarantine flag once, for the same reason as the disk image:</span>
+            <span class="cmd"><code>xattr -cr /Applications/Scriptorium.app</code><button type="button" class="copy" data-t="cmd.copy">copy</button></span>
           </li>
         </ol>
       </div>
 
-      <p class="panel-note">Apple Silicon. The app carries its own Node runtime, so Node does not need to be installed.</p>
+      <p class="panel-note" data-t="note.macos">Apple Silicon. The app carries its own Node runtime, so Node does not need to be installed.</p>
     </div>
 
     <div class="os-panel" data-os="linux">
       <div class="fmt-row" role="tablist" aria-label="Linux formats">
         <button type="button" role="tab" data-fmt="linux-appimage" aria-selected="true">AppImage</button>
-        <button type="button" role="tab" data-fmt="linux-deb" aria-selected="false">Debian package</button>
+        <button type="button" role="tab" data-fmt="linux-deb" aria-selected="false" data-t="fmt.deb">Debian package</button>
       </div>
 
       <div class="fmt-panel active" data-fmt="linux-appimage">
-        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_amd64.AppImage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download the AppImage<span class="file">Scriptorium_1.3.0_amd64.AppImage</span></span></a>
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_amd64.AppImage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span><span data-t="get.appimage">Download the AppImage</span><span class="file">Scriptorium_1.3.0_amd64.AppImage</span></span></a>
         <ol class="steps">
-          <li>Give the file its executable bit:
-            <span class="cmd"><code>chmod +x Scriptorium_1.3.0_amd64.AppImage</code><button type="button" class="copy">copy</button></span>
+          <li><span data-t="step.appimage_chmod">Give the file its executable bit:</span>
+            <span class="cmd"><code>chmod +x Scriptorium_1.3.0_amd64.AppImage</code><button type="button" class="copy" data-t="cmd.copy">copy</button></span>
           </li>
-          <li>Run it:
-            <span class="cmd"><code>./Scriptorium_1.3.0_amd64.AppImage</code><button type="button" class="copy">copy</button></span>
+          <li><span data-t="step.appimage_run">Run it:</span>
+            <span class="cmd"><code>./Scriptorium_1.3.0_amd64.AppImage</code><button type="button" class="copy" data-t="cmd.copy">copy</button></span>
           </li>
         </ol>
-        <p class="panel-note">Runs on any distribution, x86_64. On the ones that ship FUSE 3 only, install <code>libfuse2</code> first, or unpack the image with <code>--appimage-extract</code>.</p>
+        <p class="panel-note" data-t-html="note.appimage">Runs on any distribution, x86_64. On the ones that ship FUSE 3 only, install <code>libfuse2</code> first, or unpack the image with <code>--appimage-extract</code>.</p>
       </div>
 
       <div class="fmt-panel" data-fmt="linux-deb">
-        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_amd64.deb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span>Download the deb<span class="file">Scriptorium_1.3.0_amd64.deb</span></span></a>
+        <a class="get" href="https://github.com/infinition/scriptorium/releases/download/v1.3.0/Scriptorium_1.3.0_amd64.deb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 12l5 5 5-5M4 20h16"/></svg><span><span data-t="get.deb">Download the deb</span><span class="file">Scriptorium_1.3.0_amd64.deb</span></span></a>
         <ol class="steps">
-          <li>Install the package:
-            <span class="cmd"><code>sudo dpkg -i Scriptorium_1.3.0_amd64.deb</code><button type="button" class="copy">copy</button></span>
+          <li><span data-t="step.deb_install">Install the package:</span>
+            <span class="cmd"><code>sudo dpkg -i Scriptorium_1.3.0_amd64.deb</code><button type="button" class="copy" data-t="cmd.copy">copy</button></span>
           </li>
-          <li>Launch Scriptorium from the applications menu, or run <code>scriptorium</code> in a terminal.</li>
+          <li data-t-html="step.deb_launch">Launch Scriptorium from the applications menu, or run <code>scriptorium</code> in a terminal.</li>
         </ol>
-        <p class="panel-note">Debian, Ubuntu and derivatives, x86_64. The package carries its own Node runtime, so Node does not need to be installed. This is the one format with no in-app update: a system package is the package manager's business, so Scriptorium tells you a version is out and leaves the install to <code>dpkg</code>.</p>
+        <p class="panel-note" data-t-html="note.deb">Debian, Ubuntu and derivatives, x86_64. The package carries its own Node runtime, so Node does not need to be installed. This is the one format with no in-app update: a system package is the package manager's business, so Scriptorium tells you a version is out and leaves the install to <code>dpkg</code>.</p>
       </div>
     </div>
 
-    <p class="releases-note">Installers are built for every version tag. <a href="https://github.com/infinition/scriptorium/releases">See all versions</a></p>
+    <p class="releases-note" data-t-html="note.releases">Installers are built for every version tag. <a href="https://github.com/infinition/scriptorium/releases">See all versions</a></p>
 
     <!-- To add a screenshot: drop the file in docs/ and add one <img> below.
          The dots, the timer and the keyboard control adapt on their own, and
@@ -327,39 +456,61 @@
 
   <section id="features">
     <div class="wrap">
-      <h2>What Scriptorium does</h2>
+      <h2 data-t="features.title">What Scriptorium does</h2>
       <div class="grid">
-        <div class="card">
-          <h3>Your files, your disk</h3>
-          <p>Every document is a plain `.md` file. A section is a folder. Scriptorium mirrors your workspace, it does not lock it.</p>
+        <!-- Ideas is what the app is built around, so it gets the whole row
+             rather than one cell among eight. -->
+        <div class="card card-feature">
+          <h3 data-t="card.ideas_title">Ideas, the heart of Scriptorium</h3>
+          <p data-t="card.ideas_body">Sentences you collect as they come, grouped into themes, one plain `.md` file per theme. Drag an idea to reorder it, drop it on another theme to move it there, or drag it straight into your document to insert it as a block. Click archives, right-click inserts, search filters the theme you are in.</p>
         </div>
         <div class="card">
-          <h3>Live rendering</h3>
-          <p>Markdown, LaTeX, highlighted code, tables and callouts render live. The line you are editing switches back to raw source.</p>
+          <h3 data-t="card.files_title">Your files, your disk</h3>
+          <p data-t="card.files_body">Every document is a plain `.md` file. A section is a folder. Scriptorium mirrors your workspace, it does not lock it.</p>
         </div>
         <div class="card">
-          <h3>Ideas</h3>
-          <p>A sentence cloud grouped by theme. Click to archive, right-click to insert into your text.</p>
+          <h3 data-t="card.render_title">Live rendering</h3>
+          <p data-t="card.render_body">Markdown, LaTeX, highlighted code, tables and callouts render live. The line you are editing switches back to raw source.</p>
         </div>
         <div class="card">
-          <h3>Snapshots</h3>
-          <p>A per-document revision history. Compare, restore, come back before a big cut.</p>
+          <h3 data-t="card.snap_title">Snapshots</h3>
+          <p data-t="card.snap_body">A per-document revision history. Compare, restore, come back before a big cut.</p>
         </div>
         <div class="card">
-          <h3>Distraction free</h3>
-          <p>Focus mode, typewriter, paragraph focus, continuous reading. The interface steps aside.</p>
+          <h3 data-t="card.focus_title">Distraction free</h3>
+          <p data-t="card.focus_body">Focus mode, typewriter, paragraph focus, continuous reading. The interface steps aside.</p>
         </div>
         <div class="card">
-          <h3>Offline</h3>
-          <p>No CDN, no network dependency for editing. Everything is served from your machine.</p>
+          <h3 data-t="card.offline_title">Offline</h3>
+          <p data-t="card.offline_body">No CDN, no network dependency for editing. Everything is served from your machine.</p>
         </div>
         <div class="card">
-          <h3>Full-text search</h3>
-          <p>Search across titles, document bodies and ideas in one keystroke (`Ctrl+P`).</p>
+          <h3 data-t="card.search_title">Full-text search</h3>
+          <p data-t="card.search_body">Search across titles, document bodies and ideas in one keystroke (`Ctrl+P`).</p>
         </div>
         <div class="card">
-          <h3>Two ways to run</h3>
-          <p>As a web server in any browser, or as a native desktop window. Same codebase, same behaviour.</p>
+          <h3 data-t="card.run_title">Two ways to run</h3>
+          <p data-t="card.run_body">As a native window on Windows, macOS and Linux, or as a small server you reach from any browser, a phone or a tablet on your own network included. Same codebase, same behaviour.</p>
+        </div>
+        <div class="card">
+          <h3 data-t="card.themes_title">Made to your taste</h3>
+          <p data-t="card.themes_body">Named colour themes you can clone and reset, each carrying its own interface font, editor font and background image or video. Import your own fonts and icons, adjust block spacing and line height, or turn the editing area into a white page.</p>
+        </div>
+        <div class="card">
+          <h3 data-t="card.media_title">Images where you drop them</h3>
+          <p data-t="card.media_body">Paste, drop or drag an image onto the editor and it lands in the workspace, inserted as plain Markdown at the line you aimed at. Type %% anywhere to open the gallery of what you already have.</p>
+        </div>
+        <div class="card">
+          <h3 data-t="card.export_title">Export</h3>
+          <p data-t="card.export_body">Print or export to PDF as a book, to a standalone HTML file, or back out as Markdown. Nothing you write is trapped in the app.</p>
+        </div>
+        <div class="card">
+          <h3 data-t="card.portable_title">Portable workspaces</h3>
+          <p data-t="card.portable_body">Every workspace keeps its own theme, fonts, icons, snapshots and settings in one hidden folder at its root. Copy the folder to another disk or another machine and the whole setup follows.</p>
+        </div>
+        <div class="card">
+          <h3 data-t="card.lock_title">Lock</h3>
+          <p data-t="card.lock_body">One click on the name blocks edits and deletions. Enforced by the server, not just hidden in the interface.</p>
         </div>
       </div>
     </div>
@@ -368,7 +519,7 @@
 
 <footer class="foot">
   <div class="wrap">
-    <p>Scriptorium, a local, distraction-free Markdown editor.</p>
+    <p data-t="foot.line">Scriptorium, a local, distraction-free Markdown editor.</p>
     <p><a href="https://github.com/infinition/scriptorium">github.com/infinition/scriptorium</a></p>
   </div>
 </footer>
@@ -421,6 +572,206 @@
     }
     return selectAndCopy(node);
   }
+
+  // ---- Language switch ----
+  // The English text lives in the markup, so the page reads correctly with no
+  // JavaScript and search engines index the real content. French is applied on
+  // top. Elements carry data-t for plain text, data-t-html when the string has
+  // inline markup of its own.
+  // One dictionary per language. English is not listed: it lives in the
+  // markup, so the page reads correctly with no JavaScript and search engines
+  // index the real text.
+  var DICTS = {
+    fr: {
+      "nav.features": "Fonctionnalités",
+      "nav.download": "Télécharger",
+      "hero.tagline": "Votre compagnon d'écriture, et un refuge pour chaque idée.",
+      "hero.lead": "Un éditeur Markdown sans distraction qui lit et écrit de simples fichiers `.md` sur votre disque. Titres, listes, code et formules s'affichent en direct, et rien ne quitte votre machine.",
+      "fmt.installer": "Installeur",
+      "fmt.portable": "Portable, sans installation",
+      "fmt.dmg": "Image disque",
+      "fmt.archive": "Archive",
+      "fmt.deb": "Paquet Debian",
+      "get.win_setup": "Télécharger pour Windows",
+      "get.win_portable": "Télécharger l'exe portable",
+      "get.mac_dmg": "Télécharger pour macOS",
+      "get.mac_targz": "Télécharger l'archive macOS",
+      "get.appimage": "Télécharger l'AppImage",
+      "get.deb": "Télécharger le deb",
+      "step.win_run": "Lancez l'installeur.",
+      "step.win_launch": "Ouvrez Scriptorium depuis le menu Démarrer.",
+      "step.portable_keep": "Gardez l'exe où vous voulez, clé USB comprise, et double-cliquez. Aucun installeur, aucun Node à configurer.",
+      "step.portable_unpack": "Au premier lancement, il décompresse son serveur dans <code>%APPDATA%\\Scriptorium\\portable</code> et y garde son <code>config.json</code>, donc le réglage de l'espace de travail reste sur cette machine. Vos documents vivent là où vous pointez Scriptorium, la clé comprise.",
+      "step.dmg_drag": "Ouvrez l'image disque et glissez Scriptorium dans Applications.",
+      "step.dmg_quarantine": "L'app n'est pas signée avec un certificat de développeur Apple, donc macOS refuse le premier lancement. Effacez le drapeau de quarantaine une fois :",
+      "step.dmg_open": "Ouvrez Scriptorium depuis le Launchpad. macOS ne demande plus rien ensuite.",
+      "step.targz_extract": "Extrayez l'archive et déplacez Scriptorium dans Applications.",
+      "step.targz_quarantine": "Effacez le drapeau de quarantaine une fois, pour la même raison que l'image disque :",
+      "step.appimage_chmod": "Donnez au fichier son bit exécutable :",
+      "step.appimage_run": "Lancez-le :",
+      "step.deb_install": "Installez le paquet :",
+      "step.deb_launch": "Ouvrez Scriptorium depuis le menu des applications, ou lancez <code>scriptorium</code> dans un terminal.",
+      "note.windows": "Windows 64 bits. Le paquet embarque son propre Node, il n’y a donc rien à installer de plus.",
+      "note.macos": "Apple Silicon. L’app embarque son propre Node, il n’y a donc rien à installer de plus.",
+      "note.appimage": "Fonctionne sur toute distribution, x86_64. Sur celles qui ne fournissent que FUSE 3, installez d'abord <code>libfuse2</code>, ou dépliez l'image avec <code>--appimage-extract</code>.",
+      "note.deb": "Debian, Ubuntu et dérivées, x86_64. Le paquet embarque son propre Node. C'est le seul format sans mise à jour intégrée : un paquet système relève du gestionnaire de paquets, donc Scriptorium vous signale la nouvelle version et laisse l'installation à <code>dpkg</code>.",
+      "note.releases": "Les installeurs sont construits à chaque étiquette de version. <a href=\"https://github.com/infinition/scriptorium/releases\">Voir toutes les versions</a>",
+      "cmd.copy": "copier",
+      "features.title": "Ce que fait Scriptorium",
+      "card.files_title": "Vos fichiers, votre disque",
+      "card.files_body": "Chaque document est un simple fichier `.md`. Une section est un dossier. Scriptorium reflète votre espace de travail, il ne l'enferme pas.",
+      "card.render_title": "Rendu en direct",
+      "card.render_body": "Markdown, LaTeX, code coloré, tableaux et encadrés s'affichent en direct. La ligne que vous éditez repasse en source brute.",
+      "card.ideas_title": "Les idées, le cœur de Scriptorium",
+      "card.ideas_body": "Des phrases que vous collectez au fil de l'eau, groupées en thèmes, un simple fichier `.md` par thème. Glissez une idée pour la réordonner, déposez-la sur un autre thème pour l'y déplacer, ou faites-la glisser dans votre document pour l'insérer comme bloc. Le clic archive, le clic droit insère, la recherche filtre le thème courant.",
+      "card.snap_title": "Instantanés",
+      "card.snap_body": "Un historique de révisions par document. Comparez, restaurez, revenez avant une grosse coupe.",
+      "card.focus_title": "Sans distraction",
+      "card.focus_body": "Mode focus, machine à écrire, focus paragraphe, lecture continue. L'interface s'efface.",
+      "card.offline_title": "Hors ligne",
+      "card.offline_body": "Aucun CDN, aucune dépendance réseau pour écrire. Tout est servi depuis votre machine.",
+      "card.search_title": "Recherche plein texte",
+      "card.search_body": "Cherchez dans les titres, le corps des documents et les idées en une frappe (`Ctrl+P`).",
+      "card.run_title": "Deux façons de le lancer",
+      "card.themes_title": "À votre goût",
+      "card.themes_body": "Des thèmes de couleurs nommés, clonables et réinitialisables, chacun portant sa police d'interface, sa police d'éditeur et son image ou sa vidéo de fond. Importez vos propres polices et icônes, réglez l'espace entre blocs et l'interligne, ou passez la zone d'écriture en page blanche.",
+      "card.media_title": "Les images là où vous les déposez",
+      "card.media_body": "Collez, déposez ou glissez une image sur l'éditeur : elle atterrit dans l'espace de travail, insérée en Markdown à la ligne que vous visiez. Tapez %% n'importe où pour ouvrir la galerie de celles que vous avez déjà.",
+      "card.export_title": "Export",
+      "card.export_body": "Imprimez ou exportez en PDF sous forme de livre, en fichier HTML autonome, ou ressortez en Markdown. Rien de ce que vous écrivez n'est prisonnier de l'application.",
+      "card.portable_title": "Espaces de travail portables",
+      "card.portable_body": "Chaque espace de travail garde ses thèmes, polices, icônes, instantanés et réglages dans un seul dossier caché à sa racine. Copiez le dossier sur un autre disque ou une autre machine, toute la configuration suit.",
+      "card.lock_title": "Verrou",
+      "card.lock_body": "Un clic sur le nom bloque les modifications et les suppressions. Appliqué par le serveur, pas seulement masqué dans l'interface.",
+      "card.run_body": "En fenêtre native sur Windows, macOS et Linux, ou en petit serveur que vous rejoignez depuis n'importe quel navigateur, téléphone ou tablette de votre réseau compris. Même code, même comportement.",
+      "foot.line": "Scriptorium, un éditeur Markdown local et sans distraction."
+    }
+  };
+  var LANGS = [
+    { code: 'en', label: 'English' },
+    { code: 'fr', label: 'Français' }
+  ];
+
+  (function () {
+    var trigger = document.getElementById('langBtn');
+    var menu = document.getElementById('langMenu');
+    var current = document.getElementById('langCurrent');
+    if (!trigger || !menu || !current) return;
+    var english = {};
+
+    function capture() {
+      document.querySelectorAll('[data-t]').forEach(function (el) {
+        english[el.dataset.t] = el.textContent;
+      });
+      document.querySelectorAll('[data-t-html]').forEach(function (el) {
+        english[el.dataset.tHtml] = el.innerHTML;
+      });
+    }
+
+    function apply(lang) {
+      var dict = DICTS[lang] || english;
+      document.querySelectorAll('[data-t]').forEach(function (el) {
+        var value = dict[el.dataset.t];
+        if (value === undefined) value = english[el.dataset.t];
+        if (value !== undefined) el.textContent = value;
+      });
+      document.querySelectorAll('[data-t-html]').forEach(function (el) {
+        var value = dict[el.dataset.tHtml];
+        if (value === undefined) value = english[el.dataset.tHtml];
+        if (value !== undefined) el.innerHTML = value;
+      });
+      document.documentElement.lang = lang;
+      current.textContent = lang.toUpperCase();
+      menu.querySelectorAll('button').forEach(function (b) {
+        b.setAttribute('aria-selected', String(b.dataset.lang === lang));
+      });
+      try { localStorage.setItem('scriptoriumSiteLang', lang); } catch (e) {}
+    }
+
+    function open(state) {
+      menu.hidden = !state;
+      trigger.setAttribute('aria-expanded', String(state));
+    }
+
+    LANGS.forEach(function (lang) {
+      var li = document.createElement('li');
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('role', 'option');
+      button.dataset.lang = lang.code;
+      button.innerHTML = '<span></span><span class="tick">&#10003;</span>';
+      button.firstChild.textContent = lang.label;
+      button.addEventListener('click', function () {
+        apply(lang.code);
+        open(false);
+        trigger.focus();
+      });
+      li.appendChild(button);
+      menu.appendChild(li);
+    });
+
+    trigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      open(menu.hidden);
+    });
+    document.addEventListener('click', function (e) {
+      if (!menu.hidden && !e.target.closest('.lang-picker')) open(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !menu.hidden) { open(false); trigger.focus(); }
+    });
+
+    capture();
+    var saved = null;
+    try { saved = localStorage.getItem('scriptoriumSiteLang'); } catch (e) {}
+    var known = LANGS.map(function (l) { return l.code; });
+    var guess = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    var initial = (saved && known.indexOf(saved) !== -1) ? saved
+      : (known.indexOf(guess) !== -1 ? guess : 'en');
+    apply(initial);
+  })();
+
+  // ---- The title writes itself ----
+  (function () {
+    var word = document.getElementById('heroWord');
+    var dot = document.getElementById('heroDot');
+    var title = document.getElementById('heroTitle');
+    if (!word || !dot || !title) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var START_DELAY = 1000; // The page settles for a second before the first stroke.
+    var PER_LETTER = 95;
+    var letters = word.textContent.split('');
+
+    // The hidden state is set here, never in the stylesheet alone, so a browser
+    // without JavaScript renders the finished title instead of a blank one.
+    title.classList.add('writing');
+    word.textContent = '';
+    letters.forEach(function (letter) {
+      var span = document.createElement('span');
+      span.className = 'ch';
+      span.textContent = letter;
+      word.appendChild(span);
+    });
+    var spans = word.querySelectorAll('.ch');
+
+    setTimeout(function () {
+      spans.forEach(function (span, i) {
+        setTimeout(function () { span.classList.add('inked'); }, i * PER_LETTER);
+      });
+      var written = letters.length * PER_LETTER;
+      // The hand pauses before setting the seal.
+      setTimeout(function () { dot.classList.add('sealed'); }, written + 180);
+      // Once the drop has settled, hand the dot over to its shimmer. Dropping
+      // "writing" first, since that class is what holds the hidden state and
+      // the seal animation is no longer there to override it.
+      setTimeout(function () {
+        title.classList.remove('writing');
+        dot.classList.remove('sealed');
+        dot.classList.add('shimmer');
+      }, written + 1000);
+    }, START_DELAY);
+  })();
 
   // ---- Screenshot carousel ----
   (function () {
