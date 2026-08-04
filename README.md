@@ -57,7 +57,7 @@ macOS on every `v*` version tag. Binaries are on the releases page:
 
 Prebuilt installers are attached to every `v*` release on the releases page.
 Replace `<version>` below with the version you downloaded, for example
-`1.3.0`.
+`1.3.1`.
 
 **Windows**
 
